@@ -1,0 +1,63 @@
+.subagent-branch {
+  margin: 8px 10px;
+  border-left: 3px solid var(--chart-5);
+  padding-left: 12px;
+}
+
+.subagent-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+  text-align: left;
+}
+
+.subagent-toggle:hover {
+  color: var(--accent);
+}
+
+.subagent-icon {
+  font-size: 10px;
+  color: var(--chart-5);
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.subagent-summary {
+  font-weight: 500;
+}
+
+.subagent-model {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.subagent-stats {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.subagent-tool-summary {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  padding-left: 18px;
+}
+
+.subagent-turns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.subagent-turns .playback-step {
+  background-color: var(--bg-primary);
+  border-color: rgba(188, 140, 255, 0.2);
+}

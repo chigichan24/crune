@@ -1,0 +1,189 @@
+.tool-call-block {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.tool-name-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: monospace;
+  text-transform: uppercase;
+}
+
+.tool-name-badge--shell {
+  background-color: rgba(88, 166, 255, 0.2);
+  color: var(--chart-1);
+}
+
+.tool-name-badge--edit {
+  background-color: rgba(63, 185, 80, 0.2);
+  color: var(--chart-2);
+}
+
+.tool-name-badge--read {
+  background-color: rgba(210, 153, 34, 0.2);
+  color: var(--chart-3);
+}
+
+.tool-name-badge--search {
+  background-color: rgba(247, 120, 186, 0.2);
+  color: var(--chart-4);
+}
+
+.tool-name-badge--agent {
+  background-color: rgba(188, 140, 255, 0.2);
+  color: var(--chart-5);
+}
+
+.tool-name-badge--other {
+  background-color: rgba(139, 148, 158, 0.2);
+  color: var(--text-secondary);
+}
+
+/* Input section */
+.tool-input {
+  padding: 8px 10px;
+}
+
+.tool-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.tool-file-path {
+  font-size: 13px;
+  font-family: monospace;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.tool-code-block {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-primary);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Diff view */
+.tool-diff {
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: monospace;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tool-diff--old {
+  background-color: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  color: #ffa198;
+}
+
+.tool-diff--new {
+  background-color: rgba(63, 185, 80, 0.1);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  color: #7ee787;
+}
+
+.tool-pattern {
+  font-family: monospace;
+  font-size: 13px;
+  background-color: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--chart-4);
+}
+
+.tool-search-path {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.tool-agent-type {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  background-color: rgba(188, 140, 255, 0.15);
+  color: var(--chart-5);
+  border-radius: 3px;
+  margin-top: 4px;
+}
+
+.tool-content-length {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* Result section */
+.tool-result {
+  border-top: 1px solid var(--border);
+  padding: 6px 10px;
+}
+
+.tool-result--error {
+  border-left: 3px solid var(--danger);
+}
+
+.tool-result-toggle {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+  transition: color 0.15s;
+}
+
+.tool-result-toggle:hover {
+  color: var(--text-primary);
+}
+
+.tool-result-content {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-primary);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.tool-result--error .tool-result-content {
+  color: var(--danger);
+}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSessionIndex } from './hooks/useSessionIndex'
 import { SessionDashboardView } from './components/overview/SessionDashboardView'
+import { SessionPlayback } from './components/playback/SessionPlayback'
 import './App.css'
 
 type ViewMode = 'overview' | 'playback' | 'knowledge'
@@ -62,11 +63,13 @@ function App() {
           </>
         )}
         {activeTab === 'playback' && (
-          <div className="placeholder">
-            {selectedSessionId
-              ? `Session Playback: ${selectedSessionId} (Phase 5)`
-              : 'Select a session from Overview to start playback'}
-          </div>
+          <SessionPlayback
+            sessionId={selectedSessionId}
+            onBack={() => {
+              setSelectedSessionId(null)
+              setActiveTab('overview')
+            }}
+          />
         )}
         {activeTab === 'knowledge' && (
           <div className="placeholder">Knowledge Graph (Phase 6)</div>

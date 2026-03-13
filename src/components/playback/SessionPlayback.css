@@ -1,0 +1,134 @@
+.session-playback {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.playback-empty,
+.playback-loading,
+.playback-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.playback-error {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Header */
+.playback-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.playback-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.playback-project {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.playback-meta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.playback-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.playback-badge--branch {
+  background-color: rgba(88, 166, 255, 0.15);
+  color: var(--accent);
+}
+
+.playback-badge--duration {
+  background-color: rgba(63, 185, 80, 0.15);
+  color: var(--success);
+}
+
+.playback-badge--slug {
+  background-color: rgba(210, 153, 34, 0.15);
+  color: var(--warning);
+}
+
+.playback-badge--turns {
+  background-color: rgba(188, 140, 255, 0.15);
+  color: var(--chart-5);
+}
+
+.playback-back-button {
+  padding: 6px 14px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.playback-back-button:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+/* Body layout: content + side panel */
+.playback-body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  min-height: 0;
+}
+
+.playback-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+  padding-right: 8px;
+}
+
+/* Scrollbar styling */
+.playback-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.playback-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.playback-content::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+
+.playback-content::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
