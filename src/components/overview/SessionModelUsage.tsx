@@ -9,7 +9,7 @@ interface Props {
   usage: ModelUsageItem[]
 }
 
-const CHART_COLORS = ['#58a6ff', '#3fb950', '#d29922', '#f778ba', '#bc8cff', '#f85149']
+const CHART_COLORS = ['#a78bfa', '#34d399', '#fb923c', '#f472b6', '#60a5fa', '#fbbf24']
 
 export function SessionModelUsage({ usage }: Props) {
   const data = {
@@ -18,7 +18,7 @@ export function SessionModelUsage({ usage }: Props) {
       {
         data: usage.map((u) => u.count),
         backgroundColor: usage.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
-        borderColor: 'var(--bg-secondary)',
+        borderColor: '#ffffff',
         borderWidth: 2,
       },
     ],
@@ -31,17 +31,17 @@ export function SessionModelUsage({ usage }: Props) {
       legend: {
         position: 'right' as const,
         labels: {
-          color: '#8b949e',
+          color: '#8b7aaa',
           font: { size: 11 },
           padding: 12,
           boxWidth: 12,
         },
       },
       tooltip: {
-        backgroundColor: '#21262d',
-        titleColor: '#e6edf3',
-        bodyColor: '#e6edf3',
-        borderColor: '#30363d',
+        backgroundColor: '#ffffff',
+        titleColor: '#3b2960',
+        bodyColor: '#3b2960',
+        borderColor: '#e4d9f5',
         borderWidth: 1,
       },
     },

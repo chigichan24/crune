@@ -1,21 +1,32 @@
 :root {
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #21262d;
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --border: #30363d;
-  --accent: #58a6ff;
-  --accent-hover: #79c0ff;
-  --success: #3fb950;
-  --warning: #d29922;
-  --danger: #f85149;
-  --chart-1: #58a6ff;
-  --chart-2: #3fb950;
-  --chart-3: #d29922;
-  --chart-4: #f778ba;
-  --chart-5: #bc8cff;
-  --chart-6: #f85149;
+  /* Backgrounds — warm lavender whites */
+  --bg-primary: #faf7ff;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3edfc;
+
+  /* Text — soft purple-charcoal */
+  --text-primary: #3b2960;
+  --text-secondary: #8b7aaa;
+
+  /* Borders — pastel */
+  --border: #e4d9f5;
+
+  /* Accent — vivid purple */
+  --accent: #a855f7;
+  --accent-hover: #c084fc;
+
+  /* Status — softer, friendlier */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+
+  /* Chart palette — cotton candy rainbow */
+  --chart-1: #a78bfa;
+  --chart-2: #34d399;
+  --chart-3: #fb923c;
+  --chart-4: #f472b6;
+  --chart-5: #60a5fa;
+  --chart-6: #fbbf24;
 }
 
 * {
@@ -26,7 +37,8 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
-  background-color: var(--bg-primary);
+  background: linear-gradient(135deg, #faf7ff 0%, #fdf2f8 50%, #f0f4ff 100%);
+  background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.5;
   min-height: 100vh;

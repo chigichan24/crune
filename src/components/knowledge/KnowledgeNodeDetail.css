@@ -149,7 +149,7 @@
   margin-top: 4px;
   padding: 8px 16px;
   background-color: var(--accent);
-  color: #ffffff;
+  color: var(--bg-secondary);
   border: none;
   border-radius: 6px;
   font-size: 13px;

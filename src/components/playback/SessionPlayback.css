@@ -28,9 +28,10 @@
   justify-content: space-between;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 16px 20px;
   flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.06);
 }
 
 .playback-header-info {
@@ -61,22 +62,22 @@
 }
 
 .playback-badge--branch {
-  background-color: rgba(88, 166, 255, 0.15);
-  color: var(--accent);
+  background-color: rgba(167, 139, 250, 0.15);
+  color: var(--chart-1);
 }
 
 .playback-badge--duration {
-  background-color: rgba(63, 185, 80, 0.15);
+  background-color: rgba(52, 211, 153, 0.15);
   color: var(--success);
 }
 
 .playback-badge--slug {
-  background-color: rgba(210, 153, 34, 0.15);
+  background-color: rgba(251, 191, 36, 0.15);
   color: var(--warning);
 }
 
 .playback-badge--turns {
-  background-color: rgba(188, 140, 255, 0.15);
+  background-color: rgba(96, 165, 250, 0.15);
   color: var(--chart-5);
 }
 
@@ -181,15 +182,15 @@
 }
 
 .turn-dot--active.turn-dot--blue {
-  box-shadow: 0 0 8px rgba(88, 166, 255, 0.5);
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
 }
 
 .turn-dot--active.turn-dot--orange {
-  box-shadow: 0 0 8px rgba(210, 153, 34, 0.5);
+  box-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
 }
 
 .turn-dot--active.turn-dot--green {
-  box-shadow: 0 0 8px rgba(63, 185, 80, 0.5);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
 }
 
 .turn-line {

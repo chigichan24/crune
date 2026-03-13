@@ -58,6 +58,6 @@
 }
 
 .subagent-turns .playback-step {
-  background-color: var(--bg-primary);
-  border-color: rgba(188, 140, 255, 0.2);
+  background-color: var(--bg-tertiary);
+  border-color: rgba(96, 165, 250, 0.25);
 }

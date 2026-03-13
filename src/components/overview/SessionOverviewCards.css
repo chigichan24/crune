@@ -19,11 +19,18 @@
 .overview-card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.04);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.overview-card:hover {
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.08);
+  transform: translateY(-1px);
 }
 
 .overview-card-value {

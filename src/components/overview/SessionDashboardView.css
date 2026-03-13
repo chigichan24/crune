@@ -32,8 +32,9 @@
 .dashboard-section {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 20px;
+  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.04);
 }
 
 .dashboard-section--wide {

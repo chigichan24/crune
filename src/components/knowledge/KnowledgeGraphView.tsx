@@ -18,20 +18,20 @@ interface Props {
 }
 
 const CHART_COLORS = [
-  '#58a6ff',
-  '#3fb950',
-  '#d29922',
-  '#f778ba',
-  '#bc8cff',
-  '#f85149',
+  '#a78bfa',
+  '#34d399',
+  '#fb923c',
+  '#f472b6',
+  '#60a5fa',
+  '#fbbf24',
 ]
 
 const EDGE_COLORS: Record<EdgeType, string> = {
-  'same-branch': '#58a6ff',
-  'shared-files': '#8b949e',
-  'resume-chain': '#3fb950',
-  'memory-chain': '#d29922',
-  'plan-reference': '#bc8cff',
+  'same-branch': '#a78bfa',
+  'shared-files': '#8b7aaa',
+  'resume-chain': '#34d399',
+  'memory-chain': '#fbbf24',
+  'plan-reference': '#60a5fa',
 }
 
 const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
@@ -308,7 +308,7 @@ export function KnowledgeGraphView({
               graphData={filteredData}
               width={dimensions.width}
               height={dimensions.height}
-              backgroundColor="#0d1117"
+              backgroundColor="#faf7ff"
               nodeLabel={nodeLabel}
               nodeColor={nodeColor}
               nodeVal="val"

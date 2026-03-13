@@ -8,6 +8,7 @@
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   padding: 16px 24px 0;
+  box-shadow: 0 1px 8px rgba(168, 85, 247, 0.06);
 }
 
 .app-brand {
@@ -72,14 +73,15 @@
   color: var(--text-secondary);
   font-size: 16px;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 /* Playback Drawer */
 .playback-drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(59, 41, 96, 0.3);
+  backdrop-filter: blur(4px);
   z-index: 100;
   opacity: 0;
   pointer-events: none;
@@ -104,7 +106,7 @@
   transition: transform 0.3s ease;
   overflow: hidden;
   border-left: 1px solid var(--border);
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  box-shadow: -4px 0 24px rgba(168, 85, 247, 0.1);
 }
 
 .playback-drawer.open {

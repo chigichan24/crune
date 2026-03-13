@@ -1,8 +1,9 @@
 .tacit-knowledge-view {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 16px;
+  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.04);
 }
 
 .tk-title {
@@ -48,7 +49,7 @@
 .tk-card {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 12px;
   min-width: 240px;
   max-width: 320px;
@@ -79,7 +80,7 @@
   display: inline-block;
   font-size: 11px;
   color: var(--accent);
-  background-color: rgba(88, 166, 255, 0.1);
+  background-color: rgba(168, 85, 247, 0.1);
   padding: 2px 8px;
   border-radius: 10px;
   width: fit-content;
@@ -108,7 +109,7 @@
   font-family: monospace;
   font-size: 12px;
   color: var(--text-primary);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-secondary);
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid var(--border);
@@ -137,7 +138,7 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--warning);
-  background-color: rgba(210, 153, 34, 0.1);
+  background-color: rgba(251, 191, 36, 0.12);
   padding: 2px 8px;
   border-radius: 10px;
 }
