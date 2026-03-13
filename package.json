@@ -1,5 +1,5 @@
 {
-  "name": "crune-temp",
+  "name": "crune",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "analyze-sessions": "tsx scripts/analyze-sessions.ts"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
