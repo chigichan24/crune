@@ -45,7 +45,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
   const [page, setPage] = useState(0)
 
   const filtered = useMemo(() => {
-    let result = [...sessions]
+    let result = sessions.filter((s) => (s.turnCount ?? 0) > 0)
 
     if (projectFilter) {
       result = result.filter((s) => s.project === projectFilter)
