@@ -1,0 +1,18 @@
+.tacit-knowledge-view {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.tk-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.tk-placeholder {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
