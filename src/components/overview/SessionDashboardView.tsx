@@ -20,7 +20,7 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
   const { data: overview, loading, error } = useSessionOverview()
 
   if (loading) {
-    return <div className="dashboard-status">Loading overview data...</div>
+    return <div className="dashboard-status">概要データを読み込み中...</div>
   }
 
   if (error) {
@@ -28,7 +28,7 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
   }
 
   if (!overview) {
-    return <div className="dashboard-status">No overview data available.</div>
+    return <div className="dashboard-status">概要データがありません</div>
   }
 
   // overview.json has flat structure (no nested "statistics" key)

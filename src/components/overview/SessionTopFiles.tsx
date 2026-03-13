@@ -9,7 +9,7 @@ export function SessionTopFiles({ files }: Props) {
   const topFiles = files.slice(0, 20)
 
   if (topFiles.length === 0) {
-    return <div className="top-files-empty">No file edits recorded.</div>
+    return <div className="top-files-empty">ファイル編集の記録がありません</div>
   }
 
   return (

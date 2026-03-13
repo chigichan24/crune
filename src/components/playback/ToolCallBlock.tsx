@@ -87,7 +87,7 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
             )}
             {input.contentLength != null && (
               <div className="tool-content-length">
-                {input.contentLength} chars total
+                合計 {input.contentLength} 文字
               </div>
             )}
           </div>
@@ -160,7 +160,7 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
           className="tool-result-toggle"
           onClick={() => setResultOpen(prev => !prev)}
         >
-          {resultOpen ? 'Hide' : 'Show'} result
+          結果を{resultOpen ? '非表示' : '表示'}
         </button>
         {resultOpen && (
           <pre className="tool-result-content">{truncate(resultStr, 2000)}</pre>

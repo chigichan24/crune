@@ -120,7 +120,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
         <input
           className="session-list-input"
           type="text"
-          placeholder="Filter branch..."
+          placeholder="ブランチで絞り込み..."
           value={branchFilter}
           onChange={(e) => { setBranchFilter(e.target.value); setPage(0) }}
         />
@@ -142,14 +142,14 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
         <input
           className="session-list-input session-list-input--search"
           type="text"
-          placeholder="Search prompts..."
+          placeholder="プロンプトを検索..."
           value={searchQuery}
           onChange={(e) => { setSearchQuery(e.target.value); setPage(0) }}
         />
       </div>
 
       <div className="session-list-sort">
-        Sort by:
+        並べ替え:
         {(['date', 'duration', 'tools'] as const).map((key) => (
           <button
             key={key}
@@ -177,7 +177,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
             {paged.length === 0 ? (
               <tr>
                 <td className="session-list-td session-list-empty" colSpan={6}>
-                  No sessions match the current filters.
+                  現在のフィルターに一致するセッションがありません
                 </td>
               </tr>
             ) : (
@@ -222,7 +222,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
             Prev
           </button>
           <span className="session-list-page-info">
-            Page {currentPage + 1} of {totalPages} ({filtered.length} sessions)
+            {currentPage + 1} / {totalPages} ページ（{filtered.length} セッション）
           </span>
           <button
             className="session-list-page-btn"

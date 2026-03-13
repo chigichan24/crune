@@ -35,9 +35,9 @@ const DOT_COLOR_MAP: Record<DotColor, string> = {
 }
 
 const LEGEND_ITEMS: Array<{ color: DotColor; label: string; description: string }> = [
-  { color: 'blue', label: 'Standard', description: 'Code editing, file reading, shell commands' },
-  { color: 'orange', label: 'Planning', description: 'Plan mode or task management turns' },
-  { color: 'green', label: 'Agent', description: 'Spawns subagents for parallel work' },
+  { color: 'blue', label: 'Standard', description: 'コード編集、ファイル読み取り、シェルコマンド' },
+  { color: 'orange', label: 'Planning', description: 'Planモードまたはタスク管理のターン' },
+  { color: 'green', label: 'Agent', description: 'サブエージェントを生成して並列作業' },
 ]
 
 function summarizeTurn(turn: any): string {
@@ -49,7 +49,7 @@ function summarizeTurn(turn: any): string {
   const lines = [
     `Turn ${(turn.turnIndex ?? 0) + 1} — ${category?.label ?? 'Standard'}`,
     prompt ? `"${prompt}${(turn.userPrompt ?? '').length > 80 ? '...' : ''}"` : '',
-    toolCalls.length > 0 ? `Tools (${toolCalls.length}): ${toolNames}` : 'No tool calls',
+    toolCalls.length > 0 ? `Tools (${toolCalls.length}): ${toolNames}` : 'ツール呼び出しなし',
   ]
   return lines.filter(Boolean).join('\n')
 }
@@ -220,15 +220,15 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
   }
 
   if (loading) {
-    return <div className="playback-loading">Loading session...</div>
+    return <div className="playback-loading">セッションを読み込み中...</div>
   }
 
   if (error) {
-    return <div className="playback-error">Error: {error}</div>
+    return <div className="playback-error">エラー: {error}</div>
   }
 
   if (!data) {
-    return <div className="playback-empty">No session data available</div>
+    return <div className="playback-empty">セッションデータがありません</div>
   }
 
   const { meta: rawMeta, turns, subagents } = data

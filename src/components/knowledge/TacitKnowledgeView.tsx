@@ -12,7 +12,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
   if (!knowledge) {
     return (
       <div className="tacit-knowledge-view">
-        <p className="tk-empty">No tacit knowledge data available</p>
+        <p className="tk-empty">暗黙知データがありません</p>
       </div>
     )
   }
@@ -51,7 +51,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
     return (
       <div className="tacit-knowledge-view">
         <h3 className="tk-title">Tacit Knowledge</h3>
-        <p className="tk-empty">No patterns detected yet</p>
+        <p className="tk-empty">パターンはまだ検出されていません</p>
       </div>
     )
   }
@@ -66,7 +66,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Knowledge Silos</h4>
             <p className="tk-section-desc">
-              These topics have no connections to other knowledge areas
+              他の知識領域との接続がないトピックです
             </p>
             <div className="tk-cards">
               {isolatedTopics.map((topic) => (
@@ -91,7 +91,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Bridge Topics</h4>
             <p className="tk-section-desc">
-              These topics connect multiple knowledge domains
+              複数の知識領域をつなぐトピックです
             </p>
             <div className="tk-cards">
               {bridgeTopics.map((topic) => (
@@ -116,7 +116,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Cross-Project Knowledge</h4>
             <p className="tk-section-desc">
-              Topics spanning multiple projects
+              複数プロジェクトにまたがるトピックです
             </p>
             <div className="tk-cards">
               {crossProjectTopics.map((topic) => (
@@ -195,7 +195,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
               {longSessions.map((point: any, i: number) => (
                 <div key={i} className="tk-card tk-card-warning">
                   <div className="tk-pain-header">
-                    <span className="tk-pain-badge">Long Session</span>
+                    <span className="tk-pain-badge">長時間セッション</span>
                     <span className="tk-pain-metric">
                       {Math.round(point.durationMinutes ?? 0)}min
                     </span>
@@ -215,13 +215,13 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
         {/* Pain Points - Hot Files */}
         {hotFiles.length > 0 && (
           <div className="tk-section">
-            <h4 className="tk-section-title">Hot Files (5+ edits in one session)</h4>
+            <h4 className="tk-section-title">Hot Files (1セッション内で5回以上編集)</h4>
             <div className="tk-cards">
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {hotFiles.map((point: any, i: number) => (
                 <div key={i} className="tk-card tk-card-warning">
                   <div className="tk-pain-header">
-                    <span className="tk-pain-badge">Repeated Edits</span>
+                    <span className="tk-pain-badge">繰り返し編集</span>
                     <span className="tk-pain-metric">{point.editCount ?? 0}x</span>
                   </div>
                   <p className="tk-card-description">{point.file ?? ''}</p>

@@ -42,11 +42,11 @@ function formatDuration(minutes: number): string {
 }
 
 function centralityInterpretation(bc: number, dc: number): string {
-  if (bc > 0.2) return 'High bridge: connects multiple knowledge domains'
-  if (bc > 0.05) return 'Moderate bridge: links some domains'
-  if (dc > 0.5) return 'Hub: highly connected topic'
-  if (dc === 0) return 'Isolated: no connections to other topics'
-  return 'Peripheral topic'
+  if (bc > 0.2) return '複数の知識領域をつなぐ重要なブリッジ'
+  if (bc > 0.05) return 'いくつかの領域をつなぐブリッジ'
+  if (dc > 0.5) return '多くのトピックと接続されたハブ'
+  if (dc === 0) return '他のトピックとの接続がない孤立ノード'
+  return '周辺的なトピック'
 }
 
 export function KnowledgeNodeDetail({
@@ -213,7 +213,7 @@ export function KnowledgeNodeDetail({
         <div className="knd-edges-section">
           <span className="knd-field-label">Connected Topics</span>
           {edgesByType.size === 0 ? (
-            <p className="knd-no-edges">No connections</p>
+            <p className="knd-no-edges">接続なし</p>
           ) : (
             Array.from(edgesByType.entries()).map(([type, connections]) => (
               <div key={type} className="knd-edge-group">

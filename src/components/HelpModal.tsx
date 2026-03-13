@@ -29,20 +29,20 @@ const STEPS = [
   {
     number: 1,
     title: 'Clone & install',
-    description: 'Install dependencies for crune.',
+    description: 'cruneの依存パッケージをインストールします。',
     command: 'npm install',
   },
   {
     number: 2,
     title: 'Run data pipeline',
     description:
-      'Analyze your Claude Code session logs and generate visualization data.',
+      'Claude Codeのセッションログを解析し、可視化用データを生成します。',
     command: 'npm run analyze-sessions',
   },
   {
     number: 3,
     title: 'Start dev server',
-    description: 'Launch the local development server to view the dashboard.',
+    description: 'ローカル開発サーバーを起動してダッシュボードを表示します。',
     command: 'npm run dev',
   },
 ]
@@ -67,8 +67,8 @@ export function HelpModal({ onClose }: Props) {
         </div>
 
         <p className="help-intro">
-          crune visualizes your local Claude Code session logs. Run the pipeline
-          to refresh the data whenever you want to see your latest sessions.
+          cruneはローカルのClaude Codeセッションログを可視化するツールです。
+          最新のセッションを確認したいときにパイプラインを再実行してください。
         </p>
 
         <div className="help-steps">
@@ -89,9 +89,8 @@ export function HelpModal({ onClose }: Props) {
 
         <div className="help-note">
           <span className="help-note-label">Note</span>
-          Session logs are read from <code>~/.claude/projects/</code>. The
-          pipeline generates static JSON files under{' '}
-          <code>public/data/sessions/</code>.
+          セッションログは <code>~/.claude/projects/</code> から読み込まれます。
+          パイプラインは <code>public/data/sessions/</code> 配下に静的JSONファイルを生成します。
         </div>
       </div>
     </div>

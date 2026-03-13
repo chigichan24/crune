@@ -251,7 +251,7 @@ export function KnowledgeGraphView({
   if (loading) {
     return (
       <div className="knowledge-graph-view">
-        <div className="kg-loading">Loading knowledge graph...</div>
+        <div className="kg-loading">ナレッジグラフを読み込み中...</div>
       </div>
     )
   }
@@ -259,7 +259,7 @@ export function KnowledgeGraphView({
   if (error) {
     return (
       <div className="knowledge-graph-view">
-        <div className="kg-error">Error: {error}</div>
+        <div className="kg-error">エラー: {error}</div>
       </div>
     )
   }
@@ -267,7 +267,7 @@ export function KnowledgeGraphView({
   if (!overview) {
     return (
       <div className="knowledge-graph-view">
-        <div className="kg-empty">No overview data available</div>
+        <div className="kg-empty">データがありません</div>
       </div>
     )
   }
@@ -402,7 +402,7 @@ export function KnowledgeGraphView({
               />
             ) : (
               <div className="kg-empty">
-                No topics match the current filters
+                現在のフィルターに一致するトピックがありません
               </div>
             )}
           </div>
@@ -447,7 +447,7 @@ export function KnowledgeGraphView({
             )}
             {sidebarTab === 'detail' && !selectedNode && (
               <div className="kg-sidebar-empty">
-                Click a node in the graph to view topic details
+                グラフのノードをクリックするとトピックの詳細が表示されます
               </div>
             )}
           </div>

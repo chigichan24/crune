@@ -41,7 +41,7 @@ export function SubagentBranch({ agentId, session }: Props) {
           {agentType && <span className="subagent-model"> [{agentType}]</span>}
           {model && <span className="subagent-model"> ({model})</span>}
           <span className="subagent-stats">
-            {' \u2014 '}{turns.length} turns, {totalToolCalls} tool calls
+            {' \u2014 '}{turns.length} ターン、{totalToolCalls} ツール呼び出し
           </span>
         </span>
       </button>
