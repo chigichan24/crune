@@ -1,0 +1,155 @@
+.tacit-knowledge-view {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.tk-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.tk-empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.tk-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tk-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tk-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tk-cards {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.tk-card {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  min-width: 240px;
+  max-width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tk-card-warning {
+  border-color: var(--warning);
+  border-left-width: 3px;
+}
+
+.tk-card-description {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.tk-card-evidence {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.tk-card-badge {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--accent);
+  background-color: rgba(88, 166, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  width: fit-content;
+}
+
+/* Tool sequence flow */
+.tk-sequence-flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.tk-sequence-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tk-sequence-arrow {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.tk-tool-name {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.tk-sequence-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tk-sequence-contexts {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Pain points */
+.tk-pain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tk-pain-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--warning);
+  background-color: rgba(210, 153, 34, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.tk-pain-metric {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.tk-pain-session {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}

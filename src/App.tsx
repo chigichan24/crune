@@ -3,6 +3,8 @@ import { useSessionIndex } from './hooks/useSessionIndex'
 import { SessionDashboardView } from './components/overview/SessionDashboardView'
 import { SessionPlayback } from './components/playback/SessionPlayback'
 import './App.css'
+import { KnowledgeGraphView } from './components/knowledge/KnowledgeGraphView'
+import { useSessionOverview } from './hooks/useSessionOverview'
 
 type ViewMode = 'overview' | 'playback' | 'knowledge'
 
@@ -10,6 +12,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<ViewMode>('overview')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const { data: indexData, loading: indexLoading, error: indexError } = useSessionIndex()
+  const { data: overviewData, loading: overviewLoading, error: overviewError } = useSessionOverview()
 
   const handleSessionSelect = (sessionId: string) => {
     setSelectedSessionId(sessionId)
@@ -72,7 +75,12 @@ function App() {
           />
         )}
         {activeTab === 'knowledge' && (
-          <div className="placeholder">Knowledge Graph (Phase 6)</div>
+          <KnowledgeGraphView
+            overview={overviewData}
+            loading={overviewLoading}
+            error={overviewError}
+            onSessionSelect={handleSessionSelect}
+          />
         )}
       </main>
     </div>
