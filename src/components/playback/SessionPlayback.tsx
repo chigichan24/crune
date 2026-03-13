@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSessionDetail } from '../../hooks/useSessionDetail.ts'
 import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
@@ -28,18 +28,77 @@ function getDotColor(turn: any): DotColor {
   return 'blue'
 }
 
+const DOT_COLOR_MAP: Record<DotColor, string> = {
+  blue: 'var(--chart-1)',
+  orange: 'var(--chart-3)',
+  green: 'var(--chart-2)',
+}
+
 export function SessionPlayback({ sessionId, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
   const [activeTurnIndex, setActiveTurnIndex] = useState(0)
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const contentRef = useRef<HTMLDivElement>(null)
+  const minimapRef = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
+
+  // Turn measurements for minimap
+  const [turnMeasurements, setTurnMeasurements] = useState<Array<{ top: number; height: number }>>([])
+  const [scrollInfo, setScrollInfo] = useState({ top: 0, height: 1, client: 1 })
 
   // Reset active turn when session changes
   useEffect(() => {
     setActiveTurnIndex(0)
   }, [sessionId])
 
-  // Scroll active turn into view
+  // Measure turn positions after render
   useEffect(() => {
+    if (!data) return
+    const raf = requestAnimationFrame(() => {
+      const measurements: Array<{ top: number; height: number }> = []
+      for (let i = 0; i < data.turns.length; i++) {
+        const el = turnRefs.current.get(i)
+        if (el) {
+          measurements.push({ top: el.offsetTop, height: el.offsetHeight })
+        }
+      }
+      setTurnMeasurements(measurements)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [data])
+
+  // Track content scroll position
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    const update = () => {
+      setScrollInfo({
+        top: el.scrollTop,
+        height: el.scrollHeight || 1,
+        client: el.clientHeight || 1,
+      })
+    }
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = new ResizeObserver(() => {
+      update()
+      // Re-measure turns on resize
+      const measurements: Array<{ top: number; height: number }> = []
+      turnRefs.current.forEach((turnEl, i) => {
+        measurements[i] = { top: turnEl.offsetTop, height: turnEl.offsetHeight }
+      })
+      setTurnMeasurements(measurements)
+    })
+    ro.observe(el)
+    update()
+    return () => {
+      el.removeEventListener('scroll', update)
+      ro.disconnect()
+    }
+  }, [data])
+
+  // Scroll active turn into view (skip while dragging minimap)
+  useEffect(() => {
+    if (isDragging.current) return
     const el = turnRefs.current.get(activeTurnIndex)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -77,6 +136,63 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
       turnRefs.current.delete(index)
     }
   }, [])
+
+  // Minimap: click to jump
+  const handleMinimapClick = useCallback((e: React.MouseEvent) => {
+    const minimap = minimapRef.current
+    const content = contentRef.current
+    if (!minimap || !content) return
+    const rect = minimap.getBoundingClientRect()
+    const y = e.clientY - rect.top
+    const ratio = y / rect.height
+    const targetScroll = ratio * content.scrollHeight - content.clientHeight / 2
+    content.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' })
+  }, [])
+
+  // Minimap: drag viewport indicator
+  const handleViewportMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    isDragging.current = true
+    const minimap = minimapRef.current
+    const content = contentRef.current
+    if (!minimap || !content) return
+
+    const minimapRect = minimap.getBoundingClientRect()
+    const startY = e.clientY
+    const startScroll = content.scrollTop
+    const scrollRange = content.scrollHeight - content.clientHeight
+
+    const onMouseMove = (me: MouseEvent) => {
+      const dy = me.clientY - startY
+      const scrollDelta = (dy / minimapRect.height) * (scrollRange + content.clientHeight)
+      content.scrollTop = startScroll + scrollDelta
+    }
+
+    const onMouseUp = () => {
+      isDragging.current = false
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [])
+
+  // Compute minimap bar positions (percentage-based)
+  const minimapBars = useMemo(() => {
+    if (turnMeasurements.length === 0 || !data) return []
+    const totalH = scrollInfo.height
+    return turnMeasurements.map((m, i) => ({
+      topPct: (m.top / totalH) * 100,
+      heightPct: Math.max((m.height / totalH) * 100, 0.5),
+      color: getDotColor(data.turns[i]),
+      index: i,
+    }))
+  }, [turnMeasurements, scrollInfo.height, data])
+
+  // Viewport indicator position
+  const viewportTopPct = (scrollInfo.top / scrollInfo.height) * 100
+  const viewportHeightPct = (scrollInfo.client / scrollInfo.height) * 100
 
   if (!sessionId) {
     return null
@@ -134,37 +250,53 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
       </div>
 
       <div className="playback-body">
-        <div className="playback-content">
-          {turns.map((turn, i) => {
-            const dotColor = getDotColor(turn)
-            const isActive = i === activeTurnIndex
-            const isLast = i === turns.length - 1
-            return (
+        {/* Minimap */}
+        <div
+          ref={minimapRef}
+          className="playback-minimap"
+          onClick={handleMinimapClick}
+        >
+          <div className="minimap-bars">
+            {minimapBars.map((bar) => (
               <div
-                key={turn.turnIndex}
-                className="playback-turn"
-                ref={el => setTurnRef(i, el)}
-                onClick={() => setActiveTurnIndex(i)}
-              >
-                <div className="turn-timeline">
-                  <button
-                    className={`turn-dot turn-dot--${dotColor} ${isActive ? 'turn-dot--active' : ''}`}
-                    onClick={(e) => { e.stopPropagation(); setActiveTurnIndex(i) }}
-                    title={`Turn ${turn.turnIndex + 1}`}
-                  />
-                  {!isLast && <div className="turn-line" />}
-                </div>
-                <div className="turn-content">
-                  <PlaybackStep
-                    turn={turn}
-                    isActive={isActive}
-                    subagents={subagents}
-                  />
-                </div>
-              </div>
-            )
-          })}
+                key={bar.index}
+                className={`minimap-bar ${bar.index === activeTurnIndex ? 'minimap-bar--active' : ''}`}
+                style={{
+                  top: `${bar.topPct}%`,
+                  height: `${bar.heightPct}%`,
+                  backgroundColor: DOT_COLOR_MAP[bar.color],
+                }}
+              />
+            ))}
+          </div>
+          <div
+            className="minimap-viewport"
+            style={{
+              top: `${viewportTopPct}%`,
+              height: `${Math.min(viewportHeightPct, 100)}%`,
+            }}
+            onMouseDown={handleViewportMouseDown}
+          />
         </div>
+
+        {/* Turn content */}
+        <div ref={contentRef} className="playback-content">
+          {turns.map((turn, i) => (
+            <div
+              key={turn.turnIndex}
+              className={`playback-turn ${i === activeTurnIndex ? 'playback-turn--active' : ''}`}
+              ref={el => setTurnRef(i, el)}
+              onClick={() => setActiveTurnIndex(i)}
+            >
+              <PlaybackStep
+                turn={turn}
+                isActive={i === activeTurnIndex}
+                subagents={subagents}
+              />
+            </div>
+          ))}
+        </div>
+
         <PlaybackSidePanel detail={data} />
       </div>
     </div>
