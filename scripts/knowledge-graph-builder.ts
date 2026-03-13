@@ -2,7 +2,7 @@
  * knowledge-graph-builder.ts
  *
  * Semantic knowledge graph construction from Claude Code session data.
- * Pipeline: TF-IDF → Agglomerative Clustering → Topic Nodes/Edges → Louvain → Brandes
+ * Pipeline: TF-IDF + Tool-IDF + Structure → SVD (Latent Semantic) → Clustering → Louvain → Brandes
  */
 
 // ─── Input types (subset of analyze-sessions.ts types) ──────────────────────
@@ -363,52 +363,251 @@ function buildStructuralVectors(sessions: SessionInput[]): Map<string, Float64Ar
   return vectors;
 }
 
-// ─── Composite Vector Builder ────────────────────────────────────────────────
+// ─── Truncated SVD (Latent Semantic Analysis) ────────────────────────────────
 
 const WEIGHT_TEXT = 0.50;
 const WEIGHT_TOOL = 0.25;
 const WEIGHT_STRUCT = 0.25;
 
 /**
- * Compute pairwise composite distance matrix using weighted average of
- * per-group cosine distances. This avoids the "curse of dimensionality"
- * that occurs when concatenating high-dimensional sparse text vectors
- * with low-dimensional dense tool/structural vectors.
+ * Build a combined feature matrix from text, tool, and structural vectors.
+ * Each group is L2-normalized, then scaled by its weight before concatenation.
+ * Returns a dense row-major matrix (m × n) and sessionId ordering.
  */
-function buildCompositeDistanceMatrix(
+function buildCombinedMatrix(
   sessionIds: string[],
   textVectors: Map<string, Float64Array>,
   toolVectors: Map<string, Float64Array>,
-  structVectors: Map<string, Float64Array>
-): Map<string, number> {
-  const n = sessionIds.length;
-  const distMatrix = new Map<string, number>();
-  const distKey = (i: number, j: number) => i < j ? `${i}:${j}` : `${j}:${i}`;
+  structVectors: Map<string, Float64Array>,
+  textDim: number,
+  toolDim: number,
+  structDim: number
+): { matrix: Float64Array[]; totalDim: number } {
+  const totalDim = textDim + toolDim + structDim;
+  const wt = Math.sqrt(WEIGHT_TEXT);
+  const wl = Math.sqrt(WEIGHT_TOOL);
+  const ws = Math.sqrt(WEIGHT_STRUCT);
 
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const idI = sessionIds[i];
-      const idJ = sessionIds[j];
+  const matrix: Float64Array[] = [];
+  for (const sid of sessionIds) {
+    const row = new Float64Array(totalDim);
+    const tv = textVectors.get(sid);
+    const lv = toolVectors.get(sid);
+    const sv = structVectors.get(sid);
 
-      const textI = textVectors.get(idI);
-      const textJ = textVectors.get(idJ);
-      const toolI = toolVectors.get(idI);
-      const toolJ = toolVectors.get(idJ);
-      const structI = structVectors.get(idI);
-      const structJ = structVectors.get(idJ);
+    if (tv) for (let i = 0; i < textDim; i++) row[i] = tv[i] * wt;
+    if (lv) for (let i = 0; i < toolDim; i++) row[textDim + i] = lv[i] * wl;
+    if (sv) for (let i = 0; i < structDim; i++) row[textDim + toolDim + i] = sv[i] * ws;
 
-      // Per-group cosine distances (default to 1.0 if missing)
-      const textDist = (textI && textJ) ? cosineDistance(textI, textJ) : 1.0;
-      const toolDist = (toolI && toolJ) ? cosineDistance(toolI, toolJ) : 1.0;
-      const structDist = (structI && structJ) ? cosineDistance(structI, structJ) : 1.0;
+    matrix.push(row);
+  }
 
-      // Weighted average of distances
-      const compositeDist = textDist * WEIGHT_TEXT + toolDist * WEIGHT_TOOL + structDist * WEIGHT_STRUCT;
-      distMatrix.set(distKey(i, j), compositeDist);
+  return { matrix, totalDim };
+}
+
+/**
+ * Truncated SVD via power iteration on A·A^T (the Gram matrix).
+ *
+ * For m sessions × n features where m << n, computing the m×m Gram matrix
+ * and extracting its top-k eigenvectors is far cheaper than full SVD.
+ *
+ * Returns:
+ *   U_k: m × k (left singular vectors, session embeddings)
+ *   sigma: k   (singular values)
+ *   V_k: k × n (right singular vectors, latent topic axes — for interpretation)
+ */
+interface SvdResult {
+  U: Float64Array[];    // m × k
+  sigma: Float64Array;  // k
+  V: Float64Array[];    // k × n (row-major: V[component][feature])
+  k: number;
+  sessionVectors: Map<string, Float64Array>; // sessionId → U·Σ (dense k-dim)
+}
+
+function truncatedSvd(
+  sessionIds: string[],
+  matrix: Float64Array[],
+  totalDim: number,
+  targetK: number
+): SvdResult {
+  const m = matrix.length;
+  const n = totalDim;
+  const k = Math.min(targetK, m - 1, n);
+
+  // Step 1: Compute Gram matrix G = A · A^T (m × m)
+  const G = new Float64Array(m * m);
+  for (let i = 0; i < m; i++) {
+    for (let j = i; j < m; j++) {
+      let dot = 0;
+      for (let d = 0; d < n; d++) {
+        dot += matrix[i][d] * matrix[j][d];
+      }
+      G[i * m + j] = dot;
+      G[j * m + i] = dot;
     }
   }
 
-  return distMatrix;
+  // Step 2: Power iteration with deflation to extract top-k eigenvectors of G
+  const eigenvectors: Float64Array[] = [];
+  const eigenvalues: number[] = [];
+
+  // Seeded PRNG for reproducibility
+  let seed = 42;
+  const nextRand = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+
+  for (let ki = 0; ki < k; ki++) {
+    // Random initial vector
+    const v = new Float64Array(m);
+    for (let i = 0; i < m; i++) v[i] = nextRand() - 0.5;
+
+    // Normalize
+    let norm = 0;
+    for (let i = 0; i < m; i++) norm += v[i] * v[i];
+    norm = Math.sqrt(norm);
+    for (let i = 0; i < m; i++) v[i] /= norm;
+
+    // Power iteration (50 iterations is more than enough for convergence)
+    for (let iter = 0; iter < 50; iter++) {
+      // w = G · v
+      const w = new Float64Array(m);
+      for (let i = 0; i < m; i++) {
+        let s = 0;
+        for (let j = 0; j < m; j++) {
+          s += G[i * m + j] * v[j];
+        }
+        w[i] = s;
+      }
+
+      // Deflate: remove projections onto previously found eigenvectors
+      for (let prev = 0; prev < ki; prev++) {
+        const ev = eigenvectors[prev];
+        let proj = 0;
+        for (let i = 0; i < m; i++) proj += w[i] * ev[i];
+        for (let i = 0; i < m; i++) w[i] -= proj * ev[i];
+      }
+
+      // Normalize
+      norm = 0;
+      for (let i = 0; i < m; i++) norm += w[i] * w[i];
+      norm = Math.sqrt(norm);
+      if (norm < 1e-12) break;
+      for (let i = 0; i < m; i++) v[i] = w[i] / norm;
+    }
+
+    // Eigenvalue = v^T G v
+    let eigenvalue = 0;
+    for (let i = 0; i < m; i++) {
+      let s = 0;
+      for (let j = 0; j < m; j++) s += G[i * m + j] * v[j];
+      eigenvalue += v[i] * s;
+    }
+
+    eigenvectors.push(new Float64Array(v));
+    eigenvalues.push(Math.max(0, eigenvalue));
+  }
+
+  // Step 3: Singular values = sqrt(eigenvalues of G)
+  const sigma = new Float64Array(k);
+  for (let i = 0; i < k; i++) {
+    sigma[i] = Math.sqrt(eigenvalues[i]);
+  }
+
+  // Step 4: Right singular vectors V = A^T · U · Σ^{-1}
+  // V[ki] is a n-dimensional vector
+  const V: Float64Array[] = [];
+  for (let ki = 0; ki < k; ki++) {
+    const vk = new Float64Array(n);
+    if (sigma[ki] > 1e-12) {
+      const invSigma = 1 / sigma[ki];
+      for (let j = 0; j < n; j++) {
+        let s = 0;
+        for (let i = 0; i < m; i++) {
+          s += matrix[i][j] * eigenvectors[ki][i];
+        }
+        vk[j] = s * invSigma;
+      }
+    }
+    V.push(vk);
+  }
+
+  // Step 5: Session vectors = U · Σ (scaled embeddings)
+  const sessionVectors = new Map<string, Float64Array>();
+  for (let i = 0; i < m; i++) {
+    const vec = new Float64Array(k);
+    for (let ki = 0; ki < k; ki++) {
+      vec[ki] = eigenvectors[ki][i] * sigma[ki];
+    }
+    // L2 normalize for cosine-based clustering
+    let norm = 0;
+    for (let d = 0; d < k; d++) norm += vec[d] * vec[d];
+    norm = Math.sqrt(norm);
+    if (norm > 0) for (let d = 0; d < k; d++) vec[d] /= norm;
+
+    sessionVectors.set(sessionIds[i], vec);
+  }
+
+  return { U: eigenvectors, sigma, V, k, sessionVectors };
+}
+
+/**
+ * Interpret latent dimensions from V matrix.
+ * Returns top-N terms per latent dimension, useful for cluster labeling.
+ */
+interface LatentDimension {
+  index: number;
+  varianceRatio: number; // σ² / Σσ² — how much this dimension explains
+  topTerms: { term: string; weight: number }[];
+  topTools: { tool: string; weight: number }[];
+}
+
+function interpretLatentDimensions(
+  svd: SvdResult,
+  textVocabulary: string[],
+  toolVocabulary: string[],
+  textDim: number,
+  toolDim: number,
+  topN: number = 5
+): LatentDimension[] {
+  const totalVariance = svd.sigma.reduce((s, v) => s + v * v, 0);
+  const dimensions: LatentDimension[] = [];
+
+  for (let ki = 0; ki < svd.k; ki++) {
+    const v = svd.V[ki];
+    const varianceRatio = totalVariance > 0
+      ? (svd.sigma[ki] * svd.sigma[ki]) / totalVariance
+      : 0;
+
+    // Top text terms (from text portion of V)
+    const textScored: { term: string; weight: number }[] = [];
+    for (let i = 0; i < textDim && i < textVocabulary.length; i++) {
+      if (Math.abs(v[i]) > 0.01) {
+        textScored.push({ term: textVocabulary[i], weight: Math.abs(v[i]) });
+      }
+    }
+    textScored.sort((a, b) => b.weight - a.weight);
+
+    // Top tools (from tool portion of V)
+    const toolScored: { tool: string; weight: number }[] = [];
+    for (let i = 0; i < toolDim && i < toolVocabulary.length; i++) {
+      const idx = textDim + i;
+      if (Math.abs(v[idx]) > 0.01) {
+        toolScored.push({ tool: toolVocabulary[i], weight: Math.abs(v[idx]) });
+      }
+    }
+    toolScored.sort((a, b) => b.weight - a.weight);
+
+    dimensions.push({
+      index: ki,
+      varianceRatio: Math.round(varianceRatio * 10000) / 10000,
+      topTerms: textScored.slice(0, topN),
+      topTools: toolScored.slice(0, topN),
+    });
+  }
+
+  return dimensions;
 }
 
 // ─── Prompt Generation Helpers ───────────────────────────────────────────────
@@ -981,31 +1180,51 @@ function buildTopicNodes(
 function buildTopicEdges(
   topics: TopicNode[],
   sessions: SessionInput[],
-  tfidf: TfidfResult
+  tfidf: TfidfResult,
+  svd?: SvdResult
 ): TopicEdge[] {
   const edges: TopicEdge[] = [];
   const sessionIndex = new Map<string, SessionInput>();
   for (const s of sessions) sessionIndex.set(s.sessionId, s);
 
-  // Precompute topic centroids
+  // Precompute topic centroids in latent SVD space (if available)
+  // Falls back to TF-IDF centroids if SVD not provided
   const centroids = new Map<string, Float64Array>();
   for (const topic of topics) {
-    const centroid = new Float64Array(tfidf.vocabulary.length);
-    for (const sid of topic.sessionIds) {
-      const vec = tfidf.vectors.get(sid);
-      if (vec) {
-        for (let k = 0; k < centroid.length; k++) centroid[k] += vec[k];
+    if (svd) {
+      // Average SVD session vectors for this topic
+      const centroid = new Float64Array(svd.k);
+      let count = 0;
+      for (const sid of topic.sessionIds) {
+        const vec = svd.sessionVectors.get(sid);
+        if (vec) {
+          for (let k = 0; k < svd.k; k++) centroid[k] += vec[k];
+          count++;
+        }
       }
+      if (count > 0) for (let k = 0; k < svd.k; k++) centroid[k] /= count;
+      // L2 normalize
+      let norm = 0;
+      for (let k = 0; k < svd.k; k++) norm += centroid[k] * centroid[k];
+      norm = Math.sqrt(norm);
+      if (norm > 0) for (let k = 0; k < svd.k; k++) centroid[k] /= norm;
+      centroids.set(topic.id, centroid);
+    } else {
+      // Fallback: TF-IDF centroids
+      const centroid = new Float64Array(tfidf.vocabulary.length);
+      for (const sid of topic.sessionIds) {
+        const vec = tfidf.vectors.get(sid);
+        if (vec) {
+          for (let k = 0; k < centroid.length; k++) centroid[k] += vec[k];
+        }
+      }
+      for (let k = 0; k < centroid.length; k++) centroid[k] /= topic.sessionIds.length;
+      let norm = 0;
+      for (let k = 0; k < centroid.length; k++) norm += centroid[k] * centroid[k];
+      norm = Math.sqrt(norm);
+      if (norm > 0) for (let k = 0; k < centroid.length; k++) centroid[k] /= norm;
+      centroids.set(topic.id, centroid);
     }
-    for (let k = 0; k < centroid.length; k++) centroid[k] /= topic.sessionIds.length;
-    // L2 normalize
-    let norm = 0;
-    for (let k = 0; k < centroid.length; k++) norm += centroid[k] * centroid[k];
-    norm = Math.sqrt(norm);
-    if (norm > 0) {
-      for (let k = 0; k < centroid.length; k++) centroid[k] /= norm;
-    }
-    centroids.set(topic.id, centroid);
   }
 
   for (let i = 0; i < topics.length; i++) {
@@ -1013,7 +1232,7 @@ function buildTopicEdges(
       const ti = topics[i];
       const tj = topics[j];
 
-      // Signal 1: Semantic similarity (centroid cosine)
+      // Signal 1: Latent semantic similarity (SVD or TF-IDF centroid cosine)
       const ci = centroids.get(ti.id)!;
       const cj = centroids.get(tj.id)!;
       const semanticSim = cosineSimilarity(ci, cj);
@@ -1544,33 +1763,66 @@ export function buildSemanticKnowledgeGraph(
     `  [Knowledge Graph] TF-IDF: ${tfidf.vocabulary.length} terms in vocabulary`
   );
 
-  // Step 3: Build composite distance matrix (weighted average of per-group cosine distances)
-  const compositeDist = buildCompositeDistanceMatrix(
+  // Step 3: Build combined matrix and apply Truncated SVD
+  const textDim = tfidf.vocabulary.length;
+  const toolDim = toolIdf.toolVocabulary.length;
+  const { matrix, totalDim } = buildCombinedMatrix(
     sessionIds,
     tfidf.vectors,
     toolIdf.vectors,
-    structVectors
-  );
-  console.log(
-    `  [Knowledge Graph] Composite distance matrix: ${sessionIds.length} sessions, weights text:${WEIGHT_TEXT} tool:${WEIGHT_TOOL} struct:${WEIGHT_STRUCT}`
+    structVectors,
+    textDim,
+    toolDim,
+    STRUCTURAL_DIM
   );
 
-  // Step 4: Clustering on composite distances
+  // Choose k: enough dimensions to capture nuanced clusters.
+  // Use m/4 clamped to [20, 80] — higher than sqrt(m) to preserve more signal.
+  const targetK = Math.min(80, Math.max(20, Math.round(activeSessions.length / 4)));
+  const svd = truncatedSvd(sessionIds, matrix, totalDim, targetK);
+  console.log(
+    `  [Knowledge Graph] SVD: ${totalDim}d → ${svd.k}d latent space (top-3 σ: ${[...svd.sigma.slice(0, 3)].map(s => s.toFixed(2)).join(', ')})`
+  );
+
+  // Interpret latent dimensions (for logging and potential use in labeling)
+  const latentDims = interpretLatentDimensions(
+    svd, tfidf.vocabulary, toolIdf.toolVocabulary, textDim, toolDim, 5
+  );
+  // Log top 3 latent dimensions
+  for (const dim of latentDims.slice(0, 3)) {
+    const terms = dim.topTerms.slice(0, 3).map(t => t.term).join(', ');
+    const tools = dim.topTools.slice(0, 2).map(t => t.tool).join(', ');
+    console.log(
+      `    dim-${dim.index}: var=${(dim.varianceRatio * 100).toFixed(1)}% terms=[${terms}] tools=[${tools}]`
+    );
+  }
+
+  // Step 4: Clustering on dense SVD vectors (cosine distance is now reliable)
   let clusterMembers: number[][];
   if (activeSessions.length < 5) {
-    // Too few: each session is its own topic
     clusterMembers = sessionIds.map((_, i) => [i]);
   } else {
+    // Build distance matrix from SVD session vectors
+    const distKey = (i: number, j: number) => i < j ? `${i}:${j}` : `${j}:${i}`;
+    const svdDist = new Map<string, number>();
+    for (let i = 0; i < sessionIds.length; i++) {
+      const vi = svd.sessionVectors.get(sessionIds[i])!;
+      for (let j = i + 1; j < sessionIds.length; j++) {
+        const vj = svd.sessionVectors.get(sessionIds[j])!;
+        svdDist.set(distKey(i, j), cosineDistance(vi, vj));
+      }
+    }
+
     clusterMembers = agglomerativeClusteringFromDistMatrix(
       sessionIds,
-      compositeDist
+      svdDist
     );
 
-    // Split oversized clusters (> 25% of total) to avoid catch-all topics
+    // Split oversized clusters
     clusterMembers = splitOversizedClusters(
       clusterMembers,
       activeSessions.length,
-      compositeDist
+      svdDist
     );
   }
 
@@ -1578,11 +1830,11 @@ export function buildSemanticKnowledgeGraph(
     `  [Knowledge Graph] Clustering: ${clusterMembers.length} topics from ${activeSessions.length} sessions`
   );
 
-  // Step 5: Build topic nodes (uses TF-IDF for keywords, Tool-IDF for signatures)
+  // Step 5: Build topic nodes
   const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf);
 
-  // Step 6: Build topic edges
-  const edges = buildTopicEdges(topics, activeSessions, tfidf);
+  // Step 6: Build topic edges (using SVD vectors for semantic similarity)
+  const edges = buildTopicEdges(topics, activeSessions, tfidf, svd);
   console.log(`  [Knowledge Graph] Edges: ${edges.length} topic connections`);
 
   // Step 7: Louvain community detection
