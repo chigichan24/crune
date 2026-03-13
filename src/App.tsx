@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import './App.css'
+import { KnowledgeGraphView } from './components/knowledge/KnowledgeGraphView'
+import { useSessionOverview } from './hooks/useSessionOverview'
 
 type ViewMode = 'overview' | 'playback' | 'knowledge'
 
 function App() {
   const [activeTab, setActiveTab] = useState<ViewMode>('overview')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const { data: overviewData, loading: overviewLoading, error: overviewError } = useSessionOverview()
 
   const handleSessionSelect = (sessionId: string) => {
     setSelectedSessionId(sessionId)
@@ -50,7 +53,12 @@ function App() {
           </div>
         )}
         {activeTab === 'knowledge' && (
-          <div className="placeholder">Knowledge Graph (Phase 6)</div>
+          <KnowledgeGraphView
+            overview={overviewData}
+            loading={overviewLoading}
+            error={overviewError}
+            onSessionSelect={handleSessionSelect}
+          />
         )}
       </main>
     </div>
