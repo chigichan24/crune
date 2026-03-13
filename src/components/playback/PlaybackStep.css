@@ -1,0 +1,16 @@
+.playback-step {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  transition: border-color 0.2s;
+}
+
+.playback-step--active {
+  border-color: var(--accent);
+}
+
+.step-placeholder {
+  color: var(--text-secondary);
+  font-size: 14px;
+}

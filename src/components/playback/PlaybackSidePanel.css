@@ -1,0 +1,11 @@
+.playback-side-panel {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.side-panel-placeholder {
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
