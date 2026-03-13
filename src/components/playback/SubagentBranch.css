@@ -1,0 +1,10 @@
+.subagent-branch {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.subagent-placeholder {
+  padding: 8px 10px;
+  border-left: 3px solid var(--chart-5);
+  margin: 8px 10px;
+}
