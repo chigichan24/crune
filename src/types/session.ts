@@ -190,6 +190,10 @@ export interface TopicNode {
   betweennessCentrality: number
   degreeCentrality: number
   communityId: number // Louvain community
+  representativePrompts: string[] // top-3 user prompts closest to cluster centroid
+  suggestedPrompt: string // heuristic template: "action domain — tools: ..."
+  toolSignature: { tool: string; weight: number }[] // top tools by Tool-IDF weight
+  dominantRole: 'user-driven' | 'tool-heavy' | 'subagent-delegated'
 }
 
 export interface TopicEdge {

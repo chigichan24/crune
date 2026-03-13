@@ -128,6 +128,15 @@ export function KnowledgeNodeDetail({
           </div>
         </div>
 
+        {/* Dominant Role Badge */}
+        <div className="knd-role-badge-container">
+          <span className={`knd-role-badge knd-role-badge--${node.dominantRole}`}>
+            {node.dominantRole === 'user-driven' && 'User-Driven'}
+            {node.dominantRole === 'tool-heavy' && 'Tool-Heavy'}
+            {node.dominantRole === 'subagent-delegated' && 'Subagent-Delegated'}
+          </span>
+        </div>
+
         {/* Projects */}
         {node.projects.length > 0 && (
           <div className="knd-field">
@@ -136,6 +145,47 @@ export function KnowledgeNodeDetail({
               {node.projects.join(', ')}
             </span>
           </div>
+        )}
+
+        {/* Suggested Prompt */}
+        {node.suggestedPrompt && (
+          <>
+            <div className="knd-divider" />
+            <div className="knd-field">
+              <span className="knd-field-label">Suggested Prompt</span>
+              <div className="knd-suggested-prompt">{node.suggestedPrompt}</div>
+            </div>
+          </>
+        )}
+
+        {/* Tool Signature */}
+        {node.toolSignature && node.toolSignature.length > 0 && (
+          <div className="knd-field">
+            <span className="knd-field-label">Tool Signature</span>
+            <div className="knd-tool-signature">
+              {node.toolSignature.map((t) => (
+                <span key={t.tool} className="knd-tool-tag">
+                  {t.tool.replace(/^mcp__plugin_[^_]+_[^_]+__/, '')}
+                  <span className="knd-tool-weight">{t.weight.toFixed(1)}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Representative Prompts */}
+        {node.representativePrompts && node.representativePrompts.length > 0 && (
+          <>
+            <div className="knd-divider" />
+            <div className="knd-field">
+              <span className="knd-field-label">Representative Prompts</span>
+              <ul className="knd-prompt-list">
+                {node.representativePrompts.map((p, i) => (
+                  <li key={i} className="knd-prompt-item">{p}</li>
+                ))}
+              </ul>
+            </div>
+          </>
         )}
 
         {/* Centrality */}

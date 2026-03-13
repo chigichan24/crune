@@ -98,6 +98,90 @@
   font-weight: 500;
 }
 
+/* Role badge */
+.knd-role-badge-container {
+  display: flex;
+}
+
+.knd-role-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.knd-role-badge--user-driven {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.knd-role-badge--tool-heavy {
+  background: #f5f5f4;
+  color: #78716c;
+}
+
+.knd-role-badge--subagent-delegated {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+/* Suggested prompt */
+.knd-suggested-prompt {
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: monospace;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+/* Tool signature */
+.knd-tool-signature {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.knd-tool-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.knd-tool-weight {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Representative prompts */
+.knd-prompt-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.knd-prompt-item {
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 8px 10px;
+  line-height: 1.5;
+  word-break: break-word;
+  border-left: 3px solid var(--chart-1);
+}
+
 /* Fields */
 .knd-field {
   display: flex;

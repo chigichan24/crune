@@ -15,6 +15,15 @@ export interface SessionInput {
     assistantTexts: string[];
     toolCalls: { toolName: string; input: Record<string, unknown> }[];
   }[];
+  subagents: Record<string, {
+    agentId: string;
+    agentType: string;
+    turns: {
+      userPrompt: string;
+      assistantTexts: string[];
+      toolCalls: { toolName: string; input: Record<string, unknown> }[];
+    }[];
+  }>;
   meta: {
     sessionId: string;
     createdAt: string;
@@ -23,6 +32,7 @@ export interface SessionInput {
     filesEdited: string[];
     gitBranch: string;
     toolBreakdown: Record<string, number>;
+    subagentCount: number;
   };
 }
 
@@ -49,6 +59,10 @@ export interface TopicNode {
   betweennessCentrality: number;
   degreeCentrality: number;
   communityId: number;
+  representativePrompts: string[];
+  suggestedPrompt: string;
+  toolSignature: { tool: string; weight: number }[];
+  dominantRole: "user-driven" | "tool-heavy" | "subagent-delegated";
 }
 
 export interface TopicEdge {
@@ -199,6 +213,361 @@ export function tokenize(text: string): string[] {
   return tokens;
 }
 
+// ─── Tool-IDF (frequency-bias mitigation) ───────────────────────────────────
+
+interface ToolIdfResult {
+  toolVocabulary: string[];
+  toolVocabIndex: Map<string, number>;
+  toolIdfWeights: Map<string, number>;
+  vectors: Map<string, Float64Array>;
+}
+
+function buildToolIdf(sessions: SessionInput[]): ToolIdfResult {
+  const n = sessions.length;
+
+  // Collect all tool names across sessions
+  const allTools = new Set<string>();
+  const sessionToolCounts = new Map<string, Map<string, number>>();
+
+  for (const s of sessions) {
+    const toolCounts = new Map<string, number>();
+    // Main session tools
+    for (const [tool, count] of Object.entries(s.meta.toolBreakdown)) {
+      toolCounts.set(tool, (toolCounts.get(tool) || 0) + count);
+      allTools.add(tool);
+    }
+    // Subagent tools
+    for (const sub of Object.values(s.subagents)) {
+      for (const turn of sub.turns) {
+        for (const tc of turn.toolCalls) {
+          toolCounts.set(tc.toolName, (toolCounts.get(tc.toolName) || 0) + 1);
+          allTools.add(tc.toolName);
+        }
+      }
+    }
+    sessionToolCounts.set(s.sessionId, toolCounts);
+  }
+
+  // Build vocabulary and IDF
+  const toolVocabulary = [...allTools].sort();
+  const toolVocabIndex = new Map<string, number>();
+  toolVocabulary.forEach((t, i) => toolVocabIndex.set(t, i));
+
+  // Document frequency: how many sessions use each tool
+  const df = new Map<string, number>();
+  for (const [, counts] of sessionToolCounts) {
+    for (const tool of counts.keys()) {
+      df.set(tool, (df.get(tool) || 0) + 1);
+    }
+  }
+
+  // IDF weights
+  const toolIdfWeights = new Map<string, number>();
+  for (const tool of toolVocabulary) {
+    toolIdfWeights.set(tool, Math.log(n / (df.get(tool) || 1)));
+  }
+
+  // Build per-session tool vectors: log(1 + count) * tool_idf, then L2 normalize
+  const vectors = new Map<string, Float64Array>();
+  for (const s of sessions) {
+    const counts = sessionToolCounts.get(s.sessionId)!;
+    const vec = new Float64Array(toolVocabulary.length);
+
+    for (const [tool, count] of counts) {
+      const idx = toolVocabIndex.get(tool);
+      if (idx !== undefined) {
+        vec[idx] = Math.log(1 + count) * (toolIdfWeights.get(tool) || 1);
+      }
+    }
+
+    // L2 normalize
+    let norm = 0;
+    for (let i = 0; i < vec.length; i++) norm += vec[i] * vec[i];
+    norm = Math.sqrt(norm);
+    if (norm > 0) {
+      for (let i = 0; i < vec.length; i++) vec[i] /= norm;
+    }
+
+    vectors.set(s.sessionId, vec);
+  }
+
+  return { toolVocabulary, toolVocabIndex, toolIdfWeights, vectors };
+}
+
+// ─── Structural Features ─────────────────────────────────────────────────────
+
+// 7-dimensional vector: [userRatio, assistantRatio, toolCallRatio,
+//                        subagentRatio, avgToolsPerTurn, editHeaviness, readHeaviness]
+const STRUCTURAL_DIM = 7;
+
+function buildStructuralVectors(sessions: SessionInput[]): Map<string, Float64Array> {
+  const vectors = new Map<string, Float64Array>();
+
+  for (const s of sessions) {
+    const vec = new Float64Array(STRUCTURAL_DIM);
+    const totalTurns = s.turns.length;
+    if (totalTurns === 0) {
+      vectors.set(s.sessionId, vec);
+      continue;
+    }
+
+    // Count roles and tool usage
+    let userCount = 0;
+    let assistantCount = 0;
+    let toolCallCount = 0;
+    let subagentTurns = 0;
+    let totalToolsInTurns = 0;
+
+    for (const turn of s.turns) {
+      if (turn.userPrompt) userCount++;
+      if (turn.assistantTexts.length > 0) assistantCount++;
+      const turnToolCount = turn.toolCalls.length;
+      if (turnToolCount > 0) toolCallCount++;
+      totalToolsInTurns += turnToolCount;
+
+      // Check if any tool call is an Agent call
+      if (turn.toolCalls.some((tc) => tc.toolName === "Agent")) {
+        subagentTurns++;
+      }
+    }
+
+    // Also count subagent involvement from subagents object
+    const subagentCount = Object.keys(s.subagents).length;
+
+    const totalEntries = userCount + assistantCount + toolCallCount || 1;
+    vec[0] = userCount / totalEntries;         // userRatio
+    vec[1] = assistantCount / totalEntries;     // assistantRatio
+    vec[2] = toolCallCount / totalEntries;      // toolCallRatio
+    vec[3] = subagentCount > 0
+      ? Math.min(1, (subagentTurns + subagentCount) / totalTurns)
+      : 0;                                      // subagentRatio
+    vec[4] = Math.log(1 + totalToolsInTurns / totalTurns); // avgToolsPerTurn (log dampened)
+
+    // Edit heaviness vs Read heaviness
+    const tb = s.meta.toolBreakdown;
+    const totalTools = Object.values(tb).reduce((a, b) => a + b, 0) || 1;
+    vec[5] = ((tb["Edit"] || 0) + (tb["Write"] || 0)) / totalTools;  // editHeaviness
+    vec[6] = ((tb["Read"] || 0) + (tb["Grep"] || 0) + (tb["Glob"] || 0)) / totalTools; // readHeaviness
+
+    // L2 normalize
+    let norm = 0;
+    for (let i = 0; i < vec.length; i++) norm += vec[i] * vec[i];
+    norm = Math.sqrt(norm);
+    if (norm > 0) {
+      for (let i = 0; i < vec.length; i++) vec[i] /= norm;
+    }
+
+    vectors.set(s.sessionId, vec);
+  }
+
+  return vectors;
+}
+
+// ─── Composite Vector Builder ────────────────────────────────────────────────
+
+const WEIGHT_TEXT = 0.50;
+const WEIGHT_TOOL = 0.25;
+const WEIGHT_STRUCT = 0.25;
+
+/**
+ * Compute pairwise composite distance matrix using weighted average of
+ * per-group cosine distances. This avoids the "curse of dimensionality"
+ * that occurs when concatenating high-dimensional sparse text vectors
+ * with low-dimensional dense tool/structural vectors.
+ */
+function buildCompositeDistanceMatrix(
+  sessionIds: string[],
+  textVectors: Map<string, Float64Array>,
+  toolVectors: Map<string, Float64Array>,
+  structVectors: Map<string, Float64Array>
+): Map<string, number> {
+  const n = sessionIds.length;
+  const distMatrix = new Map<string, number>();
+  const distKey = (i: number, j: number) => i < j ? `${i}:${j}` : `${j}:${i}`;
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const idI = sessionIds[i];
+      const idJ = sessionIds[j];
+
+      const textI = textVectors.get(idI);
+      const textJ = textVectors.get(idJ);
+      const toolI = toolVectors.get(idI);
+      const toolJ = toolVectors.get(idJ);
+      const structI = structVectors.get(idI);
+      const structJ = structVectors.get(idJ);
+
+      // Per-group cosine distances (default to 1.0 if missing)
+      const textDist = (textI && textJ) ? cosineDistance(textI, textJ) : 1.0;
+      const toolDist = (toolI && toolJ) ? cosineDistance(toolI, toolJ) : 1.0;
+      const structDist = (structI && structJ) ? cosineDistance(structI, structJ) : 1.0;
+
+      // Weighted average of distances
+      const compositeDist = textDist * WEIGHT_TEXT + toolDist * WEIGHT_TOOL + structDist * WEIGHT_STRUCT;
+      distMatrix.set(distKey(i, j), compositeDist);
+    }
+  }
+
+  return distMatrix;
+}
+
+// ─── Prompt Generation Helpers ───────────────────────────────────────────────
+
+const ACTION_VERBS_EN = new Set([
+  "fix", "add", "implement", "create", "update", "refactor", "remove",
+  "delete", "move", "rename", "test", "debug", "optimize", "migrate",
+  "deploy", "configure", "setup", "integrate", "build", "review",
+  "investigate", "analyze", "check", "resolve", "extract", "convert",
+]);
+
+const ACTION_VERBS_JA: [RegExp, string][] = [
+  [/修正/, "fix"], [/追加/, "add"], [/実装/, "implement"],
+  [/作成|作って/, "create"], [/更新/, "update"], [/リファクタ/, "refactor"],
+  [/削除/, "remove"], [/テスト/, "test"], [/デバッグ/, "debug"],
+  [/最適化/, "optimize"], [/移行|マイグレ/, "migrate"],
+  [/設定|セットアップ/, "configure"], [/統合/, "integrate"],
+  [/ビルド/, "build"], [/レビュー/, "review"], [/調査/, "investigate"],
+  [/確認|チェック/, "check"], [/解決/, "resolve"],
+];
+
+function extractDominantAction(prompts: string[]): string {
+  const actionCounts = new Map<string, number>();
+
+  for (const prompt of prompts) {
+    const lower = prompt.toLowerCase();
+    // English verbs
+    const words = lower.split(/\s+/);
+    for (const w of words) {
+      const clean = w.replace(/[^a-z]/g, "");
+      if (ACTION_VERBS_EN.has(clean)) {
+        actionCounts.set(clean, (actionCounts.get(clean) || 0) + 1);
+      }
+    }
+    // Japanese verbs
+    for (const [pattern, verb] of ACTION_VERBS_JA) {
+      if (pattern.test(prompt)) {
+        actionCounts.set(verb, (actionCounts.get(verb) || 0) + 1);
+      }
+    }
+  }
+
+  if (actionCounts.size === 0) return "work on";
+  return [...actionCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function selectRepresentativePrompts(
+  memberSessions: SessionInput[],
+  clusterCentroid: Float64Array,
+  tfidfResult: TfidfResult,
+  maxCount: number = 3
+): string[] {
+  const scored: { prompt: string; score: number }[] = [];
+
+  for (const s of memberSessions) {
+    const sessionVec = tfidfResult.vectors.get(s.sessionId);
+    if (!sessionVec) continue;
+
+    const sim = cosineSimilarity(sessionVec, clusterCentroid);
+
+    for (const turn of s.turns) {
+      if (turn.userPrompt && turn.userPrompt.length > 10) {
+        scored.push({ prompt: turn.userPrompt, score: sim });
+      }
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // Deduplicate similar prompts
+  const selected: string[] = [];
+  for (const { prompt } of scored) {
+    const trimmed = prompt.length > 150 ? prompt.slice(0, 150) + "..." : prompt;
+    if (!selected.some((s) => s === trimmed)) {
+      selected.push(trimmed);
+      if (selected.length >= maxCount) break;
+    }
+  }
+
+  return selected;
+}
+
+function generateSuggestedPrompt(
+  memberSessions: SessionInput[],
+  keywords: string[],
+  toolIdf: ToolIdfResult
+): string {
+  // Collect all user prompts
+  const allPrompts = memberSessions.flatMap((s) =>
+    s.turns.map((t) => t.userPrompt).filter(Boolean)
+  );
+
+  // Extract dominant action
+  const action = extractDominantAction(allPrompts);
+
+  // Domain keywords (top 3)
+  const domain = keywords.slice(0, 3).join("/");
+
+  // Top tools by Tool-IDF weighted usage in this cluster
+  const clusterToolCounts = new Map<string, number>();
+  for (const s of memberSessions) {
+    for (const [tool, count] of Object.entries(s.meta.toolBreakdown)) {
+      clusterToolCounts.set(tool, (clusterToolCounts.get(tool) || 0) + count);
+    }
+  }
+  const toolScores = [...clusterToolCounts.entries()].map(([tool, count]) => ({
+    tool,
+    score: Math.log(1 + count) * (toolIdf.toolIdfWeights.get(tool) || 1),
+  }));
+  toolScores.sort((a, b) => b.score - a.score);
+  const topTools = toolScores.slice(0, 3).map((t) => t.tool);
+
+  return `${action} ${domain} — tools: ${topTools.join(", ")}`;
+}
+
+function computeToolSignature(
+  memberSessions: SessionInput[],
+  toolIdf: ToolIdfResult
+): { tool: string; weight: number }[] {
+  const clusterToolCounts = new Map<string, number>();
+  for (const s of memberSessions) {
+    for (const [tool, count] of Object.entries(s.meta.toolBreakdown)) {
+      clusterToolCounts.set(tool, (clusterToolCounts.get(tool) || 0) + count);
+    }
+  }
+
+  const scored = [...clusterToolCounts.entries()].map(([tool, count]) => ({
+    tool,
+    weight: Math.round(Math.log(1 + count) * (toolIdf.toolIdfWeights.get(tool) || 1) * 100) / 100,
+  }));
+  scored.sort((a, b) => b.weight - a.weight);
+  return scored.slice(0, 5);
+}
+
+function classifyDominantRole(
+  memberSessions: SessionInput[]
+): "user-driven" | "tool-heavy" | "subagent-delegated" {
+  let totalUserTurns = 0;
+  let totalToolCalls = 0;
+  let totalSubagentCalls = 0;
+
+  for (const s of memberSessions) {
+    for (const turn of s.turns) {
+      if (turn.userPrompt) totalUserTurns++;
+      totalToolCalls += turn.toolCalls.length;
+      totalSubagentCalls += turn.toolCalls.filter((tc) => tc.toolName === "Agent").length;
+    }
+    totalSubagentCalls += Object.keys(s.subagents).length;
+  }
+
+  const total = totalUserTurns + totalToolCalls + totalSubagentCalls || 1;
+  const subagentRatio = totalSubagentCalls / total;
+  const toolRatio = totalToolCalls / total;
+
+  if (subagentRatio > 0.15) return "subagent-delegated";
+  if (toolRatio > 0.6) return "tool-heavy";
+  return "user-driven";
+}
+
 // ─── TF-IDF ─────────────────────────────────────────────────────────────────
 
 interface TfidfResult {
@@ -285,48 +654,32 @@ function cosineDistance(a: Float64Array, b: Float64Array): number {
 
 // ─── Agglomerative Clustering (Average Linkage) ────────────────────────────
 
-interface Cluster {
-  members: number[]; // indices into sessionIds array
-  centroid: Float64Array;
-}
-
-function agglomerativeClustering(
+function agglomerativeClusteringFromDistMatrix(
   sessionIds: string[],
-  vectors: Map<string, Float64Array>,
-  vocabSize: number
+  precomputedDist: Map<string, number>
 ): number[][] {
   const n = sessionIds.length;
   if (n === 0) return [];
   if (n === 1) return [[0]];
 
   // Initialize: each session is its own cluster
-  const clusters: Cluster[] = sessionIds.map((id, _i) => ({
-    members: [_i],
-    centroid: new Float64Array(vectors.get(id) || new Float64Array(vocabSize)),
-  }));
+  const clusterMembers: number[][] = [];
+  for (let i = 0; i < n; i++) clusterMembers.push([i]);
 
   // Track active clusters
   const active = new Set<number>();
   for (let i = 0; i < n; i++) active.add(i);
 
-  // Precompute distance matrix (upper triangle)
-  const distMatrix = new Map<string, number>();
+  // Copy precomputed distances (will be updated during merges)
+  const distMatrix = new Map<string, number>(precomputedDist);
   const distKey = (i: number, j: number) =>
     i < j ? `${i}:${j}` : `${j}:${i}`;
-
-  for (const i of active) {
-    for (const j of active) {
-      if (i >= j) continue;
-      distMatrix.set(distKey(i, j), cosineDistance(clusters[i].centroid, clusters[j].centroid));
-    }
-  }
 
   // Merge history for elbow detection
   const mergeDistances: number[] = [];
 
   // Iteratively merge closest pair
   while (active.size > 1) {
-    // Find closest pair
     let minDist = Infinity;
     let mergeI = -1;
     let mergeJ = -1;
@@ -346,35 +699,20 @@ function agglomerativeClustering(
     if (mergeI === -1) break;
     mergeDistances.push(minDist);
 
-    // Merge j into i
-    const ci = clusters[mergeI];
-    const cj = clusters[mergeJ];
-    const newSize = ci.members.length + cj.members.length;
+    // Merge j into i (average linkage: weighted average of distances)
+    const sizeI = clusterMembers[mergeI].length;
+    const sizeJ = clusterMembers[mergeJ].length;
+    const newSize = sizeI + sizeJ;
 
-    // Update centroid (weighted average)
-    const newCentroid = new Float64Array(vocabSize);
-    for (let k = 0; k < vocabSize; k++) {
-      newCentroid[k] =
-        (ci.centroid[k] * ci.members.length +
-          cj.centroid[k] * cj.members.length) /
-        newSize;
-    }
-    // L2 normalize centroid
-    let norm = 0;
-    for (let k = 0; k < vocabSize; k++) norm += newCentroid[k] * newCentroid[k];
-    norm = Math.sqrt(norm);
-    if (norm > 0) {
-      for (let k = 0; k < vocabSize; k++) newCentroid[k] /= norm;
-    }
-
-    ci.members.push(...cj.members);
-    ci.centroid = newCentroid;
-
-    // Remove j, update distances for i
+    clusterMembers[mergeI].push(...clusterMembers[mergeJ]);
     active.delete(mergeJ);
+
+    // Update distances using average linkage formula
     for (const k of active) {
       if (k === mergeI) continue;
-      const newDist = cosineDistance(ci.centroid, clusters[k].centroid);
+      const distIK = distMatrix.get(distKey(mergeI, k)) ?? 1.0;
+      const distJK = distMatrix.get(distKey(mergeJ, k)) ?? 1.0;
+      const newDist = (distIK * sizeI + distJK * sizeJ) / newSize;
       distMatrix.set(distKey(mergeI, k), newDist);
     }
   }
@@ -382,8 +720,8 @@ function agglomerativeClustering(
   // Find elbow: cut point where merging starts getting expensive
   const threshold = findElbowThreshold(mergeDistances);
 
-  // Re-run clustering with threshold
-  return clusterWithThreshold(sessionIds, vectors, vocabSize, threshold);
+  // Re-run clustering with threshold using precomputed distances
+  return clusterWithThresholdFromDistMatrix(n, precomputedDist, threshold);
 }
 
 function findElbowThreshold(distances: number[]): number {
@@ -406,37 +744,23 @@ function findElbowThreshold(distances: number[]): number {
   return Math.max(0.3, Math.min(0.9, threshold));
 }
 
-function clusterWithThreshold(
-  sessionIds: string[],
-  vectors: Map<string, Float64Array>,
-  vocabSize: number,
+function clusterWithThresholdFromDistMatrix(
+  n: number,
+  precomputedDist: Map<string, number>,
   threshold: number
 ): number[][] {
-  const n = sessionIds.length;
   if (n === 0) return [];
   if (n === 1) return [[0]];
 
-  const clusters: Cluster[] = sessionIds.map((id) => ({
-    members: [sessionIds.indexOf(id)],
-    centroid: new Float64Array(vectors.get(id) || new Float64Array(vocabSize)),
-  }));
+  const clusterMembers: number[][] = [];
+  for (let i = 0; i < n; i++) clusterMembers.push([i]);
 
   const active = new Set<number>();
   for (let i = 0; i < n; i++) active.add(i);
 
   const distKey = (i: number, j: number) =>
     i < j ? `${i}:${j}` : `${j}:${i}`;
-  const distMatrix = new Map<string, number>();
-
-  for (const i of active) {
-    for (const j of active) {
-      if (i >= j) continue;
-      distMatrix.set(
-        distKey(i, j),
-        cosineDistance(clusters[i].centroid, clusters[j].centroid)
-      );
-    }
-  }
+  const distMatrix = new Map<string, number>(precomputedDist);
 
   while (active.size > 1) {
     let minDist = Infinity;
@@ -457,38 +781,84 @@ function clusterWithThreshold(
 
     if (mergeI === -1 || minDist > threshold) break;
 
-    const ci = clusters[mergeI];
-    const cj = clusters[mergeJ];
-    const newSize = ci.members.length + cj.members.length;
+    // Average linkage merge
+    const sizeI = clusterMembers[mergeI].length;
+    const sizeJ = clusterMembers[mergeJ].length;
+    const newSize = sizeI + sizeJ;
 
-    const newCentroid = new Float64Array(vocabSize);
-    for (let k = 0; k < vocabSize; k++) {
-      newCentroid[k] =
-        (ci.centroid[k] * ci.members.length +
-          cj.centroid[k] * cj.members.length) /
-        newSize;
-    }
-    let norm = 0;
-    for (let k = 0; k < vocabSize; k++) norm += newCentroid[k] * newCentroid[k];
-    norm = Math.sqrt(norm);
-    if (norm > 0) {
-      for (let k = 0; k < vocabSize; k++) newCentroid[k] /= norm;
-    }
-
-    ci.members.push(...cj.members);
-    ci.centroid = newCentroid;
+    clusterMembers[mergeI].push(...clusterMembers[mergeJ]);
     active.delete(mergeJ);
 
     for (const k of active) {
       if (k === mergeI) continue;
-      distMatrix.set(
-        distKey(mergeI, k),
-        cosineDistance(ci.centroid, clusters[k].centroid)
-      );
+      const distIK = distMatrix.get(distKey(mergeI, k)) ?? 1.0;
+      const distJK = distMatrix.get(distKey(mergeJ, k)) ?? 1.0;
+      const newDist = (distIK * sizeI + distJK * sizeJ) / newSize;
+      distMatrix.set(distKey(mergeI, k), newDist);
     }
   }
 
-  return [...active].map((i) => clusters[i].members);
+  return [...active].map((i) => clusterMembers[i]);
+}
+
+/**
+ * Split oversized clusters by re-clustering their members with a stricter
+ * (halved) threshold. This prevents a single catch-all cluster from
+ * dominating the graph when the global elbow threshold is too loose.
+ *
+ * maxClusterRatio: a cluster with > (totalSessions * ratio) members is re-split.
+ * Default 0.25 = 25% of all sessions.
+ */
+function splitOversizedClusters(
+  clusters: number[][],
+  totalSessions: number,
+  precomputedDist: Map<string, number>,
+  maxClusterRatio: number = 0.25
+): number[][] {
+  const maxSize = Math.max(10, Math.floor(totalSessions * maxClusterRatio));
+  const result: number[][] = [];
+
+  for (const members of clusters) {
+    if (members.length <= maxSize) {
+      result.push(members);
+      continue;
+    }
+
+    // Extract sub-distance-matrix for this cluster's members
+    const n = members.length;
+    const subDist = new Map<string, number>();
+    const distKey = (i: number, j: number) => i < j ? `${i}:${j}` : `${j}:${i}`;
+    const origDistKey = (i: number, j: number) => i < j ? `${i}:${j}` : `${j}:${i}`;
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const origI = members[i];
+        const origJ = members[j];
+        const d = precomputedDist.get(origDistKey(origI, origJ)) ?? 1.0;
+        subDist.set(distKey(i, j), d);
+      }
+    }
+
+    // Find sub-elbow threshold from this cluster's internal distances
+    const internalDists: number[] = [];
+    for (const [, d] of subDist) {
+      internalDists.push(d);
+    }
+    internalDists.sort((a, b) => a - b);
+
+    // Use a stricter threshold: median of internal distances
+    const medianDist = internalDists[Math.floor(internalDists.length / 2)] ?? 0.5;
+    const subThreshold = Math.max(0.15, medianDist * 0.8);
+
+    const subClusters = clusterWithThresholdFromDistMatrix(n, subDist, subThreshold);
+
+    // Map sub-cluster indices back to original indices
+    for (const subMembers of subClusters) {
+      result.push(subMembers.map((i) => members[i]));
+    }
+  }
+
+  return result;
 }
 
 // ─── Topic Node Construction ────────────────────────────────────────────────
@@ -496,7 +866,8 @@ function clusterWithThreshold(
 function buildTopicNodes(
   clusterMembers: number[][],
   sessions: SessionInput[],
-  tfidf: TfidfResult
+  tfidf: TfidfResult,
+  toolIdf: ToolIdfResult
 ): TopicNode[] {
   const topics: TopicNode[] = [];
 
@@ -504,7 +875,7 @@ function buildTopicNodes(
     const members = clusterMembers[ci];
     const memberSessions = members.map((idx) => sessions[idx]);
 
-    // Compute cluster centroid
+    // Compute cluster centroid (TF-IDF text only, for keyword extraction)
     const centroid = new Float64Array(tfidf.vocabulary.length);
     for (const idx of members) {
       const vec = tfidf.vectors.get(sessions[idx].sessionId);
@@ -561,6 +932,25 @@ function buildTopicNodes(
       .filter(Boolean)
       .sort();
 
+    // New fields: prompts, tool signature, role classification
+    // L2 normalize centroid for prompt selection
+    let centroidNorm = 0;
+    for (let k = 0; k < centroid.length; k++) centroidNorm += centroid[k] * centroid[k];
+    centroidNorm = Math.sqrt(centroidNorm);
+    const normalizedCentroid = new Float64Array(centroid.length);
+    if (centroidNorm > 0) {
+      for (let k = 0; k < centroid.length; k++) normalizedCentroid[k] = centroid[k] / centroidNorm;
+    }
+
+    const representativePrompts = selectRepresentativePrompts(
+      memberSessions, normalizedCentroid, tfidf
+    );
+    const suggestedPrompt = generateSuggestedPrompt(
+      memberSessions, keywords, toolIdf
+    );
+    const toolSignature = computeToolSignature(memberSessions, toolIdf);
+    const dominantRole = classifyDominantRole(memberSessions);
+
     topics.push({
       id: `topic-${String(ci + 1).padStart(3, "0")}`,
       label,
@@ -576,6 +966,10 @@ function buildTopicNodes(
       betweennessCentrality: 0, // computed later
       degreeCentrality: 0, // computed later
       communityId: -1, // computed later
+      representativePrompts,
+      suggestedPrompt,
+      toolSignature,
+      dominantRole,
     });
   }
 
@@ -1067,7 +1461,7 @@ export function buildSemanticKnowledgeGraph(
     };
   }
 
-  // Step 1: Extract session documents
+  // Step 1: Extract session text documents (for TF-IDF)
   const documents = new Map<string, string[]>();
   for (const session of sessions) {
     const textParts: string[] = [];
@@ -1102,12 +1496,25 @@ export function buildSemanticKnowledgeGraph(
   const activeSessions = sessions.filter((s) => documents.has(s.sessionId));
   const sessionIds = activeSessions.map((s) => s.sessionId);
 
+  // Step 1b: Build Tool-IDF and Structural vectors (always needed, even for single topic)
+  const toolIdf = buildToolIdf(activeSessions);
+  console.log(
+    `  [Knowledge Graph] Tool-IDF: ${toolIdf.toolVocabulary.length} tool types`
+  );
+
+  const structVectors = buildStructuralVectors(activeSessions);
+  console.log(
+    `  [Knowledge Graph] Structural features: ${STRUCTURAL_DIM} dimensions`
+  );
+
   if (activeSessions.length < 2) {
     // Single session: create one topic
+    const emptyTfidf: TfidfResult = { vocabulary: [], vocabIndex: new Map(), vectors: new Map() };
     const singleTopic = buildTopicNodes(
       [sessionIds.map((_, i) => i)],
       activeSessions,
-      { vocabulary: [], vocabIndex: new Map(), vectors: new Map() }
+      emptyTfidf,
+      toolIdf
     );
     return {
       nodes: singleTopic,
@@ -1131,22 +1538,39 @@ export function buildSemanticKnowledgeGraph(
     };
   }
 
-  // Step 2-3: TF-IDF
+  // Step 2: TF-IDF (text features)
   const tfidf = buildTfidf(documents);
   console.log(
     `  [Knowledge Graph] TF-IDF: ${tfidf.vocabulary.length} terms in vocabulary`
   );
 
-  // Step 4: Clustering
+  // Step 3: Build composite distance matrix (weighted average of per-group cosine distances)
+  const compositeDist = buildCompositeDistanceMatrix(
+    sessionIds,
+    tfidf.vectors,
+    toolIdf.vectors,
+    structVectors
+  );
+  console.log(
+    `  [Knowledge Graph] Composite distance matrix: ${sessionIds.length} sessions, weights text:${WEIGHT_TEXT} tool:${WEIGHT_TOOL} struct:${WEIGHT_STRUCT}`
+  );
+
+  // Step 4: Clustering on composite distances
   let clusterMembers: number[][];
   if (activeSessions.length < 5) {
     // Too few: each session is its own topic
     clusterMembers = sessionIds.map((_, i) => [i]);
   } else {
-    clusterMembers = agglomerativeClustering(
+    clusterMembers = agglomerativeClusteringFromDistMatrix(
       sessionIds,
-      tfidf.vectors,
-      tfidf.vocabulary.length
+      compositeDist
+    );
+
+    // Split oversized clusters (> 25% of total) to avoid catch-all topics
+    clusterMembers = splitOversizedClusters(
+      clusterMembers,
+      activeSessions.length,
+      compositeDist
     );
   }
 
@@ -1154,8 +1578,8 @@ export function buildSemanticKnowledgeGraph(
     `  [Knowledge Graph] Clustering: ${clusterMembers.length} topics from ${activeSessions.length} sessions`
   );
 
-  // Step 5: Build topic nodes
-  const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf);
+  // Step 5: Build topic nodes (uses TF-IDF for keywords, Tool-IDF for signatures)
+  const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf);
 
   // Step 6: Build topic edges
   const edges = buildTopicEdges(topics, activeSessions, tfidf);

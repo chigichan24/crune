@@ -823,6 +823,23 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
         input: tc.input,
       })),
     })),
+    subagents: Object.fromEntries(
+      Object.entries(s.subagents).map(([id, sub]) => [
+        id,
+        {
+          agentId: sub.agentId,
+          agentType: sub.agentType,
+          turns: sub.turns.map((t) => ({
+            userPrompt: t.userPrompt,
+            assistantTexts: t.assistantTexts,
+            toolCalls: t.toolCalls.map((tc) => ({
+              toolName: tc.toolName,
+              input: tc.input,
+            })),
+          })),
+        },
+      ])
+    ),
     meta: {
       sessionId: s.meta.sessionId,
       createdAt: s.meta.createdAt,
@@ -831,6 +848,7 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
       filesEdited: s.meta.filesEdited,
       gitBranch: s.meta.gitBranch,
       toolBreakdown: s.meta.toolBreakdown,
+      subagentCount: s.meta.subagentCount,
     },
   }));
   const knowledgeGraph = buildSemanticKnowledgeGraph(sessionInputs);
