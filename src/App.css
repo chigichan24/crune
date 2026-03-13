@@ -10,6 +10,17 @@
   padding: 16px 24px 0;
 }
 
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-logo {
+  width: 32px;
+  height: 32px;
+}
+
 .app-title {
   font-size: 20px;
   font-weight: 600;

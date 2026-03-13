@@ -22,8 +22,13 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1 className="app-title">crune</h1>
-        <p className="app-subtitle">Claude Code Session Visualizer</p>
+        <div className="app-brand">
+          <img src="/favicon.svg" alt="crune logo" className="app-logo" />
+          <div>
+            <h1 className="app-title">crune</h1>
+            <p className="app-subtitle">Claude Code Rune — Decode Your Sessions</p>
+          </div>
+        </div>
         <nav className="tab-nav">
           <button
             className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
