@@ -1,0 +1,6 @@
+.model-usage-chart {
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

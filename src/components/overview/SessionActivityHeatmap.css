@@ -1,0 +1,78 @@
+.heatmap-container {
+  position: relative;
+}
+
+.heatmap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.heatmap-spacer {
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.heatmap-row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.heatmap-row:first-of-type {
+  /* hour labels row handled separately */
+}
+
+.heatmap-grid > .heatmap-spacer,
+.heatmap-grid > .heatmap-hour-label {
+  display: none;
+}
+
+/* Hour labels as a header row */
+.heatmap-grid::before {
+  content: none;
+}
+
+.heatmap-day-label {
+  width: 36px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+  padding-right: 6px;
+}
+
+.heatmap-cell {
+  flex: 1;
+  aspect-ratio: 1;
+  min-width: 12px;
+  max-width: 24px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: outline 0.1s;
+}
+
+.heatmap-cell:hover {
+  outline: 1px solid var(--text-secondary);
+  outline-offset: 1px;
+}
+
+.heatmap-hour-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.heatmap-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+}

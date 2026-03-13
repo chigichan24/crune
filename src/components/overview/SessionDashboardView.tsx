@@ -1,6 +1,11 @@
 import type { SessionSummary, ProjectSummary } from '../../types'
 import { useSessionOverview } from '../../hooks/useSessionOverview'
 import { SessionOverviewCards } from './SessionOverviewCards'
+import { SessionActivityHeatmap } from './SessionActivityHeatmap'
+import { SessionProjectDistribution } from './SessionProjectDistribution'
+import { SessionModelUsage } from './SessionModelUsage'
+import { SessionToolTrends } from './SessionToolTrends'
+import { SessionDurationDistribution } from './SessionDurationDistribution'
 import './SessionDashboardView.css'
 
 interface Props {
@@ -26,8 +31,7 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
 
   const { statistics } = overview
 
-  // Will be used in subsequent commits for chart components
-  void statistics
+  // Will be used in the next commit for top files table and session list
   void onSessionSelect
 
   return (
@@ -37,27 +41,27 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
       <div className="dashboard-grid">
         <div className="dashboard-section dashboard-section--wide">
           <h2 className="dashboard-section-title">Activity Heatmap</h2>
-          <div className="placeholder">Heatmap (coming soon)</div>
+          <SessionActivityHeatmap heatmap={statistics.activityHeatmap} />
         </div>
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Project Distribution</h2>
-          <div className="placeholder">Project chart (coming soon)</div>
+          <SessionProjectDistribution distribution={statistics.projectDistribution} />
         </div>
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Model Usage</h2>
-          <div className="placeholder">Model chart (coming soon)</div>
+          <SessionModelUsage usage={statistics.modelUsage} />
         </div>
 
         <div className="dashboard-section dashboard-section--wide">
           <h2 className="dashboard-section-title">Weekly Tool Trends</h2>
-          <div className="placeholder">Tool trends (coming soon)</div>
+          <SessionToolTrends trends={statistics.weeklyToolTrends} />
         </div>
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Session Duration Distribution</h2>
-          <div className="placeholder">Duration chart (coming soon)</div>
+          <SessionDurationDistribution distribution={statistics.durationDistribution} />
         </div>
 
         <div className="dashboard-section">
