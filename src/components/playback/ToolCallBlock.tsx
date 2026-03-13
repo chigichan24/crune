@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import type { ToolUseBlock, SubagentSession } from '../../types/index.ts'
-import { SubagentBranch } from './SubagentBranch.tsx'
+import { SubagentBranch } from './SubagentBranch'
 import './ToolCallBlock.css'
 
 interface Props {
-  block: ToolUseBlock
-  subagents: Record<string, SubagentSession>
+  toolCall: any
+  subagents: Record<string, any>
 }
 
 type ToolCategory = 'shell' | 'edit' | 'read' | 'search' | 'agent' | 'other'
@@ -34,11 +33,17 @@ function truncate(str: string, maxLen: number): string {
   return str.slice(0, maxLen) + '...'
 }
 
-export function ToolCallBlock({ block, subagents }: Props) {
-  const { name, input, result, subagentId } = block
+export function ToolCallBlock({ toolCall, subagents }: Props) {
+  const name = toolCall.toolName ?? ''
+  const input = toolCall.input ?? {}
+  const result = toolCall.result ?? null
   const category = getToolCategory(name)
-  const isLongResult = (result?.content.length ?? 0) > 500
+  const isLongResult = typeof result === 'string' && result.length > 500
   const [resultOpen, setResultOpen] = useState(!isLongResult)
+
+  // Find matching subagent
+  const subagentId = toolCall.subagentId ?? null
+  const matchingSubagent = subagentId ? subagents[subagentId] : null
 
   const renderInput = () => {
     switch (name) {
@@ -77,7 +82,7 @@ export function ToolCallBlock({ block, subagents }: Props) {
             )}
             {input.content && (
               <pre className="tool-code-block">
-                {truncate(input.content, 300)}
+                {truncate(String(input.content), 300)}
               </pre>
             )}
             {input.contentLength != null && (
@@ -115,7 +120,7 @@ export function ToolCallBlock({ block, subagents }: Props) {
           <div className="tool-input">
             {(input.prompt || input.description) && (
               <div className="tool-subtitle">
-                {(input.prompt || input.description) as string}
+                {String(input.prompt || input.description)}
               </div>
             )}
             {input.subagent_type && (
@@ -125,7 +130,6 @@ export function ToolCallBlock({ block, subagents }: Props) {
         )
 
       default: {
-        // Show key input fields as JSON
         const displayKeys = Object.keys(input).filter(
           k => input[k] != null && typeof input[k] !== 'object'
         )
@@ -147,19 +151,19 @@ export function ToolCallBlock({ block, subagents }: Props) {
 
   const renderResult = () => {
     if (!result) return null
+    const resultStr = typeof result === 'string' ? result : JSON.stringify(result)
+    if (!resultStr) return null
 
     return (
-      <div className={`tool-result ${result.isError ? 'tool-result--error' : ''}`}>
+      <div className="tool-result">
         <button
           className="tool-result-toggle"
           onClick={() => setResultOpen(prev => !prev)}
         >
           {resultOpen ? 'Hide' : 'Show'} result
-          {result.truncated && ' (truncated)'}
-          {result.isError && ' [ERROR]'}
         </button>
         {resultOpen && (
-          <pre className="tool-result-content">{result.content}</pre>
+          <pre className="tool-result-content">{truncate(resultStr, 2000)}</pre>
         )}
       </div>
     )
@@ -174,10 +178,10 @@ export function ToolCallBlock({ block, subagents }: Props) {
       </div>
       {renderInput()}
       {renderResult()}
-      {name === 'Agent' && subagentId && subagents[subagentId] && (
+      {name === 'Agent' && matchingSubagent && (
         <SubagentBranch
           agentId={subagentId}
-          session={subagents[subagentId]}
+          session={matchingSubagent}
         />
       )}
     </div>

@@ -76,7 +76,8 @@ export function SessionPlayback({ sessionId, onBack }: Props) {
     return <div className="playback-empty">No session data available</div>
   }
 
-  const { meta, turns, subagents } = data
+  const { meta: rawMeta, turns, subagents } = data
+  const meta = rawMeta as any
 
   const formatDuration = (minutes: number) => {
     if (minutes < 60) return `${Math.round(minutes)}m`
@@ -91,9 +92,9 @@ export function SessionPlayback({ sessionId, onBack }: Props) {
         <div className="playback-header-info">
           <h2 className="playback-project">{meta.project}</h2>
           <div className="playback-meta-row">
-            {meta.gitBranch && (
+            {(meta.branch || meta.gitBranch) && (
               <span className="playback-badge playback-badge--branch">
-                {meta.gitBranch}
+                {meta.branch || meta.gitBranch}
               </span>
             )}
             <span className="playback-badge playback-badge--duration">

@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
-import type { SessionDetail } from '../../types/index.ts'
 import './PlaybackSidePanel.css'
 
 interface Props {
-  detail: SessionDetail
+  detail: any
 }
 
 function formatDuration(minutes: number): string {
@@ -23,16 +22,17 @@ function formatDate(iso: string): string {
 }
 
 export function PlaybackSidePanel({ detail }: Props) {
-  const { meta, turns, linkedPlan } = detail
+  const meta = detail.meta ?? {}
+  const turns = detail.turns ?? []
+  const linkedPlan = detail.linkedPlan ?? null
 
   // Compute tool breakdown from turns
   const toolCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const turn of turns) {
-      for (const block of turn.assistantBlocks) {
-        if (block.type === 'tool_use') {
-          counts[block.name] = (counts[block.name] ?? 0) + 1
-        }
+      for (const tc of turn.toolCalls ?? []) {
+        const name = tc.toolName ?? 'unknown'
+        counts[name] = (counts[name] ?? 0) + 1
       }
     }
     return Object.entries(counts).sort((a, b) => b[1] - a[1])
@@ -44,13 +44,12 @@ export function PlaybackSidePanel({ detail }: Props) {
   const filesEdited = useMemo(() => {
     const files = new Set<string>()
     for (const turn of turns) {
-      for (const block of turn.assistantBlocks) {
+      for (const tc of turn.toolCalls ?? []) {
         if (
-          block.type === 'tool_use' &&
-          (block.name === 'Edit' || block.name === 'Write') &&
-          block.input.file_path
+          (tc.toolName === 'Edit' || tc.toolName === 'Write') &&
+          tc.input?.file_path
         ) {
-          files.add(block.input.file_path)
+          files.add(tc.input.file_path)
         }
       }
     }
@@ -67,10 +66,10 @@ export function PlaybackSidePanel({ detail }: Props) {
             <dt>Project</dt>
             <dd>{meta.project}</dd>
           </div>
-          {meta.gitBranch && (
+          {meta.branch && (
             <div className="side-info-item">
               <dt>Branch</dt>
-              <dd>{meta.gitBranch}</dd>
+              <dd>{meta.branch}</dd>
             </div>
           )}
           <div className="side-info-item">
@@ -85,11 +84,11 @@ export function PlaybackSidePanel({ detail }: Props) {
           )}
           <div className="side-info-item">
             <dt>Duration</dt>
-            <dd>{formatDuration(meta.durationMinutes)}</dd>
+            <dd>{formatDuration(meta.durationMinutes ?? 0)}</dd>
           </div>
           <div className="side-info-item">
             <dt>Started</dt>
-            <dd>{formatDate(meta.createdAt)}</dd>
+            <dd>{formatDate(meta.createdAt ?? '')}</dd>
           </div>
           {meta.permissionMode && (
             <div className="side-info-item">

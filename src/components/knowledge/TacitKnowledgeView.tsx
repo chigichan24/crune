@@ -1,14 +1,7 @@
-import type { TacitKnowledge } from '../../types'
 import './TacitKnowledgeView.css'
 
 interface Props {
-  knowledge: TacitKnowledge | null
-}
-
-const PAIN_POINT_LABELS: Record<string, string> = {
-  'long-session': 'Long Session',
-  'repeated-edits': 'Repeated Edits',
-  'many-retries': 'Many Retries',
+  knowledge: any | null
 }
 
 export function TacitKnowledgeView({ knowledge }: Props) {
@@ -20,10 +13,17 @@ export function TacitKnowledgeView({ knowledge }: Props) {
     )
   }
 
+  const workflowPatterns: any[] = knowledge.workflowPatterns ?? []
+  const commonToolSequences: any[] = knowledge.commonToolSequences ?? []
+  const painPoints = knowledge.painPoints ?? {}
+  const longSessions: any[] = painPoints.longSessions ?? []
+  const hotFiles: any[] = painPoints.hotFiles ?? []
+
   const hasContent =
-    knowledge.workflowPatterns.length > 0 ||
-    knowledge.commonToolSequences.length > 0 ||
-    knowledge.painPoints.length > 0
+    workflowPatterns.length > 0 ||
+    commonToolSequences.length > 0 ||
+    longSessions.length > 0 ||
+    hotFiles.length > 0
 
   if (!hasContent) {
     return (
@@ -40,17 +40,20 @@ export function TacitKnowledgeView({ knowledge }: Props) {
 
       <div className="tk-sections">
         {/* Workflow Patterns */}
-        {knowledge.workflowPatterns.length > 0 && (
+        {workflowPatterns.length > 0 && (
           <div className="tk-section">
             <h4 className="tk-section-title">Workflow Patterns</h4>
             <div className="tk-cards">
-              {knowledge.workflowPatterns.map((pattern, i) => (
+              {workflowPatterns.map((pattern: any, i: number) => (
                 <div key={i} className="tk-card">
-                  <p className="tk-card-description">{pattern.description}</p>
-                  <p className="tk-card-evidence">{pattern.evidence}</p>
+                  <p className="tk-card-description">
+                    {pattern.project ?? 'Unknown project'}
+                  </p>
+                  <p className="tk-card-evidence">
+                    Plan mode: {pattern.planModeUsage ?? 0} / {pattern.totalSessions ?? 0} sessions
+                  </p>
                   <span className="tk-card-badge">
-                    {pattern.sessionIds.length} session
-                    {pattern.sessionIds.length !== 1 ? 's' : ''}
+                    {pattern.totalSessions ?? 0} session{(pattern.totalSessions ?? 0) !== 1 ? 's' : ''}
                   </span>
                 </div>
               ))}
@@ -59,14 +62,14 @@ export function TacitKnowledgeView({ knowledge }: Props) {
         )}
 
         {/* Common Tool Sequences */}
-        {knowledge.commonToolSequences.length > 0 && (
+        {commonToolSequences.length > 0 && (
           <div className="tk-section">
             <h4 className="tk-section-title">Common Tool Sequences</h4>
             <div className="tk-cards">
-              {knowledge.commonToolSequences.map((seq, i) => (
+              {commonToolSequences.map((seq: any, i: number) => (
                 <div key={i} className="tk-card">
                   <div className="tk-sequence-flow">
-                    {seq.sequence.map((tool, j) => (
+                    {(seq.sequence ?? []).map((tool: string, j: number) => (
                       <span key={j} className="tk-sequence-item">
                         {j > 0 && (
                           <span className="tk-sequence-arrow">&rarr;</span>
@@ -76,14 +79,7 @@ export function TacitKnowledgeView({ knowledge }: Props) {
                     ))}
                   </div>
                   <div className="tk-sequence-meta">
-                    <span className="tk-card-badge">{seq.count}x</span>
-                    {seq.contexts.length > 0 && (
-                      <span className="tk-sequence-contexts">
-                        {seq.contexts.slice(0, 3).join(', ')}
-                        {seq.contexts.length > 3 &&
-                          ` +${seq.contexts.length - 3}`}
-                      </span>
-                    )}
+                    <span className="tk-card-badge">{seq.count ?? 0}x</span>
                   </div>
                 </div>
               ))}
@@ -91,22 +87,45 @@ export function TacitKnowledgeView({ knowledge }: Props) {
           </div>
         )}
 
-        {/* Pain Points */}
-        {knowledge.painPoints.length > 0 && (
+        {/* Pain Points - Long Sessions */}
+        {longSessions.length > 0 && (
           <div className="tk-section">
-            <h4 className="tk-section-title">Pain Points</h4>
+            <h4 className="tk-section-title">Long Sessions</h4>
             <div className="tk-cards">
-              {knowledge.painPoints.map((point, i) => (
+              {longSessions.map((point: any, i: number) => (
                 <div key={i} className="tk-card tk-card-warning">
                   <div className="tk-pain-header">
-                    <span className="tk-pain-badge">
-                      {PAIN_POINT_LABELS[point.type] ?? point.type}
+                    <span className="tk-pain-badge">Long Session</span>
+                    <span className="tk-pain-metric">
+                      {Math.round(point.durationMinutes ?? 0)}min
                     </span>
-                    <span className="tk-pain-metric">{point.metric}</span>
                   </div>
-                  <p className="tk-card-description">{point.description}</p>
+                  <p className="tk-card-description">
+                    {point.project ?? ''} — {point.firstPrompt ?? ''}
+                  </p>
                   <span className="tk-pain-session">
-                    {point.sessionId.slice(0, 8)}...
+                    {(point.sessionId ?? '').slice(0, 8)}...
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pain Points - Hot Files */}
+        {hotFiles.length > 0 && (
+          <div className="tk-section">
+            <h4 className="tk-section-title">Hot Files (5+ edits in one session)</h4>
+            <div className="tk-cards">
+              {hotFiles.map((point: any, i: number) => (
+                <div key={i} className="tk-card tk-card-warning">
+                  <div className="tk-pain-header">
+                    <span className="tk-pain-badge">Repeated Edits</span>
+                    <span className="tk-pain-metric">{point.editCount ?? 0}x</span>
+                  </div>
+                  <p className="tk-card-description">{point.file ?? ''}</p>
+                  <span className="tk-pain-session">
+                    {(point.sessionId ?? '').slice(0, 8)}...
                   </span>
                 </div>
               ))}

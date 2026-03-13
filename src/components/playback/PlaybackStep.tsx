@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import type { ConversationTurn, SubagentSession } from '../../types/index.ts'
-import { ToolCallBlock } from './ToolCallBlock.tsx'
+import { ToolCallBlock } from './ToolCallBlock'
 import './PlaybackStep.css'
 
 interface Props {
-  turn: ConversationTurn
+  turn: any
   isActive: boolean
-  subagents: Record<string, SubagentSession>
+  subagents: Record<string, any>
 }
 
 function formatTimestamp(iso: string): string {
@@ -17,6 +16,10 @@ function formatTimestamp(iso: string): string {
 export function PlaybackStep({ turn, isActive, subagents }: Props) {
   const [thinkingOpen, setThinkingOpen] = useState(false)
 
+  const toolCalls = turn.toolCalls ?? []
+  const assistantTexts = turn.assistantTexts ?? []
+  const assistantThinking = turn.assistantThinking ?? null
+
   return (
     <div className={`playback-step ${isActive ? 'playback-step--active' : ''}`}>
       {/* User prompt */}
@@ -26,47 +29,36 @@ export function PlaybackStep({ turn, isActive, subagents }: Props) {
         <div className="step-user-text">{turn.userPrompt}</div>
       </div>
 
-      {/* Assistant blocks */}
-      <div className="step-assistant-blocks">
-        {turn.assistantBlocks.map((block, i) => {
-          switch (block.type) {
-            case 'thinking':
-              return (
-                <div key={i} className="step-thinking">
-                  <button
-                    className="step-thinking-toggle"
-                    onClick={() => setThinkingOpen(prev => !prev)}
-                  >
-                    {thinkingOpen ? 'Hide' : 'Show'} thinking
-                    {block.truncated && ' (truncated)'}
-                  </button>
-                  {thinkingOpen && (
-                    <pre className="step-thinking-text">{block.thinking}</pre>
-                  )}
-                </div>
-              )
+      {/* Thinking */}
+      {assistantThinking && (
+        <div className="step-thinking">
+          <button
+            className="step-thinking-toggle"
+            onClick={() => setThinkingOpen(prev => !prev)}
+          >
+            {thinkingOpen ? 'Hide' : 'Show'} thinking
+          </button>
+          {thinkingOpen && (
+            <pre className="step-thinking-text">{assistantThinking}</pre>
+          )}
+        </div>
+      )}
 
-            case 'text':
-              return (
-                <div key={i} className="step-text">
-                  <pre className="step-text-content">{block.text}</pre>
-                </div>
-              )
+      {/* Text blocks */}
+      {assistantTexts.map((text: string, i: number) => (
+        <div key={i} className="step-text">
+          <pre className="step-text-content">{text}</pre>
+        </div>
+      ))}
 
-            case 'tool_use':
-              return (
-                <ToolCallBlock
-                  key={block.id}
-                  block={block}
-                  subagents={subagents}
-                />
-              )
-
-            default:
-              return null
-          }
-        })}
-      </div>
+      {/* Tool calls */}
+      {toolCalls.map((tc: any) => (
+        <ToolCallBlock
+          key={tc.toolUseId}
+          toolCall={tc}
+          subagents={subagents}
+        />
+      ))}
     </div>
   )
 }
