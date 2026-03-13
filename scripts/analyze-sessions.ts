@@ -111,11 +111,49 @@ interface ConversationTurn {
   model?: string;
 }
 
+/** Metadata extracted from a session */
+interface SessionMeta {
+  sessionId: string;
+  cwd: string;
+  gitBranch: string;
+  version: string;
+  slug: string;
+  createdAt: string;
+  lastActiveAt: string;
+  durationMinutes: number;
+  permissionMode: string;
+  toolBreakdown: Record<string, number>;
+  modelsUsed: Record<string, number>;
+  filesEdited: string[];
+  subagentCount: number;
+  turnCount: number;
+  firstUserPrompt: string;
+}
+
+/** A parsed subagent session */
+interface SubagentSession {
+  agentId: string;
+  agentType: string;
+  turns: ConversationTurn[];
+  model?: string;
+}
+
+/** Full parsed session */
+interface ParsedSession {
+  meta: SessionMeta;
+  turns: ConversationTurn[];
+  subagents: Record<string, SubagentSession>;
+  linkedPlan: { slug: string; content: string } | null;
+  projectDir: string;
+  projectDisplayName: string;
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const THINKING_LIMIT = 5000;
 const TOOL_RESULT_LIMIT = 2000;
 const WRITE_CONTENT_PREVIEW = 500;
+const FIRST_PROMPT_LIMIT = 200;
 
 // ─── Task 1.1: Session Discovery ────────────────────────────────────────────
 
@@ -353,6 +391,155 @@ export function buildTurns(lines: JsonlLine[]): ConversationTurn[] {
   return turns;
 }
 
+// ─── Task 1.3: Metadata Extraction ─────────────────────────────────────────
+
+function extractMetadata(
+  sessionFile: SessionFile,
+  lines: JsonlLine[],
+  turns: ConversationTurn[]
+): SessionMeta {
+  let cwd = "";
+  let gitBranch = "";
+  let version = "";
+  let slug = "";
+  let permissionMode = "";
+  let createdAt = "";
+  let lastActiveAt = "";
+  const toolBreakdown: Record<string, number> = {};
+  const modelsUsed: Record<string, number> = {};
+  const filesEdited = new Set<string>();
+
+  for (const line of lines) {
+    // Extract metadata from any line that has these fields
+    if (line.cwd && !cwd) cwd = line.cwd;
+    if (line.gitBranch && !gitBranch) gitBranch = line.gitBranch;
+    if (line.version && !version) version = line.version;
+    if (line.slug && !slug) slug = line.slug;
+    if (line.permissionMode && !permissionMode) permissionMode = line.permissionMode;
+
+    // Track timestamps
+    if (line.timestamp) {
+      if (!createdAt || line.timestamp < createdAt) createdAt = line.timestamp;
+      if (!lastActiveAt || line.timestamp > lastActiveAt) lastActiveAt = line.timestamp;
+    }
+
+    // Extract model usage from assistant messages
+    if (line.type === "assistant" && line.message?.model) {
+      const model = line.message.model;
+      modelsUsed[model] = (modelsUsed[model] || 0) + 1;
+    }
+  }
+
+  // Extract tool breakdown and files edited from turns
+  for (const turn of turns) {
+    for (const tc of turn.toolCalls) {
+      toolBreakdown[tc.toolName] = (toolBreakdown[tc.toolName] || 0) + 1;
+
+      // Track files edited via Edit/Write
+      if (tc.toolName === "Edit" || tc.toolName === "Write") {
+        const fp = tc.input.file_path;
+        if (typeof fp === "string") {
+          filesEdited.add(fp);
+        }
+      }
+    }
+  }
+
+  const durationMinutes =
+    createdAt && lastActiveAt
+      ? Math.round(
+          (new Date(lastActiveAt).getTime() - new Date(createdAt).getTime()) /
+            60000
+        )
+      : 0;
+
+  const firstPrompt = turns.length > 0 ? turns[0].userPrompt : "";
+
+  return {
+    sessionId: sessionFile.sessionId,
+    cwd,
+    gitBranch,
+    version,
+    slug,
+    createdAt,
+    lastActiveAt,
+    durationMinutes,
+    permissionMode,
+    toolBreakdown,
+    modelsUsed,
+    filesEdited: [...filesEdited],
+    subagentCount: sessionFile.subagentFiles.length,
+    turnCount: turns.length,
+    firstUserPrompt: truncate(firstPrompt, FIRST_PROMPT_LIMIT),
+  };
+}
+
+// ─── Task 1.4: Subagent Linking ─────────────────────────────────────────────
+
+async function parseSubagents(
+  subagentFiles: string[]
+): Promise<Record<string, SubagentSession>> {
+  const subagents: Record<string, SubagentSession> = {};
+
+  for (const filePath of subagentFiles) {
+    const basename = path.basename(filePath, ".jsonl");
+    // agent-a8edec15cbcf8cf42.jsonl -> agentId = a8edec15cbcf8cf42
+    const agentId = basename.replace("agent-", "");
+
+    // Read meta.json if exists
+    const metaPath = filePath.replace(".jsonl", ".meta.json");
+    let agentType = "unknown";
+    if (fs.existsSync(metaPath)) {
+      try {
+        const metaContent = fs.readFileSync(metaPath, "utf-8");
+        const meta = JSON.parse(metaContent);
+        agentType = meta.agentType || "unknown";
+      } catch {
+        // ignore
+      }
+    }
+
+    const lines = await parseJsonlFile(filePath);
+    const turns = buildTurns(lines);
+
+    // Extract model from first assistant line
+    let model: string | undefined;
+    for (const line of lines) {
+      if (line.type === "assistant" && line.message?.model) {
+        model = line.message.model;
+        break;
+      }
+    }
+
+    subagents[agentId] = {
+      agentId,
+      agentType,
+      turns,
+      model,
+    };
+  }
+
+  return subagents;
+}
+
+// ─── Linked Plan ────────────────────────────────────────────────────────────
+
+function loadLinkedPlan(
+  slug: string
+): { slug: string; content: string } | null {
+  if (!slug) return null;
+  const planPath = path.join(os.homedir(), ".claude", "plans", `${slug}.md`);
+  if (fs.existsSync(planPath)) {
+    try {
+      const content = fs.readFileSync(planPath, "utf-8");
+      return { slug, content };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
@@ -370,8 +557,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 2: Parse each session into turns
-  let totalTurns = 0;
+  // Step 2: Parse each session with metadata and subagents
+  const parsedSessions: ParsedSession[] = [];
 
   for (let i = 0; i < sessionFiles.length; i++) {
     const sf = sessionFiles[i];
@@ -380,9 +567,34 @@ async function main() {
     );
 
     try {
+      // Parse main JSONL
       const lines = await parseJsonlFile(sf.filePath);
       const turns = buildTurns(lines);
-      totalTurns += turns.length;
+      const meta = extractMetadata(sf, lines, turns);
+
+      // Update projectDisplayName from cwd if available
+      let displayName = sf.projectDisplayName;
+      if (meta.cwd) {
+        const cwdParts = meta.cwd.split(path.sep).filter(Boolean);
+        if (cwdParts.length >= 2) {
+          displayName = cwdParts.slice(-2).join("/");
+        }
+      }
+
+      // Parse subagents
+      const subagents = await parseSubagents(sf.subagentFiles);
+
+      // Load linked plan
+      const linkedPlan = loadLinkedPlan(meta.slug);
+
+      parsedSessions.push({
+        meta,
+        turns,
+        subagents,
+        linkedPlan,
+        projectDir: sf.projectDir,
+        projectDisplayName: displayName,
+      });
     } catch (err) {
       console.error(
         `  [ERROR] Failed to process ${sf.sessionId}: ${err instanceof Error ? err.message : String(err)}`
@@ -390,7 +602,9 @@ async function main() {
     }
   }
 
-  console.error(`\n[crune] Parsed ${totalTurns} turns across ${sessionFiles.length} sessions`);
+  console.error(
+    `\n[crune] Successfully parsed ${parsedSessions.length}/${sessionFiles.length} sessions`
+  );
   console.error(`[crune] Done (output generation not yet implemented).`);
 }
 
