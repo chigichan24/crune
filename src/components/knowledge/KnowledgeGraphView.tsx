@@ -9,7 +9,6 @@ import type {
 } from '../../types'
 import { KnowledgeNodeDetail } from './KnowledgeNodeDetail'
 import { TacitKnowledgeView } from './TacitKnowledgeView'
-import { GraphMetricsPanel } from './GraphMetricsPanel'
 import './KnowledgeGraphView.css'
 
 interface Props {
@@ -40,10 +39,10 @@ const EDGE_COLORS: Record<SemanticEdgeType, string> = {
 }
 
 const EDGE_TYPE_LABELS: Record<SemanticEdgeType, string> = {
-  'semantic-similarity': 'Semantic Similarity',
-  'shared-module': 'Shared Module',
-  'workflow-continuation': 'Workflow Continuation',
-  'cross-project-bridge': 'Cross-Project Bridge',
+  'semantic-similarity': 'Semantic',
+  'shared-module': 'Module',
+  'workflow-continuation': 'Workflow',
+  'cross-project-bridge': 'Cross-Project',
 }
 
 const ALL_EDGE_TYPES: SemanticEdgeType[] = [
@@ -69,6 +68,8 @@ export function KnowledgeGraphView({
   const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<SemanticEdgeType>>(
     new Set(ALL_EDGE_TYPES)
   )
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [sidebarTab, setSidebarTab] = useState<'insights' | 'detail'>('insights')
 
   // Extract communities
   const communities = useMemo(() => {
@@ -160,7 +161,10 @@ export function KnowledgeGraphView({
       const topicNode = overview.knowledgeGraph.nodes.find(
         (n: TopicNode) => n.id === node.id
       )
-      setSelectedNode(topicNode ?? null)
+      if (topicNode) {
+        setSelectedNode(topicNode)
+        setSidebarTab('detail')
+      }
     },
     [overview]
   )
@@ -175,6 +179,7 @@ export function KnowledgeGraphView({
 
   const handleCloseDetail = useCallback(() => {
     setSelectedNode(null)
+    setSidebarTab('insights')
   }, [])
 
   const toggleCommunity = useCallback((communityId: number) => {
@@ -200,6 +205,15 @@ export function KnowledgeGraphView({
       return next
     })
   }, [])
+
+  const toggleAllCommunities = useCallback(() => {
+    setVisibleCommunities((prev) => {
+      if (prev.size === communities.length) {
+        return new Set<number>()
+      }
+      return new Set(communities.map((c) => c.id))
+    })
+  }, [communities])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nodeColor = useCallback(
@@ -258,112 +272,186 @@ export function KnowledgeGraphView({
     )
   }
 
+  const { metrics } = overview.knowledgeGraph
+
   return (
     <div className="knowledge-graph-view">
-      {/* Filter controls */}
-      <div className="kg-filters">
-        <div className="kg-filter-group">
-          <span className="kg-filter-label">Communities</span>
-          <div className="kg-filter-options">
-            {communities.map((comm: KnowledgeCommunity) => (
-              <label key={comm.id} className="kg-filter-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleCommunities.has(comm.id)}
-                  onChange={() => toggleCommunity(comm.id)}
-                />
-                <span
-                  className="project-color-dot"
-                  style={{
-                    backgroundColor: communityColorMap.get(comm.id),
-                  }}
-                />
-                {comm.label}
-                <span className="kg-filter-count">
-                  ({comm.topicIds.length})
+      <div className="kg-main-layout">
+        {/* Left: Graph area */}
+        <div className="kg-graph-area">
+          {/* Floating metrics bar */}
+          <div className="kg-metrics-bar">
+            <span className="kg-metric">{metrics.totalTopics} topics</span>
+            <span className="kg-metric-sep" />
+            <span className="kg-metric">{metrics.totalEdges} edges</span>
+            <span className="kg-metric-sep" />
+            <span className="kg-metric">{communities.length} communities</span>
+            <span className="kg-metric-sep" />
+            <span className="kg-metric">Q={metrics.modularity.toFixed(2)}</span>
+            {metrics.isolatedTopicCount > 0 && (
+              <>
+                <span className="kg-metric-sep" />
+                <span className="kg-metric kg-metric-warn">
+                  {metrics.isolatedTopicCount} isolated
                 </span>
-              </label>
-            ))}
+              </>
+            )}
           </div>
-        </div>
 
-        <div className="kg-filter-group">
-          <span className="kg-filter-label">Edge Types</span>
-          <div className="kg-filter-options">
-            {ALL_EDGE_TYPES.map((edgeType) => (
-              <label key={edgeType} className="kg-filter-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleEdgeTypes.has(edgeType)}
-                  onChange={() => toggleEdgeType(edgeType)}
-                />
-                <span
-                  className="edge-color-dot"
-                  style={{ backgroundColor: EDGE_COLORS[edgeType] }}
-                />
-                {EDGE_TYPE_LABELS[edgeType]}
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
+          {/* Filter toggle button */}
+          <button
+            className={`kg-filter-toggle ${filtersOpen ? 'active' : ''}`}
+            onClick={() => setFiltersOpen((p) => !p)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            Filters
+          </button>
 
-      {/* Metrics panel */}
-      <GraphMetricsPanel
-        metrics={overview.knowledgeGraph.metrics}
-        communities={communities}
-      />
+          {/* Collapsible filter overlay */}
+          {filtersOpen && (
+            <div className="kg-filter-overlay">
+              <div className="kg-filter-section">
+                <div className="kg-filter-header">
+                  <span className="kg-filter-title">Communities</span>
+                  <button
+                    className="kg-filter-toggle-all"
+                    onClick={toggleAllCommunities}
+                  >
+                    {visibleCommunities.size === communities.length ? 'None' : 'All'}
+                  </button>
+                </div>
+                <div className="kg-filter-pills">
+                  {communities.map((comm: KnowledgeCommunity) => {
+                    const active = visibleCommunities.has(comm.id)
+                    const color = communityColorMap.get(comm.id) ?? COMMUNITY_COLORS[0]
+                    return (
+                      <button
+                        key={comm.id}
+                        className={`kg-pill ${active ? 'active' : ''}`}
+                        style={{
+                          '--pill-color': color,
+                          borderColor: active ? color : undefined,
+                          backgroundColor: active ? `${color}18` : undefined,
+                        } as React.CSSProperties}
+                        onClick={() => toggleCommunity(comm.id)}
+                      >
+                        <span
+                          className="kg-pill-dot"
+                          style={{ backgroundColor: active ? color : 'var(--text-secondary)' }}
+                        />
+                        <span className="kg-pill-label">{comm.label}</span>
+                        <span className="kg-pill-count">{comm.topicIds.length}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
-      {/* Graph + detail panel */}
-      <div className="kg-content">
-        <div
-          ref={containerRef}
-          className={`kg-graph-container ${selectedNode ? 'with-detail' : ''}`}
-        >
-          {filteredData.nodes.length > 0 ? (
-            <ForceGraph2D
-              graphData={filteredData}
-              width={dimensions.width}
-              height={dimensions.height}
-              backgroundColor="#fafaf9"
-              nodeLabel={nodeLabel}
-              nodeColor={nodeColor}
-              nodeVal="val"
-              nodeRelSize={4}
-              linkColor={linkColor}
-              linkWidth={linkWidth}
-              linkDirectionalParticles={1}
-              onNodeClick={handleNodeClick}
-              onNodeHover={handleNodeHover}
-              cooldownTicks={100}
-              d3AlphaDecay={0.02}
-              d3VelocityDecay={0.3}
-            />
-          ) : (
-            <div className="kg-empty">
-              No topics match the current filters
+              <div className="kg-filter-section">
+                <span className="kg-filter-title">Edge Types</span>
+                <div className="kg-filter-chips">
+                  {ALL_EDGE_TYPES.map((edgeType) => {
+                    const active = visibleEdgeTypes.has(edgeType)
+                    const color = EDGE_COLORS[edgeType]
+                    return (
+                      <button
+                        key={edgeType}
+                        className={`kg-chip ${active ? 'active' : ''}`}
+                        style={{
+                          '--chip-color': color,
+                          borderColor: active ? color : undefined,
+                          backgroundColor: active ? `${color}18` : undefined,
+                        } as React.CSSProperties}
+                        onClick={() => toggleEdgeType(edgeType)}
+                      >
+                        <span
+                          className="kg-chip-line"
+                          style={{ backgroundColor: active ? color : 'var(--text-secondary)' }}
+                        />
+                        {EDGE_TYPE_LABELS[edgeType]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           )}
+
+          {/* Graph canvas */}
+          <div ref={containerRef} className="kg-graph-container">
+            {filteredData.nodes.length > 0 ? (
+              <ForceGraph2D
+                graphData={filteredData}
+                width={dimensions.width}
+                height={dimensions.height}
+                backgroundColor="#fafaf9"
+                nodeLabel={nodeLabel}
+                nodeColor={nodeColor}
+                nodeVal="val"
+                nodeRelSize={4}
+                linkColor={linkColor}
+                linkWidth={linkWidth}
+                linkDirectionalParticles={1}
+                onNodeClick={handleNodeClick}
+                onNodeHover={handleNodeHover}
+                cooldownTicks={100}
+                d3AlphaDecay={0.02}
+                d3VelocityDecay={0.3}
+              />
+            ) : (
+              <div className="kg-empty">
+                No topics match the current filters
+              </div>
+            )}
+          </div>
         </div>
 
-        {selectedNode && (
-          <KnowledgeNodeDetail
-            node={selectedNode}
-            edges={selectedNodeEdges}
-            allTopics={overview.knowledgeGraph.nodes}
-            onSessionSelect={onSessionSelect}
-            onClose={handleCloseDetail}
-          />
-        )}
-      </div>
+        {/* Right: Sidebar */}
+        <div className="kg-sidebar">
+          {/* Sidebar tabs */}
+          <div className="kg-sidebar-tabs">
+            <button
+              className={`kg-sidebar-tab ${sidebarTab === 'insights' ? 'active' : ''}`}
+              onClick={() => setSidebarTab('insights')}
+            >
+              Insights
+            </button>
+            <button
+              className={`kg-sidebar-tab ${sidebarTab === 'detail' ? 'active' : ''}`}
+              onClick={() => setSidebarTab('detail')}
+              disabled={!selectedNode}
+            >
+              Topic Detail
+            </button>
+          </div>
 
-      {/* Tacit knowledge section */}
-      <div className="kg-tacit-section">
-        <TacitKnowledgeView
-          knowledge={overview.tacitKnowledge}
-          graphMetrics={overview.knowledgeGraph.metrics}
-          topics={overview.knowledgeGraph.nodes}
-        />
+          {/* Sidebar content */}
+          <div className="kg-sidebar-content">
+            {sidebarTab === 'insights' && (
+              <TacitKnowledgeView
+                knowledge={overview.tacitKnowledge}
+                graphMetrics={metrics}
+                topics={overview.knowledgeGraph.nodes}
+              />
+            )}
+            {sidebarTab === 'detail' && selectedNode && (
+              <KnowledgeNodeDetail
+                node={selectedNode}
+                edges={selectedNodeEdges}
+                allTopics={overview.knowledgeGraph.nodes}
+                onSessionSelect={onSessionSelect}
+                onClose={handleCloseDetail}
+              />
+            )}
+            {sidebarTab === 'detail' && !selectedNode && (
+              <div className="kg-sidebar-empty">
+                Click a node in the graph to view topic details
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

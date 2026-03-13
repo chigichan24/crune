@@ -1,62 +1,62 @@
 .tacit-knowledge-view {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  padding: 14px;
 }
 
 .tk-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .tk-empty {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   font-style: italic;
 }
 
 .tk-sections {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .tk-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tk-section-title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
+.tk-section-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Cards - vertical stack in sidebar */
 .tk-cards {
   display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .tk-card {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  min-width: 240px;
-  max-width: 320px;
-  flex-shrink: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .tk-card-warning {
@@ -64,26 +64,55 @@
   border-left-width: 3px;
 }
 
+.tk-card-silo {
+  border-color: #e11d48;
+  border-left-width: 3px;
+}
+
+.tk-card-bridge {
+  border-color: #f59e0b;
+  border-left-width: 3px;
+}
+
 .tk-card-description {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
   line-height: 1.4;
+  word-break: break-word;
 }
 
 .tk-card-evidence {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   line-height: 1.3;
 }
 
+.tk-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .tk-card-badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--accent);
-  background-color: rgba(37, 99, 235, 0.1);
-  padding: 2px 8px;
+  background-color: rgba(37, 99, 235, 0.08);
+  padding: 1px 6px;
   border-radius: 8px;
   width: fit-content;
+}
+
+.tk-badge-bridge {
+  color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.08);
+}
+
+.tk-card-keywords {
+  font-size: 10px;
+  color: var(--text-secondary);
 }
 
 /* Tool sequence flow */
@@ -97,34 +126,29 @@
 .tk-sequence-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .tk-sequence-arrow {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .tk-tool-name {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-primary);
   background-color: var(--bg-secondary);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
   border: 1px solid var(--border);
 }
 
 .tk-sequence-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.tk-sequence-contexts {
-  font-size: 11px;
-  color: var(--text-secondary);
+  gap: 6px;
+  margin-top: 2px;
 }
 
 /* Pain points */
@@ -135,59 +159,22 @@
 }
 
 .tk-pain-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--warning);
-  background-color: rgba(217, 119, 6, 0.12);
-  padding: 2px 8px;
+  background-color: rgba(217, 119, 6, 0.1);
+  padding: 1px 6px;
   border-radius: 8px;
 }
 
 .tk-pain-metric {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
 .tk-pain-session {
   font-family: monospace;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
-}
-
-/* Section description */
-.tk-section-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-/* Card meta */
-.tk-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tk-card-keywords {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-/* Silo card */
-.tk-card-silo {
-  border-color: #e11d48;
-  border-left-width: 3px;
-}
-
-/* Bridge card */
-.tk-card-bridge {
-  border-color: #f59e0b;
-  border-left-width: 3px;
-}
-
-.tk-badge-bridge {
-  color: #f59e0b;
-  background-color: rgba(245, 158, 11, 0.1);
 }
