@@ -85,5 +85,4 @@ public/
 - Claude Code session logs at `~/.claude/projects/`
 
 ## License
-
-Private.
+Apache-2.0 license
