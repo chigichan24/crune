@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useSessionIndex } from './hooks/useSessionIndex'
+import { SessionDashboardView } from './components/overview/SessionDashboardView'
 import './App.css'
 
 type ViewMode = 'overview' | 'playback' | 'knowledge'
@@ -6,6 +8,7 @@ type ViewMode = 'overview' | 'playback' | 'knowledge'
 function App() {
   const [activeTab, setActiveTab] = useState<ViewMode>('overview')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const { data: indexData, loading: indexLoading, error: indexError } = useSessionIndex()
 
   const handleSessionSelect = (sessionId: string) => {
     setSelectedSessionId(sessionId)
@@ -40,7 +43,23 @@ function App() {
       </header>
       <main className="app-main">
         {activeTab === 'overview' && (
-          <div className="placeholder">Overview Dashboard (Phase 4)</div>
+          <>
+            {indexLoading && (
+              <div className="placeholder">Loading session data...</div>
+            )}
+            {indexError && (
+              <div className="placeholder" style={{ color: 'var(--danger)' }}>
+                Error loading sessions: {indexError}
+              </div>
+            )}
+            {indexData && (
+              <SessionDashboardView
+                sessions={indexData.sessions}
+                projects={indexData.projects}
+                onSessionSelect={handleSessionSelect}
+              />
+            )}
+          </>
         )}
         {activeTab === 'playback' && (
           <div className="placeholder">

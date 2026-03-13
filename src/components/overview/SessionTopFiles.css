@@ -1,0 +1,77 @@
+.top-files-wrapper {
+  overflow-x: auto;
+}
+
+.top-files-empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.top-files-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.top-files-th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.top-files-th--rank {
+  width: 40px;
+  text-align: center;
+}
+
+.top-files-th--count {
+  width: 60px;
+  text-align: right;
+}
+
+.top-files-th--projects {
+  width: 200px;
+}
+
+.top-files-row:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.top-files-td {
+  padding: 6px 12px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.top-files-td--rank {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.top-files-td--path {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
+  font-size: 12px;
+}
+
+.top-files-td--count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-files-td--projects {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 12px;
+}

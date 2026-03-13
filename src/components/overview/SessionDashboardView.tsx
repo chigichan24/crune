@@ -6,6 +6,8 @@ import { SessionProjectDistribution } from './SessionProjectDistribution'
 import { SessionModelUsage } from './SessionModelUsage'
 import { SessionToolTrends } from './SessionToolTrends'
 import { SessionDurationDistribution } from './SessionDurationDistribution'
+import { SessionTopFiles } from './SessionTopFiles'
+import { SessionList } from './SessionList'
 import './SessionDashboardView.css'
 
 interface Props {
@@ -30,9 +32,6 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
   }
 
   const { statistics } = overview
-
-  // Will be used in the next commit for top files table and session list
-  void onSessionSelect
 
   return (
     <div className="session-dashboard">
@@ -66,12 +65,16 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Top Files</h2>
-          <div className="placeholder">File table (coming soon)</div>
+          <SessionTopFiles files={statistics.topFiles} />
         </div>
 
         <div className="dashboard-section dashboard-section--full">
           <h2 className="dashboard-section-title">Sessions</h2>
-          <div className="placeholder">Session list (coming soon)</div>
+          <SessionList
+            sessions={sessions}
+            projects={projects}
+            onSessionSelect={onSessionSelect}
+          />
         </div>
       </div>
     </div>
