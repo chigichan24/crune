@@ -1,28 +1,27 @@
 import { useMemo } from 'react'
-import type { KnowledgeNode, KnowledgeEdge, EdgeType } from '../../types'
+import type { TopicNode, TopicEdge, SemanticEdgeType } from '../../types'
 import './KnowledgeNodeDetail.css'
 
 interface Props {
-  node: KnowledgeNode | null
-  edges: KnowledgeEdge[]
+  node: TopicNode | null
+  edges: TopicEdge[]
+  allTopics: TopicNode[]
   onSessionSelect: (sessionId: string) => void
   onClose: () => void
 }
 
-const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
-  'same-branch': 'Same Branch',
-  'shared-files': 'Shared Files',
-  'resume-chain': 'Resume Chain',
-  'memory-chain': 'Memory Chain',
-  'plan-reference': 'Plan Reference',
+const EDGE_TYPE_LABELS: Record<SemanticEdgeType, string> = {
+  'semantic-similarity': 'Semantic Similarity',
+  'shared-module': 'Shared Module',
+  'workflow-continuation': 'Workflow Continuation',
+  'cross-project-bridge': 'Cross-Project Bridge',
 }
 
-const EDGE_COLORS: Record<EdgeType, string> = {
-  'same-branch': '#58a6ff',
-  'shared-files': '#8b949e',
-  'resume-chain': '#3fb950',
-  'memory-chain': '#d29922',
-  'plan-reference': '#bc8cff',
+const EDGE_COLORS: Record<SemanticEdgeType, string> = {
+  'semantic-similarity': '#6366f1',
+  'shared-module': '#06b6d4',
+  'workflow-continuation': '#14b8a6',
+  'cross-project-bridge': '#f59e0b',
 }
 
 function formatDate(iso: string): string {
@@ -31,8 +30,6 @@ function formatDate(iso: string): string {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   })
 }
 
@@ -44,83 +41,127 @@ function formatDuration(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`
 }
 
+function centralityInterpretation(bc: number, dc: number): string {
+  if (bc > 0.2) return 'High bridge: connects multiple knowledge domains'
+  if (bc > 0.05) return 'Moderate bridge: links some domains'
+  if (dc > 0.5) return 'Hub: highly connected topic'
+  if (dc === 0) return 'Isolated: no connections to other topics'
+  return 'Peripheral topic'
+}
+
 export function KnowledgeNodeDetail({
   node,
   edges,
+  allTopics,
   onSessionSelect,
   onClose,
 }: Props) {
-  // Group edges by type
+  // Group edges by type, resolve connected topic labels
   const edgesByType = useMemo(() => {
-    const grouped = new Map<EdgeType, { sessionId: string; strength: number }[]>()
+    const topicMap = new Map(allTopics.map((t) => [t.id, t]))
+    const grouped = new Map<
+      SemanticEdgeType,
+      { topicId: string; topicLabel: string; strength: number; label: string }[]
+    >()
     for (const edge of edges) {
       const connectedId =
         edge.source === node?.id ? edge.target : edge.source
+      const connectedTopic = topicMap.get(connectedId)
       const list = grouped.get(edge.type) ?? []
-      list.push({ sessionId: connectedId, strength: edge.strength })
+      list.push({
+        topicId: connectedId,
+        topicLabel: connectedTopic?.label ?? connectedId,
+        strength: edge.strength,
+        label: edge.label,
+      })
       grouped.set(edge.type, list)
     }
     return grouped
-  }, [edges, node?.id])
+  }, [edges, node?.id, allTopics])
 
   if (!node) return null
 
   return (
     <div className="knowledge-node-detail">
       <div className="knd-header">
-        <h3 className="knd-title">Node Detail</h3>
+        <h3 className="knd-title">Topic Detail</h3>
         <button className="knd-close" onClick={onClose}>
           &times;
         </button>
       </div>
 
       <div className="knd-body">
-        {/* Session ID */}
-        <div className="knd-field">
-          <span className="knd-field-label">Session ID</span>
-          <span className="knd-field-value knd-mono">
-            {node.id.slice(0, 8)}...
-          </span>
+        {/* Topic label */}
+        <div className="knd-topic-label">{node.label}</div>
+
+        {/* Keywords */}
+        <div className="knd-keywords">
+          {node.keywords.map((kw) => (
+            <span key={kw} className="knd-keyword-tag">
+              {kw}
+            </span>
+          ))}
         </div>
 
-        {/* Project */}
-        <div className="knd-field">
-          <span className="knd-field-label">Project</span>
-          <span className="knd-field-value">{node.project}</span>
+        {/* Stats */}
+        <div className="knd-stats-grid">
+          <div className="knd-stat">
+            <span className="knd-stat-label">Sessions</span>
+            <span className="knd-stat-value">{node.sessionCount}</span>
+          </div>
+          <div className="knd-stat">
+            <span className="knd-stat-label">Duration</span>
+            <span className="knd-stat-value">
+              {formatDuration(node.totalDurationMinutes)}
+            </span>
+          </div>
+          <div className="knd-stat">
+            <span className="knd-stat-label">Tool Calls</span>
+            <span className="knd-stat-value">{node.totalToolCalls}</span>
+          </div>
+          <div className="knd-stat">
+            <span className="knd-stat-label">Period</span>
+            <span className="knd-stat-value knd-stat-small">
+              {node.firstSeen ? formatDate(node.firstSeen) : '—'} –{' '}
+              {node.lastSeen ? formatDate(node.lastSeen) : '—'}
+            </span>
+          </div>
         </div>
 
-        {/* First prompt */}
-        <div className="knd-field">
-          <span className="knd-field-label">First Prompt</span>
-          <span className="knd-field-value knd-prompt">{node.firstPrompt}</span>
-        </div>
+        {/* Projects */}
+        {node.projects.length > 0 && (
+          <div className="knd-field">
+            <span className="knd-field-label">Projects</span>
+            <span className="knd-field-value">
+              {node.projects.join(', ')}
+            </span>
+          </div>
+        )}
 
-        {/* Created at */}
-        <div className="knd-field">
-          <span className="knd-field-label">Created At</span>
-          <span className="knd-field-value">{formatDate(node.createdAt)}</span>
-        </div>
-
-        {/* Duration */}
-        <div className="knd-field">
-          <span className="knd-field-label">Duration</span>
-          <span className="knd-field-value">
-            {formatDuration(node.durationMinutes)}
-          </span>
-        </div>
-
-        {/* Tool call count */}
-        <div className="knd-field">
-          <span className="knd-field-label">Tool Calls</span>
-          <span className="knd-field-value">{node.toolCallCount}</span>
-        </div>
-
-        {/* Divider */}
+        {/* Centrality */}
         <div className="knd-divider" />
+        <div className="knd-centrality">
+          <span className="knd-field-label">Graph Position</span>
+          <div className="knd-centrality-values">
+            <span>
+              Betweenness: <strong>{node.betweennessCentrality.toFixed(3)}</strong>
+            </span>
+            <span>
+              Degree: <strong>{node.degreeCentrality.toFixed(3)}</strong>
+            </span>
+          </div>
+          <p className="knd-centrality-hint">
+            {centralityInterpretation(
+              node.betweennessCentrality,
+              node.degreeCentrality
+            )}
+          </p>
+        </div>
 
-        {/* Connected edges */}
+        {/* Connected topics */}
+        <div className="knd-divider" />
         <div className="knd-edges-section">
-          <span className="knd-field-label">Connected Sessions</span>
+          <span className="knd-field-label">Connected Topics</span>
           {edgesByType.size === 0 ? (
             <p className="knd-no-edges">No connections</p>
           ) : (
@@ -140,10 +181,11 @@ export function KnowledgeNodeDetail({
                 </div>
                 <ul className="knd-edge-list">
                   {connections.map((conn) => (
-                    <li key={conn.sessionId} className="knd-edge-item">
-                      <span className="knd-mono">
-                        {conn.sessionId.slice(0, 8)}...
+                    <li key={conn.topicId} className="knd-edge-item">
+                      <span className="knd-edge-topic-label">
+                        {conn.topicLabel}
                       </span>
+                      <span className="knd-edge-label">{conn.label}</span>
                       <span className="knd-edge-strength">
                         {Math.round(conn.strength * 100)}%
                       </span>
@@ -155,13 +197,25 @@ export function KnowledgeNodeDetail({
           )}
         </div>
 
-        {/* Open in Playback button */}
-        <button
-          className="knd-open-button"
-          onClick={() => onSessionSelect(node.id)}
-        >
-          Open in Playback
-        </button>
+        {/* Session list */}
+        <div className="knd-divider" />
+        <div className="knd-sessions-section">
+          <span className="knd-field-label">
+            Sessions ({node.sessionIds.length})
+          </span>
+          <ul className="knd-session-list">
+            {node.sessionIds.map((sid) => (
+              <li key={sid} className="knd-session-item">
+                <button
+                  className="knd-session-link"
+                  onClick={() => onSessionSelect(sid)}
+                >
+                  {sid.slice(0, 8)}...
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   )

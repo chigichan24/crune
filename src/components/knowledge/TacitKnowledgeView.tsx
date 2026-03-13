@@ -1,10 +1,14 @@
+import type { KnowledgeGraphMetrics, TopicNode } from '../../types'
 import './TacitKnowledgeView.css'
 
 interface Props {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   knowledge: any | null
+  graphMetrics?: KnowledgeGraphMetrics
+  topics?: TopicNode[]
 }
 
-export function TacitKnowledgeView({ knowledge }: Props) {
+export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
   if (!knowledge) {
     return (
       <div className="tacit-knowledge-view">
@@ -13,17 +17,35 @@ export function TacitKnowledgeView({ knowledge }: Props) {
     )
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workflowPatterns: any[] = knowledge.workflowPatterns ?? []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const commonToolSequences: any[] = knowledge.commonToolSequences ?? []
   const painPoints = knowledge.painPoints ?? {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const longSessions: any[] = painPoints.longSessions ?? []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hotFiles: any[] = painPoints.hotFiles ?? []
+
+  // Knowledge graph insights
+  const isolatedTopics = topics?.filter((t) => t.degreeCentrality === 0) ?? []
+  const bridgeTopics = topics
+    ?.filter(
+      (t) =>
+        graphMetrics?.bridgeTopicIds?.includes(t.id) && t.betweennessCentrality > 0
+    )
+    ?.sort((a, b) => b.betweennessCentrality - a.betweennessCentrality) ?? []
+  const crossProjectTopics =
+    topics?.filter((t) => t.projects.length > 1) ?? []
 
   const hasContent =
     workflowPatterns.length > 0 ||
     commonToolSequences.length > 0 ||
     longSessions.length > 0 ||
-    hotFiles.length > 0
+    hotFiles.length > 0 ||
+    isolatedTopics.length > 0 ||
+    bridgeTopics.length > 0 ||
+    crossProjectTopics.length > 0
 
   if (!hasContent) {
     return (
@@ -39,11 +61,87 @@ export function TacitKnowledgeView({ knowledge }: Props) {
       <h3 className="tk-title">Tacit Knowledge</h3>
 
       <div className="tk-sections">
+        {/* Knowledge Silos */}
+        {isolatedTopics.length > 0 && (
+          <div className="tk-section">
+            <h4 className="tk-section-title">Knowledge Silos</h4>
+            <p className="tk-section-desc">
+              These topics have no connections to other knowledge areas
+            </p>
+            <div className="tk-cards">
+              {isolatedTopics.map((topic) => (
+                <div key={topic.id} className="tk-card tk-card-silo">
+                  <p className="tk-card-description">{topic.label}</p>
+                  <div className="tk-card-meta">
+                    <span className="tk-card-badge">
+                      {topic.sessionCount} session{topic.sessionCount !== 1 ? 's' : ''}
+                    </span>
+                    <span className="tk-card-keywords">
+                      {topic.keywords.slice(0, 3).join(', ')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bridge Topics */}
+        {bridgeTopics.length > 0 && (
+          <div className="tk-section">
+            <h4 className="tk-section-title">Bridge Topics</h4>
+            <p className="tk-section-desc">
+              These topics connect multiple knowledge domains
+            </p>
+            <div className="tk-cards">
+              {bridgeTopics.map((topic) => (
+                <div key={topic.id} className="tk-card tk-card-bridge">
+                  <p className="tk-card-description">{topic.label}</p>
+                  <div className="tk-card-meta">
+                    <span className="tk-card-badge tk-badge-bridge">
+                      BC: {topic.betweennessCentrality.toFixed(3)}
+                    </span>
+                    <span className="tk-card-keywords">
+                      {topic.keywords.slice(0, 3).join(', ')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cross-Project Knowledge */}
+        {crossProjectTopics.length > 0 && (
+          <div className="tk-section">
+            <h4 className="tk-section-title">Cross-Project Knowledge</h4>
+            <p className="tk-section-desc">
+              Topics spanning multiple projects
+            </p>
+            <div className="tk-cards">
+              {crossProjectTopics.map((topic) => (
+                <div key={topic.id} className="tk-card">
+                  <p className="tk-card-description">{topic.label}</p>
+                  <div className="tk-card-meta">
+                    <span className="tk-card-badge">
+                      {topic.projects.length} projects
+                    </span>
+                    <span className="tk-card-keywords">
+                      {topic.projects.join(', ')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Workflow Patterns */}
         {workflowPatterns.length > 0 && (
           <div className="tk-section">
             <h4 className="tk-section-title">Workflow Patterns</h4>
             <div className="tk-cards">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {workflowPatterns.map((pattern: any, i: number) => (
                 <div key={i} className="tk-card">
                   <p className="tk-card-description">
@@ -66,6 +164,7 @@ export function TacitKnowledgeView({ knowledge }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Common Tool Sequences</h4>
             <div className="tk-cards">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {commonToolSequences.map((seq: any, i: number) => (
                 <div key={i} className="tk-card">
                   <div className="tk-sequence-flow">
@@ -92,6 +191,7 @@ export function TacitKnowledgeView({ knowledge }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Long Sessions</h4>
             <div className="tk-cards">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {longSessions.map((point: any, i: number) => (
                 <div key={i} className="tk-card tk-card-warning">
                   <div className="tk-pain-header">
@@ -117,6 +217,7 @@ export function TacitKnowledgeView({ knowledge }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Hot Files (5+ edits in one session)</h4>
             <div className="tk-cards">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {hotFiles.map((point: any, i: number) => (
                 <div key={i} className="tk-card tk-card-warning">
                   <div className="tk-pain-header">

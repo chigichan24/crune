@@ -168,40 +168,64 @@ export interface ModelUsageItem {
   count: number
 }
 
-// === Knowledge Graph ===
-export interface KnowledgeGraph {
-  nodes: KnowledgeNode[]
-  edges: KnowledgeEdge[]
-  clusters: KnowledgeCluster[]
+// === Knowledge Graph (Semantic Topic Graph) ===
+export type SemanticEdgeType =
+  | 'semantic-similarity'
+  | 'shared-module'
+  | 'workflow-continuation'
+  | 'cross-project-bridge'
+
+export interface TopicNode {
+  id: string // "topic-001"
+  label: string // auto-generated from top keywords + project
+  keywords: string[] // top-5 TF-IDF terms
+  project: string // dominant project
+  projects: string[] // all contributing projects
+  sessionIds: string[] // member session IDs
+  sessionCount: number
+  totalDurationMinutes: number
+  totalToolCalls: number
+  firstSeen: string
+  lastSeen: string
+  betweennessCentrality: number
+  degreeCentrality: number
+  communityId: number // Louvain community
 }
 
-export interface KnowledgeNode {
-  id: string // sessionId
-  project: string
-  firstPrompt: string // truncated to 30 chars for label
-  createdAt: string
-  toolCallCount: number
-  durationMinutes: number
-}
-
-export interface KnowledgeEdge {
-  source: string // sessionId
-  target: string // sessionId
-  type: EdgeType
+export interface TopicEdge {
+  source: string // topic ID
+  target: string // topic ID
+  type: SemanticEdgeType
   strength: number // 0-1
+  label: string // human-readable edge description
+  signals: {
+    semanticSimilarity: number
+    fileOverlap: number
+    sessionOverlap: number
+  }
 }
 
-export type EdgeType =
-  | 'same-branch'
-  | 'shared-files'
-  | 'resume-chain'
-  | 'memory-chain'
-  | 'plan-reference'
+export interface KnowledgeCommunity {
+  id: number
+  topicIds: string[]
+  label: string
+  dominantProject: string
+}
 
-export interface KnowledgeCluster {
-  id: string
-  nodeIds: string[]
-  label: string // auto-generated from dominant project/branch
+export interface KnowledgeGraphMetrics {
+  totalTopics: number
+  totalEdges: number
+  graphDensity: number
+  modularity: number
+  isolatedTopicCount: number
+  bridgeTopicIds: string[]
+}
+
+export interface KnowledgeGraph {
+  nodes: TopicNode[]
+  edges: TopicEdge[]
+  communities: KnowledgeCommunity[]
+  metrics: KnowledgeGraphMetrics
 }
 
 // === Tacit Knowledge ===

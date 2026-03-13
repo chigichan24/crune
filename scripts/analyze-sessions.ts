@@ -12,6 +12,11 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as readline from "node:readline";
 import * as os from "node:os";
+import {
+  buildSemanticKnowledgeGraph,
+  type SessionInput,
+  type SemanticKnowledgeGraph,
+} from "./knowledge-graph-builder.js";
 
 // ─── CLI argument parsing ───────────────────────────────────────────────────
 
@@ -197,22 +202,6 @@ interface DetailJson {
   linkedPlan: { slug: string; content: string } | null;
 }
 
-interface KnowledgeGraphNode {
-  id: string;
-  project: string;
-  firstPrompt: string;
-  createdAt: string;
-  toolCallCount: number;
-  durationMinutes: number;
-}
-
-interface KnowledgeGraphEdge {
-  source: string;
-  target: string;
-  type: string;
-  strength: number;
-}
-
 interface OverviewJson {
   generatedAt: string;
   activityHeatmap: number[][];
@@ -221,10 +210,7 @@ interface OverviewJson {
   durationDistribution: { bucket: string; count: number }[];
   topFiles: { file: string; editCount: number }[];
   modelUsage: { model: string; count: number }[];
-  knowledgeGraph: {
-    nodes: KnowledgeGraphNode[];
-    edges: KnowledgeGraphEdge[];
-  };
+  knowledgeGraph: SemanticKnowledgeGraph;
   tacitKnowledge: {
     workflowPatterns: { project: string; planModeUsage: number; totalSessions: number }[];
     commonToolSequences: { sequence: string[]; count: number }[];
@@ -736,9 +722,7 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
   // Model usage
   const modelCounts = new Map<string, number>();
 
-  // Knowledge graph
-  const nodes: KnowledgeGraphNode[] = [];
-  const edges: KnowledgeGraphEdge[] = [];
+  // Knowledge graph (built separately via semantic pipeline)
 
   // Tacit knowledge
   const projectPlanMode = new Map<
@@ -809,20 +793,6 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
       modelCounts.set(model, (modelCounts.get(model) || 0) + count);
     }
 
-    // Knowledge graph node
-    const totalToolCalls = Object.values(meta.toolBreakdown).reduce(
-      (a, b) => a + b,
-      0
-    );
-    nodes.push({
-      id: meta.sessionId,
-      project: session.projectDisplayName,
-      firstPrompt: truncate(meta.firstUserPrompt, 30),
-      createdAt: meta.createdAt,
-      toolCallCount: totalToolCalls,
-      durationMinutes: meta.durationMinutes,
-    });
-
     // Tacit knowledge: plan mode usage
     const projPlan = projectPlanMode.get(session.projectDisplayName) || {
       planCount: 0,
@@ -841,8 +811,29 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
     }
   }
 
-  // Build knowledge graph edges
-  buildKnowledgeGraphEdges(sessions, edges);
+  // Build semantic knowledge graph
+  const sessionInputs: SessionInput[] = sessions.map((s) => ({
+    sessionId: s.meta.sessionId,
+    projectDisplayName: s.projectDisplayName,
+    turns: s.turns.map((t) => ({
+      userPrompt: t.userPrompt,
+      assistantTexts: t.assistantTexts,
+      toolCalls: t.toolCalls.map((tc) => ({
+        toolName: tc.toolName,
+        input: tc.input,
+      })),
+    })),
+    meta: {
+      sessionId: s.meta.sessionId,
+      createdAt: s.meta.createdAt,
+      lastActiveAt: s.meta.lastActiveAt,
+      durationMinutes: s.meta.durationMinutes,
+      filesEdited: s.meta.filesEdited,
+      gitBranch: s.meta.gitBranch,
+      toolBreakdown: s.meta.toolBreakdown,
+    },
+  }));
+  const knowledgeGraph = buildSemanticKnowledgeGraph(sessionInputs);
 
   // Top files
   const topFiles = [...fileEditCounts.entries()]
@@ -932,7 +923,7 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
     durationDistribution,
     topFiles,
     modelUsage,
-    knowledgeGraph: { nodes, edges },
+    knowledgeGraph,
     tacitKnowledge: {
       workflowPatterns,
       commonToolSequences,
@@ -952,125 +943,7 @@ function getWeekLabel(date: Date): string {
   return `${date.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
 }
 
-function buildKnowledgeGraphEdges(
-  sessions: ParsedSession[],
-  edges: KnowledgeGraphEdge[]
-): void {
-  // Index sessions by (project, branch) and by slug
-  const branchGroups = new Map<string, ParsedSession[]>();
-  const slugGroups = new Map<string, ParsedSession[]>();
-  const projectGroups = new Map<string, ParsedSession[]>();
-
-  for (const s of sessions) {
-    const branchKey = `${s.projectDisplayName}::${s.meta.gitBranch}`;
-    const group = branchGroups.get(branchKey) || [];
-    group.push(s);
-    branchGroups.set(branchKey, group);
-
-    if (s.meta.slug) {
-      const slugGroup = slugGroups.get(s.meta.slug) || [];
-      slugGroup.push(s);
-      slugGroups.set(s.meta.slug, slugGroup);
-    }
-
-    const projGroup = projectGroups.get(s.projectDisplayName) || [];
-    projGroup.push(s);
-    projectGroups.set(s.projectDisplayName, projGroup);
-  }
-
-  const edgeSet = new Set<string>();
-  const addEdge = (
-    source: string,
-    target: string,
-    type: string,
-    strength: number
-  ) => {
-    const key = `${source}::${target}::${type}`;
-    if (!edgeSet.has(key) && source !== target) {
-      edgeSet.add(key);
-      edges.push({ source, target, type, strength });
-    }
-  };
-
-  // same-branch: chronological chain
-  for (const group of branchGroups.values()) {
-    if (group.length < 2) continue;
-    const sorted = [...group].sort(
-      (a, b) =>
-        new Date(a.meta.createdAt).getTime() -
-        new Date(b.meta.createdAt).getTime()
-    );
-    for (let i = 0; i < sorted.length - 1; i++) {
-      addEdge(
-        sorted[i].meta.sessionId,
-        sorted[i + 1].meta.sessionId,
-        "same-branch",
-        1.0
-      );
-    }
-  }
-
-  // shared-files: Jaccard coefficient > 0.3
-  for (let i = 0; i < sessions.length; i++) {
-    const filesA = new Set(sessions[i].meta.filesEdited);
-    if (filesA.size === 0) continue;
-    for (let j = i + 1; j < sessions.length; j++) {
-      const filesB = new Set(sessions[j].meta.filesEdited);
-      if (filesB.size === 0) continue;
-      const intersection = [...filesA].filter((f) => filesB.has(f)).length;
-      const union = new Set([...filesA, ...filesB]).size;
-      const jaccard = union > 0 ? intersection / union : 0;
-      if (jaccard > 0.3) {
-        addEdge(
-          sessions[i].meta.sessionId,
-          sessions[j].meta.sessionId,
-          "shared-files",
-          Math.round(jaccard * 100) / 100
-        );
-      }
-    }
-  }
-
-  // plan-reference: same slug
-  for (const group of slugGroups.values()) {
-    if (group.length < 2) continue;
-    const sorted = [...group].sort(
-      (a, b) =>
-        new Date(a.meta.createdAt).getTime() -
-        new Date(b.meta.createdAt).getTime()
-    );
-    for (let i = 0; i < sorted.length - 1; i++) {
-      addEdge(
-        sorted[i].meta.sessionId,
-        sorted[i + 1].meta.sessionId,
-        "plan-reference",
-        1.0
-      );
-    }
-  }
-
-  // memory-chain: sessions that edit MEMORY.md -> subsequent sessions in same project
-  for (const [, projSessions] of projectGroups) {
-    const sorted = [...projSessions].sort(
-      (a, b) =>
-        new Date(a.meta.createdAt).getTime() -
-        new Date(b.meta.createdAt).getTime()
-    );
-    for (let i = 0; i < sorted.length; i++) {
-      const writesMemory = sorted[i].meta.filesEdited.some((f) =>
-        f.endsWith("MEMORY.md")
-      );
-      if (writesMemory && i + 1 < sorted.length) {
-        addEdge(
-          sorted[i].meta.sessionId,
-          sorted[i + 1].meta.sessionId,
-          "memory-chain",
-          0.8
-        );
-      }
-    }
-  }
-}
+// buildKnowledgeGraphEdges removed — replaced by buildSemanticKnowledgeGraph
 
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 

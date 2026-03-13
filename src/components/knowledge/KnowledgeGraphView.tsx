@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import type {
   SessionOverviewData,
-  KnowledgeNode,
-  KnowledgeEdge,
-  EdgeType,
+  TopicNode,
+  TopicEdge,
+  SemanticEdgeType,
+  KnowledgeCommunity,
 } from '../../types'
 import { KnowledgeNodeDetail } from './KnowledgeNodeDetail'
 import { TacitKnowledgeView } from './TacitKnowledgeView'
+import { GraphMetricsPanel } from './GraphMetricsPanel'
 import './KnowledgeGraphView.css'
 
 interface Props {
@@ -17,37 +19,38 @@ interface Props {
   onSessionSelect: (sessionId: string) => void
 }
 
-const CHART_COLORS = [
-  '#a78bfa',
-  '#34d399',
-  '#fb923c',
-  '#f472b6',
-  '#60a5fa',
-  '#fbbf24',
+const COMMUNITY_COLORS = [
+  '#6366f1',
+  '#06b6d4',
+  '#f59e0b',
+  '#ec4899',
+  '#8b5cf6',
+  '#14b8a6',
+  '#f97316',
+  '#84cc16',
+  '#e11d48',
+  '#0ea5e9',
 ]
 
-const EDGE_COLORS: Record<EdgeType, string> = {
-  'same-branch': '#a78bfa',
-  'shared-files': '#8b7aaa',
-  'resume-chain': '#34d399',
-  'memory-chain': '#fbbf24',
-  'plan-reference': '#60a5fa',
+const EDGE_COLORS: Record<SemanticEdgeType, string> = {
+  'semantic-similarity': '#6366f1',
+  'shared-module': '#06b6d4',
+  'workflow-continuation': '#14b8a6',
+  'cross-project-bridge': '#f59e0b',
 }
 
-const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
-  'same-branch': 'Same Branch',
-  'shared-files': 'Shared Files',
-  'resume-chain': 'Resume Chain',
-  'memory-chain': 'Memory Chain',
-  'plan-reference': 'Plan Reference',
+const EDGE_TYPE_LABELS: Record<SemanticEdgeType, string> = {
+  'semantic-similarity': 'Semantic Similarity',
+  'shared-module': 'Shared Module',
+  'workflow-continuation': 'Workflow Continuation',
+  'cross-project-bridge': 'Cross-Project Bridge',
 }
 
-const ALL_EDGE_TYPES: EdgeType[] = [
-  'same-branch',
-  'shared-files',
-  'resume-chain',
-  'memory-chain',
-  'plan-reference',
+const ALL_EDGE_TYPES: SemanticEdgeType[] = [
+  'semantic-similarity',
+  'shared-module',
+  'workflow-continuation',
+  'cross-project-bridge',
 ]
 
 export function KnowledgeGraphView({
@@ -58,39 +61,36 @@ export function KnowledgeGraphView({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 })
-  const [selectedNode, setSelectedNode] = useState<KnowledgeNode | null>(null)
+  const [selectedNode, setSelectedNode] = useState<TopicNode | null>(null)
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
-  const [visibleProjects, setVisibleProjects] = useState<Set<string>>(
+  const [visibleCommunities, setVisibleCommunities] = useState<Set<number>>(
     new Set()
   )
-  const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<EdgeType>>(
+  const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<SemanticEdgeType>>(
     new Set(ALL_EDGE_TYPES)
   )
 
-  // Extract unique projects from knowledge graph
-  const projects = useMemo(() => {
+  // Extract communities
+  const communities = useMemo(() => {
     if (!overview) return []
-    const projectSet = new Set(
-      overview.knowledgeGraph.nodes.map((n) => n.project)
-    )
-    return Array.from(projectSet).sort()
+    return overview.knowledgeGraph.communities
   }, [overview])
 
-  // Build project -> color mapping
-  const projectColorMap = useMemo(() => {
-    const map = new Map<string, string>()
-    projects.forEach((p, i) => {
-      map.set(p, CHART_COLORS[i % CHART_COLORS.length])
+  // Build community -> color mapping
+  const communityColorMap = useMemo(() => {
+    const map = new Map<number, string>()
+    communities.forEach((c, i) => {
+      map.set(c.id, COMMUNITY_COLORS[i % COMMUNITY_COLORS.length])
     })
     return map
-  }, [projects])
+  }, [communities])
 
-  // Initialize visible projects when data loads
+  // Initialize visible communities when data loads
   useEffect(() => {
-    if (projects.length > 0 && visibleProjects.size === 0) {
-      setVisibleProjects(new Set(projects))
+    if (communities.length > 0 && visibleCommunities.size === 0) {
+      setVisibleCommunities(new Set(communities.map((c) => c.id)))
     }
-  }, [projects, visibleProjects.size])
+  }, [communities, visibleCommunities.size])
 
   // ResizeObserver for responsive graph sizing
   useEffect(() => {
@@ -112,7 +112,9 @@ export function KnowledgeGraphView({
     if (!overview) return { nodes: [], links: [] }
 
     const { nodes, edges } = overview.knowledgeGraph
-    const filteredNodes = nodes.filter((n) => visibleProjects.has(n.project))
+    const filteredNodes = nodes.filter((n) =>
+      visibleCommunities.has(n.communityId)
+    )
     const nodeIds = new Set(filteredNodes.map((n) => n.id))
 
     const filteredEdges = edges.filter(
@@ -125,21 +127,23 @@ export function KnowledgeGraphView({
     return {
       nodes: filteredNodes.map((n) => ({
         id: n.id,
+        label: n.label,
+        keywords: n.keywords,
         project: n.project,
-        firstPrompt: n.firstPrompt,
-        createdAt: n.createdAt,
-        toolCallCount: n.toolCallCount,
-        durationMinutes: n.durationMinutes,
-        val: Math.max(1, n.toolCallCount / 10),
+        sessionCount: n.sessionCount,
+        communityId: n.communityId,
+        betweennessCentrality: n.betweennessCentrality,
+        val: Math.max(2, n.sessionCount * 2),
       })),
       links: filteredEdges.map((e) => ({
         source: e.source,
         target: e.target,
         type: e.type,
         strength: e.strength,
+        label: e.label,
       })),
     }
-  }, [overview, visibleProjects, visibleEdgeTypes])
+  }, [overview, visibleCommunities, visibleEdgeTypes])
 
   // Edges connected to selected node
   const selectedNodeEdges = useMemo(() => {
@@ -153,10 +157,10 @@ export function KnowledgeGraphView({
   const handleNodeClick = useCallback(
     (node: any) => {
       if (!overview || !node.id) return
-      const knowledgeNode = overview.knowledgeGraph.nodes.find(
-        (n: KnowledgeNode) => n.id === node.id
+      const topicNode = overview.knowledgeGraph.nodes.find(
+        (n: TopicNode) => n.id === node.id
       )
-      setSelectedNode(knowledgeNode ?? null)
+      setSelectedNode(topicNode ?? null)
     },
     [overview]
   )
@@ -173,19 +177,19 @@ export function KnowledgeGraphView({
     setSelectedNode(null)
   }, [])
 
-  const toggleProject = useCallback((project: string) => {
-    setVisibleProjects((prev) => {
+  const toggleCommunity = useCallback((communityId: number) => {
+    setVisibleCommunities((prev) => {
       const next = new Set(prev)
-      if (next.has(project)) {
-        next.delete(project)
+      if (next.has(communityId)) {
+        next.delete(communityId)
       } else {
-        next.add(project)
+        next.add(communityId)
       }
       return next
     })
   }, [])
 
-  const toggleEdgeType = useCallback((edgeType: EdgeType) => {
+  const toggleEdgeType = useCallback((edgeType: SemanticEdgeType) => {
     setVisibleEdgeTypes((prev) => {
       const next = new Set(prev)
       if (next.has(edgeType)) {
@@ -203,27 +207,31 @@ export function KnowledgeGraphView({
       if (hoveredNodeId && String(node.id) === hoveredNodeId) {
         return '#ffffff'
       }
-      return projectColorMap.get(node.project ?? '') ?? CHART_COLORS[0]
+      return communityColorMap.get(node.communityId ?? 0) ?? COMMUNITY_COLORS[0]
     },
-    [projectColorMap, hoveredNodeId]
+    [communityColorMap, hoveredNodeId]
   )
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const linkColor = useCallback(
     (link: any) => {
-      return EDGE_COLORS[(link.type as EdgeType) ?? 'shared-files'] ?? '#8b949e'
+      return (
+        EDGE_COLORS[(link.type as SemanticEdgeType) ?? 'semantic-similarity'] ??
+        '#8b949e'
+      )
     },
     []
   )
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const linkWidth = useCallback((link: any) => {
-    return (link.strength ?? 0.5) * 2
+    return (link.strength ?? 0.5) * 3
   }, [])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nodeLabel = useCallback((node: any) => {
-    return node.firstPrompt ?? ''
+    const kw = (node.keywords as string[]) || []
+    return `${node.label}\n[${kw.join(', ')}]\nSessions: ${node.sessionCount ?? 0}`
   }, [])
 
   if (loading) {
@@ -255,22 +263,25 @@ export function KnowledgeGraphView({
       {/* Filter controls */}
       <div className="kg-filters">
         <div className="kg-filter-group">
-          <span className="kg-filter-label">Projects</span>
+          <span className="kg-filter-label">Communities</span>
           <div className="kg-filter-options">
-            {projects.map((project) => (
-              <label key={project} className="kg-filter-checkbox">
+            {communities.map((comm: KnowledgeCommunity) => (
+              <label key={comm.id} className="kg-filter-checkbox">
                 <input
                   type="checkbox"
-                  checked={visibleProjects.has(project)}
-                  onChange={() => toggleProject(project)}
+                  checked={visibleCommunities.has(comm.id)}
+                  onChange={() => toggleCommunity(comm.id)}
                 />
                 <span
                   className="project-color-dot"
                   style={{
-                    backgroundColor: projectColorMap.get(project),
+                    backgroundColor: communityColorMap.get(comm.id),
                   }}
                 />
-                {project}
+                {comm.label}
+                <span className="kg-filter-count">
+                  ({comm.topicIds.length})
+                </span>
               </label>
             ))}
           </div>
@@ -297,6 +308,12 @@ export function KnowledgeGraphView({
         </div>
       </div>
 
+      {/* Metrics panel */}
+      <GraphMetricsPanel
+        metrics={overview.knowledgeGraph.metrics}
+        communities={communities}
+      />
+
       {/* Graph + detail panel */}
       <div className="kg-content">
         <div
@@ -308,7 +325,7 @@ export function KnowledgeGraphView({
               graphData={filteredData}
               width={dimensions.width}
               height={dimensions.height}
-              backgroundColor="#faf7ff"
+              backgroundColor="#fafaf9"
               nodeLabel={nodeLabel}
               nodeColor={nodeColor}
               nodeVal="val"
@@ -324,7 +341,7 @@ export function KnowledgeGraphView({
             />
           ) : (
             <div className="kg-empty">
-              No nodes match the current filters
+              No topics match the current filters
             </div>
           )}
         </div>
@@ -333,6 +350,7 @@ export function KnowledgeGraphView({
           <KnowledgeNodeDetail
             node={selectedNode}
             edges={selectedNodeEdges}
+            allTopics={overview.knowledgeGraph.nodes}
             onSessionSelect={onSessionSelect}
             onClose={handleCloseDetail}
           />
@@ -341,7 +359,11 @@ export function KnowledgeGraphView({
 
       {/* Tacit knowledge section */}
       <div className="kg-tacit-section">
-        <TacitKnowledgeView knowledge={overview.tacitKnowledge} />
+        <TacitKnowledgeView
+          knowledge={overview.tacitKnowledge}
+          graphMetrics={overview.knowledgeGraph.metrics}
+          topics={overview.knowledgeGraph.nodes}
+        />
       </div>
     </div>
   )

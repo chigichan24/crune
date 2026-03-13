@@ -104,6 +104,12 @@
   color: var(--danger);
 }
 
+.kg-filter-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+
 /* Tacit knowledge section */
 .kg-tacit-section {
   flex-shrink: 0;
