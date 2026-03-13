@@ -34,6 +34,26 @@ const DOT_COLOR_MAP: Record<DotColor, string> = {
   green: 'var(--chart-2)',
 }
 
+const LEGEND_ITEMS: Array<{ color: DotColor; label: string; description: string }> = [
+  { color: 'blue', label: 'Standard', description: 'Code editing, file reading, shell commands' },
+  { color: 'orange', label: 'Planning', description: 'Plan mode or task management turns' },
+  { color: 'green', label: 'Agent', description: 'Spawns subagents for parallel work' },
+]
+
+function summarizeTurn(turn: any): string {
+  const toolCalls = turn.toolCalls ?? []
+  const color = getDotColor(turn)
+  const category = LEGEND_ITEMS.find(l => l.color === color)
+  const prompt = (turn.userPrompt ?? '').slice(0, 80)
+  const toolNames = [...new Set(toolCalls.map((tc: any) => tc.toolName))].join(', ')
+  const lines = [
+    `Turn ${(turn.turnIndex ?? 0) + 1} — ${category?.label ?? 'Standard'}`,
+    prompt ? `"${prompt}${(turn.userPrompt ?? '').length > 80 ? '...' : ''}"` : '',
+    toolCalls.length > 0 ? `Tools (${toolCalls.length}): ${toolNames}` : 'No tool calls',
+  ]
+  return lines.filter(Boolean).join('\n')
+}
+
 export function SessionPlayback({ sessionId, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
   const [activeTurnIndex, setActiveTurnIndex] = useState(0)
@@ -41,6 +61,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
   const contentRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
+  const [hoveredBar, setHoveredBar] = useState<{ index: number; x: number; y: number } | null>(null)
 
   // Turn measurements for minimap
   const [turnMeasurements, setTurnMeasurements] = useState<Array<{ top: number; height: number }>>([])
@@ -249,6 +270,20 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
         </button>
       </div>
 
+      {/* Color legend */}
+      <div className="playback-legend">
+        {LEGEND_ITEMS.map((item) => (
+          <div key={item.color} className="legend-item" title={item.description}>
+            <span
+              className="legend-dot"
+              style={{ backgroundColor: DOT_COLOR_MAP[item.color] }}
+            />
+            <span className="legend-label">{item.label}</span>
+            <span className="legend-desc">{item.description}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="playback-body">
         {/* Minimap */}
         <div
@@ -266,6 +301,11 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
                   height: `${bar.heightPct}%`,
                   backgroundColor: DOT_COLOR_MAP[bar.color],
                 }}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setHoveredBar({ index: bar.index, x: rect.right + 8, y: rect.top })
+                }}
+                onMouseLeave={() => setHoveredBar(null)}
               />
             ))}
           </div>
@@ -278,6 +318,20 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
             onMouseDown={handleViewportMouseDown}
           />
         </div>
+
+        {/* Minimap hover tooltip */}
+        {hoveredBar && (
+          <div
+            className="minimap-tooltip"
+            style={{ top: hoveredBar.y, left: hoveredBar.x }}
+          >
+            {summarizeTurn(turns[hoveredBar.index]).split('\n').map((line, i) => (
+              <div key={i} className={i === 0 ? 'minimap-tooltip-title' : 'minimap-tooltip-line'}>
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Turn content */}
         <div ref={contentRef} className="playback-content">
