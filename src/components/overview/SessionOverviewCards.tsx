@@ -16,7 +16,10 @@ function formatDuration(totalMinutes: number): string {
 export function SessionOverviewCards({ sessions, projects }: Props) {
   const totalSessions = sessions.length
   const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0)
-  const totalToolCalls = sessions.reduce((sum, s) => sum + s.toolCallCount, 0)
+  const totalToolCalls = sessions.reduce((sum, s) => {
+    const tc = s.toolCallCount ?? Object.values(s.toolBreakdown ?? {}).reduce((a: number, b: number) => a + b, 0)
+    return sum + tc
+  }, 0)
   const uniqueProjects = projects.length
 
   return (

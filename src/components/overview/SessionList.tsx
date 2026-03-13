@@ -78,8 +78,11 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         case 'duration':
           return b.durationMinutes - a.durationMinutes
-        case 'tools':
-          return b.toolCallCount - a.toolCallCount
+        case 'tools': {
+          const aTools = a.toolCallCount ?? Object.values(a.toolBreakdown ?? {}).reduce((x: number, y: number) => x + y, 0)
+          const bTools = b.toolCallCount ?? Object.values(b.toolBreakdown ?? {}).reduce((x: number, y: number) => x + y, 0)
+          return bTools - aTools
+        }
       }
     })
 
@@ -104,11 +107,14 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
           onChange={(e) => { setProjectFilter(e.target.value); setPage(0) }}
         >
           <option value="">All Projects</option>
-          {projects.map((p) => (
-            <option key={p.projectDir} value={p.displayName}>
-              {p.displayName}
+          {projects.map((p) => {
+            const name = (p as any).name ?? p.displayName ?? p.projectDir
+            return (
+            <option key={name} value={name}>
+              {name}
             </option>
-          ))}
+            )
+          })}
         </select>
 
         <input
@@ -194,7 +200,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
                     {formatDuration(s.durationMinutes)}
                   </td>
                   <td className="session-list-td session-list-td--right">
-                    {s.toolCallCount}
+                    {s.toolCallCount ?? Object.values(s.toolBreakdown ?? {}).reduce((a: number, b: number) => a + b, 0)}
                   </td>
                   <td className="session-list-td session-list-td--prompt">
                     {truncate(s.firstUserPrompt, 80)}

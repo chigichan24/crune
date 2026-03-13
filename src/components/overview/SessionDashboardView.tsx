@@ -31,7 +31,8 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
     return <div className="dashboard-status">No overview data available.</div>
   }
 
-  const { statistics } = overview
+  // overview.json has flat structure (no nested "statistics" key)
+  const stats = overview as any
 
   return (
     <div className="session-dashboard">
@@ -40,32 +41,32 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
       <div className="dashboard-grid">
         <div className="dashboard-section dashboard-section--wide">
           <h2 className="dashboard-section-title">Activity Heatmap</h2>
-          <SessionActivityHeatmap heatmap={statistics.activityHeatmap} />
+          <SessionActivityHeatmap heatmap={stats.activityHeatmap} />
         </div>
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Project Distribution</h2>
-          <SessionProjectDistribution distribution={statistics.projectDistribution} />
+          <SessionProjectDistribution distribution={stats.projectDistribution} />
         </div>
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Model Usage</h2>
-          <SessionModelUsage usage={statistics.modelUsage} />
+          <SessionModelUsage usage={stats.modelUsage} />
         </div>
 
         <div className="dashboard-section dashboard-section--wide">
           <h2 className="dashboard-section-title">Weekly Tool Trends</h2>
-          <SessionToolTrends trends={statistics.weeklyToolTrends} />
+          <SessionToolTrends trends={stats.weeklyToolTrends} />
         </div>
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Session Duration Distribution</h2>
-          <SessionDurationDistribution distribution={statistics.durationDistribution} />
+          <SessionDurationDistribution distribution={stats.durationDistribution} />
         </div>
 
         <div className="dashboard-section">
           <h2 className="dashboard-section-title">Top Files</h2>
-          <SessionTopFiles files={statistics.topFiles} />
+          <SessionTopFiles files={stats.topFiles} />
         </div>
 
         <div className="dashboard-section dashboard-section--full">

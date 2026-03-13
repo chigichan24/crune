@@ -24,18 +24,22 @@ export function SessionTopFiles({ files }: Props) {
           </tr>
         </thead>
         <tbody>
-          {topFiles.map((file, i) => (
-            <tr key={file.filePath} className="top-files-row">
+          {topFiles.map((file, i) => {
+            const path = (file as any).file ?? file.filePath
+            const projects = file.projects ?? []
+            return (
+            <tr key={path} className="top-files-row">
               <td className="top-files-td top-files-td--rank">{i + 1}</td>
-              <td className="top-files-td top-files-td--path" title={file.filePath}>
-                {file.filePath}
+              <td className="top-files-td top-files-td--path" title={path}>
+                {path}
               </td>
               <td className="top-files-td top-files-td--count">{file.editCount}</td>
               <td className="top-files-td top-files-td--projects">
-                {file.projects.join(', ')}
+                {projects.length > 0 ? projects.join(', ') : '-'}
               </td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>
