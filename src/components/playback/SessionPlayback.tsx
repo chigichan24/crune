@@ -1,16 +1,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSessionDetail } from '../../hooks/useSessionDetail.ts'
-import { PlaybackTimeline } from './PlaybackTimeline.tsx'
 import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
 import './SessionPlayback.css'
 
 interface Props {
   sessionId: string | null
-  onBack: () => void
+  onClose: () => void
 }
 
-export function SessionPlayback({ sessionId, onBack }: Props) {
+type DotColor = 'blue' | 'orange' | 'green'
+
+function getDotColor(turn: any): DotColor {
+  const toolCalls = turn.toolCalls ?? []
+  const hasAgent = toolCalls.some((tc: any) => tc.toolName === 'Agent')
+  if (hasAgent) return 'green'
+
+  const hasPlanTool = toolCalls.some(
+    (tc: any) =>
+      tc.toolName === 'EnterPlanMode' ||
+      tc.toolName === 'ExitPlanMode' ||
+      tc.toolName === 'TaskCreate' ||
+      tc.toolName === 'TaskUpdate'
+  )
+  if (hasPlanTool) return 'orange'
+
+  return 'blue'
+}
+
+export function SessionPlayback({ sessionId, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
   const [activeTurnIndex, setActiveTurnIndex] = useState(0)
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map())
@@ -32,15 +50,19 @@ export function SessionPlayback({ sessionId, onBack }: Props) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!data) return
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key === 'ArrowDown') {
         e.preventDefault()
         setActiveTurnIndex(prev => Math.min(prev + 1, data.turns.length - 1))
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setActiveTurnIndex(prev => Math.max(prev - 1, 0))
       }
     },
-    [data]
+    [data, onClose]
   )
 
   useEffect(() => {
@@ -57,11 +79,7 @@ export function SessionPlayback({ sessionId, onBack }: Props) {
   }, [])
 
   if (!sessionId) {
-    return (
-      <div className="playback-empty">
-        Select a session from Overview to start playback
-      </div>
-    )
+    return null
   }
 
   if (loading) {
@@ -110,32 +128,42 @@ export function SessionPlayback({ sessionId, onBack }: Props) {
             </span>
           </div>
         </div>
-        <button className="playback-back-button" onClick={onBack}>
-          Back to Overview
+        <button className="playback-close-button" onClick={onClose}>
+          ✕
         </button>
       </div>
 
-      <PlaybackTimeline
-        turns={turns}
-        activeTurnIndex={activeTurnIndex}
-        onTurnSelect={setActiveTurnIndex}
-      />
-
       <div className="playback-body">
         <div className="playback-content">
-          {turns.map((turn, i) => (
-            <div
-              key={turn.turnIndex}
-              ref={el => setTurnRef(i, el)}
-              onClick={() => setActiveTurnIndex(i)}
-            >
-              <PlaybackStep
-                turn={turn}
-                isActive={i === activeTurnIndex}
-                subagents={subagents}
-              />
-            </div>
-          ))}
+          {turns.map((turn, i) => {
+            const dotColor = getDotColor(turn)
+            const isActive = i === activeTurnIndex
+            const isLast = i === turns.length - 1
+            return (
+              <div
+                key={turn.turnIndex}
+                className="playback-turn"
+                ref={el => setTurnRef(i, el)}
+                onClick={() => setActiveTurnIndex(i)}
+              >
+                <div className="turn-timeline">
+                  <button
+                    className={`turn-dot turn-dot--${dotColor} ${isActive ? 'turn-dot--active' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); setActiveTurnIndex(i) }}
+                    title={`Turn ${turn.turnIndex + 1}`}
+                  />
+                  {!isLast && <div className="turn-line" />}
+                </div>
+                <div className="turn-content">
+                  <PlaybackStep
+                    turn={turn}
+                    isActive={isActive}
+                    subagents={subagents}
+                  />
+                </div>
+              </div>
+            )
+          })}
         </div>
         <PlaybackSidePanel detail={data} />
       </div>

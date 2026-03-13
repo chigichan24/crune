@@ -6,7 +6,7 @@ import './App.css'
 import { KnowledgeGraphView } from './components/knowledge/KnowledgeGraphView'
 import { useSessionOverview } from './hooks/useSessionOverview'
 
-type ViewMode = 'overview' | 'playback' | 'knowledge'
+type ViewMode = 'overview' | 'knowledge'
 
 function App() {
   const [activeTab, setActiveTab] = useState<ViewMode>('overview')
@@ -16,8 +16,13 @@ function App() {
 
   const handleSessionSelect = (sessionId: string) => {
     setSelectedSessionId(sessionId)
-    setActiveTab('playback')
   }
+
+  const handleDrawerClose = () => {
+    setSelectedSessionId(null)
+  }
+
+  const drawerOpen = selectedSessionId !== null
 
   return (
     <div className="app">
@@ -35,12 +40,6 @@ function App() {
             onClick={() => setActiveTab('overview')}
           >
             Overview
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'playback' ? 'active' : ''}`}
-            onClick={() => setActiveTab('playback')}
-          >
-            Playback
           </button>
           <button
             className={`tab-button ${activeTab === 'knowledge' ? 'active' : ''}`}
@@ -70,15 +69,6 @@ function App() {
             )}
           </>
         )}
-        {activeTab === 'playback' && (
-          <SessionPlayback
-            sessionId={selectedSessionId}
-            onBack={() => {
-              setSelectedSessionId(null)
-              setActiveTab('overview')
-            }}
-          />
-        )}
         {activeTab === 'knowledge' && (
           <KnowledgeGraphView
             overview={overviewData}
@@ -88,6 +78,20 @@ function App() {
           />
         )}
       </main>
+
+      {/* Playback Drawer */}
+      <div
+        className={`playback-drawer-overlay ${drawerOpen ? 'open' : ''}`}
+        onClick={handleDrawerClose}
+      />
+      <div className={`playback-drawer ${drawerOpen ? 'open' : ''}`}>
+        {drawerOpen && (
+          <SessionPlayback
+            sessionId={selectedSessionId}
+            onClose={handleDrawerClose}
+          />
+        )}
+      </div>
     </div>
   )
 }

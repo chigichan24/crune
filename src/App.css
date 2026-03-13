@@ -74,3 +74,39 @@
   border: 1px dashed var(--border);
   border-radius: 8px;
 }
+
+/* Playback Drawer */
+.playback-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.playback-drawer-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.playback-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: calc(100vw - 60px);
+  max-width: 1200px;
+  background-color: var(--bg-primary);
+  z-index: 101;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.playback-drawer.open {
+  transform: translateX(0);
+}
