@@ -8,7 +8,7 @@
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   padding: 16px 24px 0;
-  box-shadow: 0 1px 8px rgba(168, 85, 247, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .app-brand {
@@ -25,7 +25,7 @@
 .app-title {
   font-size: 20px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--brand);
   margin: 0;
 }
 
@@ -76,11 +76,40 @@
   border-radius: 12px;
 }
 
+/* Help FAB */
+.help-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 90;
+}
+
+.help-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
 /* Playback Drawer */
 .playback-drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(59, 41, 96, 0.3);
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(4px);
   z-index: 100;
   opacity: 0;
@@ -106,7 +135,7 @@
   transition: transform 0.3s ease;
   overflow: hidden;
   border-left: 1px solid var(--border);
-  box-shadow: -4px 0 24px rgba(168, 85, 247, 0.1);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
 }
 
 .playback-drawer.open {

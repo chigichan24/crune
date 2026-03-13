@@ -16,7 +16,7 @@ interface Props {
   trends: WeeklyToolTrend[]
 }
 
-const CHART_COLORS = ['#a78bfa', '#34d399', '#fb923c', '#f472b6', '#60a5fa', '#fbbf24']
+const CHART_COLORS = ['#6366f1', '#06b6d4', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6']
 
 type ToolCategory = 'Core' | 'Agent' | 'Plan' | 'MCP' | 'Other'
 
@@ -103,32 +103,32 @@ export function SessionToolTrends({ trends }: Props) {
     scales: {
       x: {
         stacked: true,
-        ticks: { color: '#8b7aaa', font: { size: 10 } },
+        ticks: { color: '#78716c', font: { size: 10 } },
         grid: { display: false },
       },
       y: {
         stacked: true,
         max: 100,
         ticks: {
-          color: '#8b7aaa',
+          color: '#78716c',
           callback: (value: number | string) => `${value}%`,
         },
-        grid: { color: '#e4d9f5' },
+        grid: { color: '#e7e5e4' },
       },
     },
     plugins: {
       legend: {
         labels: {
-          color: '#8b7aaa',
+          color: '#1c1917',
           font: { size: 11 },
           boxWidth: 12,
         },
       },
       tooltip: {
         backgroundColor: '#ffffff',
-        titleColor: '#3b2960',
-        bodyColor: '#3b2960',
-        borderColor: '#e4d9f5',
+        titleColor: '#1c1917',
+        bodyColor: '#1c1917',
+        borderColor: '#e7e5e4',
         borderWidth: 1,
         callbacks: {
           label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {

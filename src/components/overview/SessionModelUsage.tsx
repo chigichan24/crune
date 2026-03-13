@@ -9,7 +9,7 @@ interface Props {
   usage: ModelUsageItem[]
 }
 
-const CHART_COLORS = ['#a78bfa', '#34d399', '#fb923c', '#f472b6', '#60a5fa', '#fbbf24']
+const CHART_COLORS = ['#6366f1', '#06b6d4', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6']
 
 export function SessionModelUsage({ usage }: Props) {
   const data = {
@@ -31,7 +31,7 @@ export function SessionModelUsage({ usage }: Props) {
       legend: {
         position: 'right' as const,
         labels: {
-          color: '#8b7aaa',
+          color: '#1c1917',
           font: { size: 11 },
           padding: 12,
           boxWidth: 12,
@@ -39,9 +39,9 @@ export function SessionModelUsage({ usage }: Props) {
       },
       tooltip: {
         backgroundColor: '#ffffff',
-        titleColor: '#3b2960',
-        bodyColor: '#3b2960',
-        borderColor: '#e4d9f5',
+        titleColor: '#1c1917',
+        bodyColor: '#1c1917',
+        borderColor: '#e7e5e4',
         borderWidth: 1,
       },
     },

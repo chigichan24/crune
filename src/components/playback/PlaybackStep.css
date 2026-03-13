@@ -1,21 +1,21 @@
 .playback-step {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 16px;
   transition: border-color 0.2s, box-shadow 0.2s;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(168, 85, 247, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .playback-step:hover {
   border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .playback-step--active {
   border-color: var(--accent);
-  box-shadow: 0 2px 12px rgba(168, 85, 247, 0.12);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
 }
 
 .playback-step--active:hover {
@@ -38,8 +38,8 @@
 }
 
 .step-role-label--user {
-  background-color: rgba(167, 139, 250, 0.15);
-  color: var(--chart-1);
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 .step-timestamp {

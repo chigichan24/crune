@@ -21,7 +21,7 @@ export function SessionDurationDistribution({ distribution }: Props) {
     datasets: [
       {
         data: distribution.map((d) => d.count),
-        backgroundColor: '#a78bfa',
+        backgroundColor: '#6366f1',
         borderRadius: 4,
         borderWidth: 0,
       },
@@ -33,21 +33,21 @@ export function SessionDurationDistribution({ distribution }: Props) {
     maintainAspectRatio: false,
     scales: {
       x: {
-        ticks: { color: '#8b7aaa', font: { size: 10 } },
+        ticks: { color: '#78716c', font: { size: 10 } },
         grid: { display: false },
       },
       y: {
-        ticks: { color: '#8b7aaa' },
-        grid: { color: '#e4d9f5' },
+        ticks: { color: '#78716c' },
+        grid: { color: '#e7e5e4' },
       },
     },
     plugins: {
       legend: { display: false },
       tooltip: {
         backgroundColor: '#ffffff',
-        titleColor: '#3b2960',
-        bodyColor: '#3b2960',
-        borderColor: '#e4d9f5',
+        titleColor: '#1c1917',
+        bodyColor: '#1c1917',
+        borderColor: '#e7e5e4',
         borderWidth: 1,
         callbacks: {
           label: (ctx: { parsed: { y: number | null } }) => {

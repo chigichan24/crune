@@ -52,7 +52,7 @@ export function SessionActivityHeatmap({ heatmap }: Props) {
                 style={{
                   backgroundColor: count === 0
                     ? 'var(--bg-tertiary)'
-                    : `color-mix(in srgb, var(--accent) ${Math.round((count / maxValue) * 100)}%, var(--bg-tertiary))`,
+                    : `color-mix(in srgb, var(--chart-1) ${Math.round((count / maxValue) * 100)}%, var(--bg-tertiary))`,
                 }}
                 onMouseEnter={(e) => handleMouseEnter(dayIndex, hour, count, e)}
                 onMouseLeave={handleMouseLeave}

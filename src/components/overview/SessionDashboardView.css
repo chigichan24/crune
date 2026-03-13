@@ -29,12 +29,22 @@
   }
 }
 
+.dashboard-grid--three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid--three {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dashboard-section {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .dashboard-section--wide {
@@ -46,8 +56,10 @@
 }
 
 .dashboard-section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
   margin-bottom: 16px;
 }

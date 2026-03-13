@@ -38,8 +38,17 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
     <div className="session-dashboard">
       <SessionOverviewCards sessions={sessions} projects={projects} />
 
-      <div className="dashboard-grid">
-        <div className="dashboard-section dashboard-section--wide">
+      <div className="dashboard-section dashboard-section--full">
+        <h2 className="dashboard-section-title">Sessions</h2>
+        <SessionList
+          sessions={sessions}
+          projects={projects}
+          onSessionSelect={onSessionSelect}
+        />
+      </div>
+
+      <div className="dashboard-grid dashboard-grid--three">
+        <div className="dashboard-section">
           <h2 className="dashboard-section-title">Activity Heatmap</h2>
           <SessionActivityHeatmap heatmap={stats.activityHeatmap} />
         </div>
@@ -53,8 +62,10 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
           <h2 className="dashboard-section-title">Model Usage</h2>
           <SessionModelUsage usage={stats.modelUsage} />
         </div>
+      </div>
 
-        <div className="dashboard-section dashboard-section--wide">
+      <div className="dashboard-grid">
+        <div className="dashboard-section">
           <h2 className="dashboard-section-title">Weekly Tool Trends</h2>
           <SessionToolTrends trends={stats.weeklyToolTrends} />
         </div>
@@ -63,20 +74,11 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
           <h2 className="dashboard-section-title">Session Duration Distribution</h2>
           <SessionDurationDistribution distribution={stats.durationDistribution} />
         </div>
+      </div>
 
-        <div className="dashboard-section">
-          <h2 className="dashboard-section-title">Top Files</h2>
-          <SessionTopFiles files={stats.topFiles} />
-        </div>
-
-        <div className="dashboard-section dashboard-section--full">
-          <h2 className="dashboard-section-title">Sessions</h2>
-          <SessionList
-            sessions={sessions}
-            projects={projects}
-            onSessionSelect={onSessionSelect}
-          />
-        </div>
+      <div className="dashboard-section dashboard-section--full">
+        <h2 className="dashboard-section-title">Top Files</h2>
+        <SessionTopFiles files={stats.topFiles} />
       </div>
     </div>
   )

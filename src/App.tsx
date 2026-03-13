@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSessionIndex } from './hooks/useSessionIndex'
 import { SessionDashboardView } from './components/overview/SessionDashboardView'
 import { SessionPlayback } from './components/playback/SessionPlayback'
+import { HelpModal } from './components/HelpModal'
 import './App.css'
 import { KnowledgeGraphView } from './components/knowledge/KnowledgeGraphView'
 import { useSessionOverview } from './hooks/useSessionOverview'
@@ -13,6 +14,7 @@ function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const { data: indexData, loading: indexLoading, error: indexError } = useSessionIndex()
   const { data: overviewData, loading: overviewLoading, error: overviewError } = useSessionOverview()
+  const [showHelp, setShowHelp] = useState(false)
 
   const handleSessionSelect = (sessionId: string) => {
     setSelectedSessionId(sessionId)
@@ -78,6 +80,10 @@ function App() {
           />
         )}
       </main>
+
+      {/* Help Button */}
+      <button className="help-fab" onClick={() => setShowHelp(true)}>?</button>
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
 
       {/* Playback Drawer */}
       <div

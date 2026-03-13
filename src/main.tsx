@@ -5,8 +5,8 @@ import './index.css'
 import App from './App.tsx'
 
 Chart.register(...registerables)
-Chart.defaults.color = '#8b7aaa'
-Chart.defaults.borderColor = '#e4d9f5'
+Chart.defaults.color = '#78716c'
+Chart.defaults.borderColor = '#e7e5e4'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

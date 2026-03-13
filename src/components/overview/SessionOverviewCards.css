@@ -19,22 +19,16 @@
 .overview-card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: 0 1px 4px rgba(168, 85, 247, 0.04);
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-.overview-card:hover {
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.08);
-  transform: translateY(-1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .overview-card-value {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.2;
