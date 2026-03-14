@@ -189,24 +189,33 @@ export interface KnowledgeGraph {
 export interface TacitKnowledge {
   workflowPatterns: WorkflowPattern[]
   commonToolSequences: ToolSequence[]
-  painPoints: PainPoint[]
+  painPoints: PainPoints
 }
 
 export interface WorkflowPattern {
-  description: string // e.g. "Android bug fixes always use plan mode"
-  evidence: string // supporting data
-  sessionIds: string[]
+  project: string
+  planModeUsage: number
+  totalSessions: number
 }
 
 export interface ToolSequence {
   sequence: string[] // e.g. ["Grep", "Read", "Edit"]
   count: number
-  contexts: string[] // which projects/tasks
 }
 
-export interface PainPoint {
-  type: 'long-session' | 'repeated-edits' | 'many-retries'
-  description: string
+export interface PainPoints {
+  longSessions: LongSession[]
+  hotFiles: HotFile[]
+}
+
+export interface LongSession {
   sessionId: string
-  metric: number // duration in minutes, edit count, etc.
+  durationMinutes: number
+  medianDuration: number
+}
+
+export interface HotFile {
+  file: string
+  editCount: number
+  sessionId: string
 }
