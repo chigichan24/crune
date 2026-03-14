@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PlaybackStep } from './PlaybackStep'
+import { usePlanMode } from './PlanModeContext'
 import './SubagentBranch.css'
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 
 export function SubagentBranch({ agentId, session }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const isPlanMode = usePlanMode()
 
   const turns = session.turns ?? []
   const model = session.model ?? null
@@ -30,14 +32,14 @@ export function SubagentBranch({ agentId, session }: Props) {
     .join(', ')
 
   return (
-    <div className="subagent-branch">
+    <div className={`subagent-branch${isPlanMode ? ' subagent-branch--plan' : ''}`}>
       <button
         className="subagent-toggle"
         onClick={() => setExpanded(prev => !prev)}
       >
         <span className="subagent-icon">{expanded ? '\u25BC' : '\u25B6'}</span>
         <span className="subagent-summary">
-          Subagent {agentId.slice(0, 8)}
+          {isPlanMode ? '探索エージェント' : 'Subagent'} {agentId.slice(0, 8)}
           {agentType && <span className="subagent-model"> [{agentType}]</span>}
           {model && <span className="subagent-model"> ({model})</span>}
           <span className="subagent-stats">

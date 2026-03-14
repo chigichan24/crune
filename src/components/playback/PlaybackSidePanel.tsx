@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { usePlanMode } from './PlanModeContext'
 import './PlaybackSidePanel.css'
 
 interface Props {
@@ -25,6 +26,7 @@ export function PlaybackSidePanel({ detail }: Props) {
   const meta = detail.meta ?? {}
   const turns = detail.turns ?? []
   const linkedPlan = detail.linkedPlan ?? null
+  const isPlanMode = usePlanMode()
 
   const [detailsExpanded, setDetailsExpanded] = useState(!linkedPlan)
 
@@ -123,7 +125,13 @@ export function PlaybackSidePanel({ detail }: Props) {
                 {meta.permissionMode && (
                   <div className="side-info-item">
                     <dt>Permission</dt>
-                    <dd>{meta.permissionMode}</dd>
+                    <dd>
+                      {isPlanMode ? (
+                        <span className="playback-badge playback-badge--plan-mode">計画モード</span>
+                      ) : (
+                        meta.permissionMode
+                      )}
+                    </dd>
                   </div>
                 )}
               </dl>

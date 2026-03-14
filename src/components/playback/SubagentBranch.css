@@ -61,3 +61,12 @@
   background-color: var(--bg-tertiary);
   border-color: var(--border);
 }
+
+/* Plan mode exploration variant */
+.subagent-branch--plan {
+  border-left-color: var(--chart-3);
+}
+
+.subagent-branch--plan .subagent-icon {
+  color: var(--chart-3);
+}

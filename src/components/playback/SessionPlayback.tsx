@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSessionDetail } from '../../hooks/useSessionDetail.ts'
 import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
+import { PlanModeContext } from './PlanModeContext.ts'
 import './SessionPlayback.css'
 
 interface Props {
@@ -233,6 +234,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
 
   const { meta: rawMeta, turns, subagents } = data
   const meta = rawMeta as any
+  const isPlanMode = meta.permissionMode === 'plan'
 
   const formatDuration = (minutes: number) => {
     if (minutes < 60) return `${Math.round(minutes)}m`
@@ -242,7 +244,8 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
   }
 
   return (
-    <div className="session-playback">
+    <PlanModeContext.Provider value={isPlanMode}>
+      <div className="session-playback">
       <div className="playback-header">
         <div className="playback-header-info">
           <h2 className="playback-project">{meta.project}</h2>
@@ -263,6 +266,9 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
             <span className="playback-badge playback-badge--turns">
               {turns.length} turns
             </span>
+            {isPlanMode && (
+              <span className="playback-badge playback-badge--plan-mode">計画モード</span>
+            )}
           </div>
         </div>
         <button className="playback-close-button" onClick={onClose}>
@@ -353,6 +359,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
 
         <PlaybackSidePanel detail={data} />
       </div>
-    </div>
+      </div>
+    </PlanModeContext.Provider>
   )
 }

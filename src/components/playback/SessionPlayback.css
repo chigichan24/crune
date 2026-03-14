@@ -69,6 +69,12 @@
   color: var(--text-secondary);
 }
 
+.playback-badge--plan-mode {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: var(--chart-3);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
 .playback-close-button {
   padding: 4px 10px;
   background: none;
