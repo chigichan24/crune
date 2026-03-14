@@ -13,7 +13,7 @@ const CHART_COLORS = ['#6366f1', '#06b6d4', '#f59e0b', '#ec4899', '#8b5cf6', '#1
 
 export function SessionProjectDistribution({ distribution }: Props) {
   const data = {
-    labels: distribution.map((d) => (d as any).name ?? d.project),
+    labels: distribution.map((d) => d.name),
     datasets: [
       {
         data: distribution.map((d) => d.sessionCount),

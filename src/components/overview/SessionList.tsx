@@ -108,7 +108,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
         >
           <option value="">All Projects</option>
           {projects.map((p) => {
-            const name = (p as any).name ?? p.displayName ?? p.projectDir
+            const name = p.name
             return (
             <option key={name} value={name}>
               {name}

@@ -42,7 +42,7 @@ const CATEGORY_COLORS: Record<ToolCategory, string> = {
 
 export function SessionToolTrends({ trends }: Props) {
   // Aggregate tools into categories per week
-  const weekLabels = trends.map((t) => (t as any).week ?? t.weekLabel)
+  const weekLabels = trends.map((t) => t.week)
 
   const categoryData: Record<ToolCategory, number[]> = {
     Core: [],

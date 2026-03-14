@@ -17,7 +17,7 @@ interface Props {
 
 export function SessionDurationDistribution({ distribution }: Props) {
   const data = {
-    labels: distribution.map((d) => (d as any).bucket ?? d.rangeLabel),
+    labels: distribution.map((d) => d.bucket),
     datasets: [
       {
         data: distribution.map((d) => d.count),
