@@ -18,6 +18,27 @@ interface Props {
   onSessionSelect: (sessionId: string) => void
 }
 
+interface GraphNode {
+  id: string
+  label: string
+  keywords: string[]
+  project: string
+  sessionCount: number
+  communityId: number
+  betweennessCentrality: number
+  val: number
+  x?: number
+  y?: number
+}
+
+interface GraphLink {
+  source: string | GraphNode
+  target: string | GraphNode
+  type: SemanticEdgeType
+  strength: number
+  label: string
+}
+
 const COMMUNITY_COLORS = [
   '#6366f1',
   '#06b6d4',
@@ -110,7 +131,7 @@ export function KnowledgeGraphView({
 
   // Filter nodes and edges
   const filteredData = useMemo(() => {
-    if (!overview) return { nodes: [], links: [] }
+    if (!overview) return { nodes: [] as GraphNode[], links: [] as GraphLink[] }
 
     const { nodes, edges } = overview.knowledgeGraph
     const filteredNodes = nodes.filter((n) =>
@@ -154,9 +175,8 @@ export function KnowledgeGraphView({
     )
   }, [selectedNode, overview])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleNodeClick = useCallback(
-    (node: any) => {
+    (node: GraphNode) => {
       if (!overview || !node.id) return
       const topicNode = overview.knowledgeGraph.nodes.find(
         (n: TopicNode) => n.id === node.id
@@ -169,9 +189,8 @@ export function KnowledgeGraphView({
     [overview]
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleNodeHover = useCallback(
-    (node: any | null) => {
+    (node: GraphNode | null) => {
       setHoveredNodeId(node?.id != null ? String(node.id) : null)
     },
     []
@@ -215,9 +234,8 @@ export function KnowledgeGraphView({
     })
   }, [communities])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nodeColor = useCallback(
-    (node: any) => {
+    (node: GraphNode) => {
       if (hoveredNodeId && String(node.id) === hoveredNodeId) {
         return '#ffffff'
       }
@@ -226,25 +244,25 @@ export function KnowledgeGraphView({
     [communityColorMap, hoveredNodeId]
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const linkColor = useCallback(
-    (link: any) => {
+    (link: GraphLink) => {
+      const type = (typeof link.source === 'string' || typeof link.target === 'string')
+        ? link.type
+        : link.type
       return (
-        EDGE_COLORS[(link.type as SemanticEdgeType) ?? 'semantic-similarity'] ??
+        EDGE_COLORS[type ?? 'semantic-similarity'] ??
         '#8b949e'
       )
     },
     []
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const linkWidth = useCallback((link: any) => {
+  const linkWidth = useCallback((link: GraphLink) => {
     return (link.strength ?? 0.5) * 3
   }, [])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodeLabel = useCallback((node: any) => {
-    const kw = (node.keywords as string[]) || []
+  const nodeLabel = useCallback((node: GraphNode) => {
+    const kw = node.keywords || []
     return `${node.label}\n[${kw.join(', ')}]\nSessions: ${node.sessionCount ?? 0}`
   }, [])
 
@@ -387,15 +405,15 @@ export function KnowledgeGraphView({
                 width={dimensions.width}
                 height={dimensions.height}
                 backgroundColor="#fafaf9"
-                nodeLabel={nodeLabel}
-                nodeColor={nodeColor}
+                nodeLabel={nodeLabel as (node: object) => string}
+                nodeColor={nodeColor as (node: object) => string}
                 nodeVal="val"
                 nodeRelSize={4}
-                linkColor={linkColor}
-                linkWidth={linkWidth}
+                linkColor={linkColor as (link: object) => string}
+                linkWidth={linkWidth as (link: object) => number}
                 linkDirectionalParticles={1}
-                onNodeClick={handleNodeClick}
-                onNodeHover={handleNodeHover}
+                onNodeClick={handleNodeClick as (node: object, event: MouseEvent) => void}
+                onNodeHover={handleNodeHover as (node: object | null, previousNode: object | null) => void}
                 cooldownTicks={100}
                 d3AlphaDecay={0.02}
                 d3VelocityDecay={0.3}

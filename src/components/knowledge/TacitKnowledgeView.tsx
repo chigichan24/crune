@@ -1,9 +1,8 @@
-import type { KnowledgeGraphMetrics, TopicNode } from '../../types'
+import type { KnowledgeGraphMetrics, TopicNode, TacitKnowledge } from '../../types'
 import './TacitKnowledgeView.css'
 
 interface Props {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  knowledge: any | null
+  knowledge: TacitKnowledge | null
   graphMetrics?: KnowledgeGraphMetrics
   topics?: TopicNode[]
 }
@@ -17,15 +16,10 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
     )
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const workflowPatterns: any[] = knowledge.workflowPatterns ?? []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const commonToolSequences: any[] = knowledge.commonToolSequences ?? []
-  const painPoints = knowledge.painPoints ?? {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const longSessions: any[] = painPoints.longSessions ?? []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hotFiles: any[] = painPoints.hotFiles ?? []
+  const workflowPatterns = knowledge.workflowPatterns ?? []
+  const commonToolSequences = knowledge.commonToolSequences ?? []
+  const longSessions = knowledge.painPoints?.longSessions ?? []
+  const hotFiles = knowledge.painPoints?.hotFiles ?? []
 
   // Knowledge graph insights
   const isolatedTopics = topics?.filter((t) => t.degreeCentrality === 0) ?? []
@@ -141,8 +135,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Workflow Patterns</h4>
             <div className="tk-cards">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {workflowPatterns.map((pattern: any, i: number) => (
+              {workflowPatterns.map((pattern, i) => (
                 <div key={i} className="tk-card">
                   <p className="tk-card-description">
                     {pattern.project ?? 'Unknown project'}
@@ -164,8 +157,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Common Tool Sequences</h4>
             <div className="tk-cards">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {commonToolSequences.map((seq: any, i: number) => (
+              {commonToolSequences.map((seq, i) => (
                 <div key={i} className="tk-card">
                   <div className="tk-sequence-flow">
                     {(seq.sequence ?? []).map((tool: string, j: number) => (
@@ -191,8 +183,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Long Sessions</h4>
             <div className="tk-cards">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {longSessions.map((point: any, i: number) => (
+              {longSessions.map((point, i) => (
                 <div key={i} className="tk-card tk-card-warning">
                   <div className="tk-pain-header">
                     <span className="tk-pain-badge">長時間セッション</span>
@@ -201,10 +192,10 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
                     </span>
                   </div>
                   <p className="tk-card-description">
-                    {point.project ?? ''} — {point.firstPrompt ?? ''}
+                    {point.sessionId.slice(0, 8)}
                   </p>
                   <span className="tk-pain-session">
-                    {(point.sessionId ?? '').slice(0, 8)}...
+                    {point.sessionId.slice(0, 8)}...
                   </span>
                 </div>
               ))}
@@ -217,8 +208,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           <div className="tk-section">
             <h4 className="tk-section-title">Hot Files (1セッション内で5回以上編集)</h4>
             <div className="tk-cards">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {hotFiles.map((point: any, i: number) => (
+              {hotFiles.map((point, i) => (
                 <div key={i} className="tk-card tk-card-warning">
                   <div className="tk-pain-header">
                     <span className="tk-pain-badge">繰り返し編集</span>
