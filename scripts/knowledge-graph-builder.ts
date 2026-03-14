@@ -134,7 +134,7 @@ const STOP_WORDS = new Set([
 
 // ─── Tokenizer ──────────────────────────────────────────────────────────────
 
-function splitCamelCase(word: string): string[] {
+export function splitCamelCase(word: string): string[] {
   return word
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
@@ -142,7 +142,7 @@ function splitCamelCase(word: string): string[] {
     .map((w) => w.toLowerCase());
 }
 
-function extractPathTokens(text: string): string[] {
+export function extractPathTokens(text: string): string[] {
   const pathPattern = /(?:\/[\w.-]+){2,}/g;
   const tokens: string[] = [];
   let match;
@@ -165,7 +165,7 @@ const HEX_PATTERN = /^[0-9a-f]{6,}$/i;
 // Pure numbers
 const NUM_PATTERN = /^\d+$/;
 
-function isNoiseToken(token: string): boolean {
+export function isNoiseToken(token: string): boolean {
   return (
     UUID_PATTERN.test(token) ||
     HEX_PATTERN.test(token) ||
@@ -215,14 +215,14 @@ export function tokenize(text: string): string[] {
 
 // ─── Tool-IDF (frequency-bias mitigation) ───────────────────────────────────
 
-interface ToolIdfResult {
+export interface ToolIdfResult {
   toolVocabulary: string[];
   toolVocabIndex: Map<string, number>;
   toolIdfWeights: Map<string, number>;
   vectors: Map<string, Float64Array>;
 }
 
-function buildToolIdf(sessions: SessionInput[]): ToolIdfResult {
+export function buildToolIdf(sessions: SessionInput[]): ToolIdfResult {
   const n = sessions.length;
 
   // Collect all tool names across sessions
@@ -300,7 +300,7 @@ function buildToolIdf(sessions: SessionInput[]): ToolIdfResult {
 //                        subagentRatio, avgToolsPerTurn, editHeaviness, readHeaviness]
 const STRUCTURAL_DIM = 7;
 
-function buildStructuralVectors(sessions: SessionInput[]): Map<string, Float64Array> {
+export function buildStructuralVectors(sessions: SessionInput[]): Map<string, Float64Array> {
   const vectors = new Map<string, Float64Array>();
 
   for (const s of sessions) {
@@ -374,7 +374,7 @@ const WEIGHT_STRUCT = 0.25;
  * Each group is L2-normalized, then scaled by its weight before concatenation.
  * Returns a dense row-major matrix (m × n) and sessionId ordering.
  */
-function buildCombinedMatrix(
+export function buildCombinedMatrix(
   sessionIds: string[],
   textVectors: Map<string, Float64Array>,
   toolVectors: Map<string, Float64Array>,
@@ -416,7 +416,7 @@ function buildCombinedMatrix(
  *   sigma: k   (singular values)
  *   V_k: k × n (right singular vectors, latent topic axes — for interpretation)
  */
-interface SvdResult {
+export interface SvdResult {
   U: Float64Array[];    // m × k
   sigma: Float64Array;  // k
   V: Float64Array[];    // k × n (row-major: V[component][feature])
@@ -424,7 +424,7 @@ interface SvdResult {
   sessionVectors: Map<string, Float64Array>; // sessionId → U·Σ (dense k-dim)
 }
 
-function truncatedSvd(
+export function truncatedSvd(
   sessionIds: string[],
   matrix: Float64Array[],
   totalDim: number,
@@ -556,14 +556,14 @@ function truncatedSvd(
  * Interpret latent dimensions from V matrix.
  * Returns top-N terms per latent dimension, useful for cluster labeling.
  */
-interface LatentDimension {
+export interface LatentDimension {
   index: number;
   varianceRatio: number; // σ² / Σσ² — how much this dimension explains
   topTerms: { term: string; weight: number }[];
   topTools: { tool: string; weight: number }[];
 }
 
-function interpretLatentDimensions(
+export function interpretLatentDimensions(
   svd: SvdResult,
   textVocabulary: string[],
   toolVocabulary: string[],
@@ -629,7 +629,7 @@ const ACTION_VERBS_JA: [RegExp, string][] = [
   [/確認|チェック/, "check"], [/解決/, "resolve"],
 ];
 
-function extractDominantAction(prompts: string[]): string {
+export function extractDominantAction(prompts: string[]): string {
   const actionCounts = new Map<string, number>();
 
   for (const prompt of prompts) {
@@ -654,7 +654,7 @@ function extractDominantAction(prompts: string[]): string {
   return [...actionCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
 }
 
-function selectRepresentativePrompts(
+export function selectRepresentativePrompts(
   memberSessions: SessionInput[],
   clusterCentroid: Float64Array,
   tfidfResult: TfidfResult,
@@ -690,7 +690,7 @@ function selectRepresentativePrompts(
   return selected;
 }
 
-function generateSuggestedPrompt(
+export function generateSuggestedPrompt(
   memberSessions: SessionInput[],
   keywords: string[],
   toolIdf: ToolIdfResult
@@ -723,7 +723,7 @@ function generateSuggestedPrompt(
   return `${action} ${domain} — tools: ${topTools.join(", ")}`;
 }
 
-function computeToolSignature(
+export function computeToolSignature(
   memberSessions: SessionInput[],
   toolIdf: ToolIdfResult
 ): { tool: string; weight: number }[] {
@@ -742,7 +742,7 @@ function computeToolSignature(
   return scored.slice(0, 5);
 }
 
-function classifyDominantRole(
+export function classifyDominantRole(
   memberSessions: SessionInput[]
 ): "user-driven" | "tool-heavy" | "subagent-delegated" {
   let totalUserTurns = 0;
@@ -769,13 +769,13 @@ function classifyDominantRole(
 
 // ─── TF-IDF ─────────────────────────────────────────────────────────────────
 
-interface TfidfResult {
+export interface TfidfResult {
   vocabulary: string[];
   vocabIndex: Map<string, number>;
   vectors: Map<string, Float64Array>;
 }
 
-function buildTfidf(
+export function buildTfidf(
   documents: Map<string, string[]>
 ): TfidfResult {
   // Build vocabulary
@@ -839,7 +839,7 @@ function buildTfidf(
 
 // ─── Cosine similarity / distance ───────────────────────────────────────────
 
-function cosineSimilarity(a: Float64Array, b: Float64Array): number {
+export function cosineSimilarity(a: Float64Array, b: Float64Array): number {
   let dot = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
@@ -847,13 +847,13 @@ function cosineSimilarity(a: Float64Array, b: Float64Array): number {
   return dot; // Already L2-normalized
 }
 
-function cosineDistance(a: Float64Array, b: Float64Array): number {
+export function cosineDistance(a: Float64Array, b: Float64Array): number {
   return 1 - cosineSimilarity(a, b);
 }
 
 // ─── Agglomerative Clustering (Average Linkage) ────────────────────────────
 
-function agglomerativeClusteringFromDistMatrix(
+export function agglomerativeClusteringFromDistMatrix(
   sessionIds: string[],
   precomputedDist: Map<string, number>
 ): number[][] {
@@ -923,7 +923,7 @@ function agglomerativeClusteringFromDistMatrix(
   return clusterWithThresholdFromDistMatrix(n, precomputedDist, threshold);
 }
 
-function findElbowThreshold(distances: number[]): number {
+export function findElbowThreshold(distances: number[]): number {
   if (distances.length < 3) return 0.7; // fallback
 
   // Compute second derivative (acceleration)
@@ -943,7 +943,7 @@ function findElbowThreshold(distances: number[]): number {
   return Math.max(0.3, Math.min(0.9, threshold));
 }
 
-function clusterWithThresholdFromDistMatrix(
+export function clusterWithThresholdFromDistMatrix(
   n: number,
   precomputedDist: Map<string, number>,
   threshold: number
@@ -1008,7 +1008,7 @@ function clusterWithThresholdFromDistMatrix(
  * maxClusterRatio: a cluster with > (totalSessions * ratio) members is re-split.
  * Default 0.25 = 25% of all sessions.
  */
-function splitOversizedClusters(
+export function splitOversizedClusters(
   clusters: number[][],
   totalSessions: number,
   precomputedDist: Map<string, number>,
@@ -1062,7 +1062,7 @@ function splitOversizedClusters(
 
 // ─── Topic Node Construction ────────────────────────────────────────────────
 
-function buildTopicNodes(
+export function buildTopicNodes(
   clusterMembers: number[][],
   sessions: SessionInput[],
   tfidf: TfidfResult,
@@ -1177,7 +1177,7 @@ function buildTopicNodes(
 
 // ─── Topic Edge Construction ────────────────────────────────────────────────
 
-function buildTopicEdges(
+export function buildTopicEdges(
   topics: TopicNode[],
   sessions: SessionInput[],
   tfidf: TfidfResult,
@@ -1303,7 +1303,7 @@ function buildTopicEdges(
   return edges;
 }
 
-function classifyEdge(
+export function classifyEdge(
   ti: TopicNode,
   tj: TopicNode,
   signals: { semanticSimilarity: number; fileOverlap: number; sessionOverlap: number },
@@ -1351,7 +1351,7 @@ function classifyEdge(
   };
 }
 
-function findSharedKeywords(
+export function findSharedKeywords(
   topicIdA: string,
   topicIdB: string,
   tfidf: TfidfResult,
@@ -1373,7 +1373,7 @@ function findSharedKeywords(
   return shared.slice(0, topK).map((s) => s.term);
 }
 
-function findCommonPathPrefix(paths: string[]): string {
+export function findCommonPathPrefix(paths: string[]): string {
   if (paths.length === 0) return "";
   const segments = paths.map((p) => p.split("/"));
   const minLen = Math.min(...segments.map((s) => s.length));
@@ -1391,7 +1391,7 @@ function findCommonPathPrefix(paths: string[]): string {
 
 // ─── Louvain Community Detection ────────────────────────────────────────────
 
-function louvainDetection(
+export function louvainDetection(
   topics: TopicNode[],
   edges: TopicEdge[]
 ): { communities: KnowledgeCommunity[]; modularity: number } {
@@ -1577,7 +1577,7 @@ function louvainDetection(
 
 // ─── Brandes Betweenness Centrality ─────────────────────────────────────────
 
-function brandesBetweenness(
+export function brandesBetweenness(
   topics: TopicNode[],
   edges: TopicEdge[]
 ): void {
