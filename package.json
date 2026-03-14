@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "analyze-sessions": "tsx scripts/analyze-sessions.ts"
+    "analyze-sessions": "tsx scripts/analyze-sessions.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
@@ -30,6 +31,7 @@
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^8.0.0"
+    "vite": "^8.0.0",
+    "vitest": "^3.2.4"
   }
 }
