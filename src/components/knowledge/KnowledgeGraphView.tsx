@@ -3,7 +3,6 @@ import ForceGraph2D from 'react-force-graph-2d'
 import type {
   SessionOverviewData,
   TopicNode,
-  TopicEdge,
   SemanticEdgeType,
   KnowledgeCommunity,
 } from '../../types'
@@ -19,6 +18,7 @@ interface Props {
 }
 
 interface GraphNode {
+  [key: string]: unknown
   id: string
   label: string
   keywords: string[]
@@ -32,6 +32,7 @@ interface GraphNode {
 }
 
 interface GraphLink {
+  [key: string]: unknown
   source: string | GraphNode
   target: string | GraphNode
   type: SemanticEdgeType
@@ -83,8 +84,8 @@ export function KnowledgeGraphView({
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 })
   const [selectedNode, setSelectedNode] = useState<TopicNode | null>(null)
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
-  const [visibleCommunities, setVisibleCommunities] = useState<Set<number>>(
-    new Set()
+  const [visibleCommunities, setVisibleCommunities] = useState<Set<number> | null>(
+    null
   )
   const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<SemanticEdgeType>>(
     new Set(ALL_EDGE_TYPES)
@@ -107,12 +108,11 @@ export function KnowledgeGraphView({
     return map
   }, [communities])
 
-  // Initialize visible communities when data loads
-  useEffect(() => {
-    if (communities.length > 0 && visibleCommunities.size === 0) {
-      setVisibleCommunities(new Set(communities.map((c) => c.id)))
-    }
-  }, [communities, visibleCommunities.size])
+  // Default to all communities visible until user interacts
+  const effectiveVisibleCommunities = useMemo(
+    () => visibleCommunities ?? new Set(communities.map((c) => c.id)),
+    [visibleCommunities, communities]
+  )
 
   // ResizeObserver for responsive graph sizing
   useEffect(() => {
@@ -135,7 +135,7 @@ export function KnowledgeGraphView({
 
     const { nodes, edges } = overview.knowledgeGraph
     const filteredNodes = nodes.filter((n) =>
-      visibleCommunities.has(n.communityId)
+      effectiveVisibleCommunities.has(n.communityId)
     )
     const nodeIds = new Set(filteredNodes.map((n) => n.id))
 
@@ -165,7 +165,7 @@ export function KnowledgeGraphView({
         label: e.label,
       })),
     }
-  }, [overview, visibleCommunities, visibleEdgeTypes])
+  }, [overview, effectiveVisibleCommunities, visibleEdgeTypes])
 
   // Edges connected to selected node
   const selectedNodeEdges = useMemo(() => {
@@ -203,7 +203,7 @@ export function KnowledgeGraphView({
 
   const toggleCommunity = useCallback((communityId: number) => {
     setVisibleCommunities((prev) => {
-      const next = new Set(prev)
+      const next = new Set(prev ?? communities.map((c) => c.id))
       if (next.has(communityId)) {
         next.delete(communityId)
       } else {
@@ -211,7 +211,7 @@ export function KnowledgeGraphView({
       }
       return next
     })
-  }, [])
+  }, [communities])
 
   const toggleEdgeType = useCallback((edgeType: SemanticEdgeType) => {
     setVisibleEdgeTypes((prev) => {
@@ -227,7 +227,7 @@ export function KnowledgeGraphView({
 
   const toggleAllCommunities = useCallback(() => {
     setVisibleCommunities((prev) => {
-      if (prev.size === communities.length) {
+      if ((prev?.size ?? communities.length) === communities.length) {
         return new Set<number>()
       }
       return new Set(communities.map((c) => c.id))
@@ -337,12 +337,12 @@ export function KnowledgeGraphView({
                     className="kg-filter-toggle-all"
                     onClick={toggleAllCommunities}
                   >
-                    {visibleCommunities.size === communities.length ? 'None' : 'All'}
+                    {effectiveVisibleCommunities.size === communities.length ? 'None' : 'All'}
                   </button>
                 </div>
                 <div className="kg-filter-pills">
                   {communities.map((comm: KnowledgeCommunity) => {
-                    const active = visibleCommunities.has(comm.id)
+                    const active = effectiveVisibleCommunities.has(comm.id)
                     const color = communityColorMap.get(comm.id) ?? COMMUNITY_COLORS[0]
                     return (
                       <button

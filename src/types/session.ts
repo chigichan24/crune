@@ -26,6 +26,7 @@ export interface SessionSummary {
   durationMinutes: number
   turnCount: number
   toolBreakdown: Record<string, number>
+  toolCallCount?: number
   firstUserPrompt: string // truncated to 200 chars
   permissionMode: string | null
   subagentCount: number

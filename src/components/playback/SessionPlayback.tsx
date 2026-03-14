@@ -71,6 +71,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
 
   // Reset active turn when session changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on prop change is intentional
     setActiveTurnIndex(0)
   }, [sessionId])
 
