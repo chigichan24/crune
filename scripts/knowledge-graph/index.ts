@@ -7,6 +7,7 @@ import type {
   SessionInput,
   SemanticKnowledgeGraph,
   KnowledgeGraphMetrics,
+  KnowledgeGraphOptions,
   TfidfResult,
 } from "./types.js";
 import { STRUCTURAL_DIM } from "./constants.js";
@@ -22,6 +23,9 @@ import {
 import { buildTopicNodes } from "./topic-nodes.js";
 import { buildTopicEdges } from "./edges.js";
 import { louvainDetection, brandesBetweenness } from "./community.js";
+import { computeReusabilityScores } from "./reusability.js";
+import { extractEnrichedSequences } from "./tool-pattern.js";
+import { generateSkillCandidates } from "./skill-generator.js";
 
 // Re-export all public types and key functions
 export type {
@@ -32,10 +36,16 @@ export type {
   TopicEdge,
   KnowledgeCommunity,
   KnowledgeGraphMetrics,
+  KnowledgeGraphOptions,
   ToolIdfResult,
   TfidfResult,
   SvdResult,
   LatentDimension,
+  ReusabilityScore,
+  ToolCategory,
+  EnrichedToolStep,
+  EnrichedToolSequence,
+  SkillCandidate,
 } from "./types.js";
 
 export { tokenize, splitCamelCase, extractPathTokens, isNoiseToken } from "./tokenizer.js";
@@ -64,12 +74,18 @@ export {
   findCommonPathPrefix,
 } from "./edges.js";
 export { louvainDetection, brandesBetweenness } from "./community.js";
+export { computeReusabilityScores } from "./reusability.js";
+export { abstractToolCall, extractEnrichedSequences } from "./tool-pattern.js";
+export { generateSkillMarkdown, generateHookJson, generateSkillCandidates } from "./skill-generator.js";
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 
 export function buildSemanticKnowledgeGraph(
-  sessions: SessionInput[]
+  sessions: SessionInput[],
+  options: KnowledgeGraphOptions = {}
 ): SemanticKnowledgeGraph {
+  const { enableLouvain = true, enableBrandes = true } = options;
+
   console.log(`  [Knowledge Graph] Processing ${sessions.length} sessions...`);
 
   // Edge case: too few sessions
@@ -86,6 +102,8 @@ export function buildSemanticKnowledgeGraph(
         isolatedTopicCount: 0,
         bridgeTopicIds: [],
       },
+      enrichedToolSequences: [],
+      skillCandidates: [],
     };
   }
 
@@ -135,6 +153,12 @@ export function buildSemanticKnowledgeGraph(
     `  [Knowledge Graph] Structural features: ${STRUCTURAL_DIM} dimensions`
   );
 
+  // Extract enriched tool sequences from all sessions
+  const enrichedSequences = extractEnrichedSequences(activeSessions);
+  console.log(
+    `  [Knowledge Graph] Enriched sequences: ${enrichedSequences.length} patterns detected`
+  );
+
   if (activeSessions.length < 2) {
     // Single session: create one topic
     const emptyTfidf: TfidfResult = { vocabulary: [], vocabIndex: new Map(), vectors: new Map() };
@@ -144,6 +168,8 @@ export function buildSemanticKnowledgeGraph(
       emptyTfidf,
       toolIdf
     );
+    computeReusabilityScores(singleTopic);
+    const skillCandidates = generateSkillCandidates(singleTopic, enrichedSequences);
     return {
       nodes: singleTopic,
       edges: [],
@@ -163,6 +189,8 @@ export function buildSemanticKnowledgeGraph(
         isolatedTopicCount: singleTopic.length,
         bridgeTopicIds: [],
       },
+      enrichedToolSequences: enrichedSequences,
+      skillCandidates,
     };
   }
 
@@ -242,18 +270,62 @@ export function buildSemanticKnowledgeGraph(
   // Step 5: Build topic nodes
   const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf);
 
+  // Step 5b: Compute reusability scores
+  computeReusabilityScores(topics);
+  console.log(
+    `  [Knowledge Graph] Reusability scores computed for ${topics.length} topics`
+  );
+
   // Step 6: Build topic edges (using SVD vectors for semantic similarity)
   const edges = buildTopicEdges(topics, activeSessions, tfidf, svd);
   console.log(`  [Knowledge Graph] Edges: ${edges.length} topic connections`);
 
-  // Step 7: Louvain community detection
-  const { communities, modularity } = louvainDetection(topics, edges);
-  console.log(
-    `  [Knowledge Graph] Communities: ${communities.length} (modularity: ${modularity.toFixed(3)})`
-  );
+  // Step 7: Louvain community detection (optional)
+  let communities;
+  let modularity: number;
+  if (enableLouvain) {
+    const louvainResult = louvainDetection(topics, edges);
+    communities = louvainResult.communities;
+    modularity = louvainResult.modularity;
+    console.log(
+      `  [Knowledge Graph] Communities: ${communities.length} (modularity: ${modularity.toFixed(3)})`
+    );
+  } else {
+    // Fallback: each cluster is its own community
+    communities = topics.map((t, i) => ({
+      id: i,
+      topicIds: [t.id],
+      label: t.label,
+      dominantProject: t.project,
+    }));
+    // Assign communityId to topics
+    for (let i = 0; i < topics.length; i++) {
+      topics[i].communityId = i;
+    }
+    modularity = 0;
+    console.log(
+      `  [Knowledge Graph] Communities: ${communities.length} (Louvain disabled, using cluster-based)`
+    );
+  }
 
-  // Step 8: Graph metrics (Brandes + degree centrality)
-  brandesBetweenness(topics, edges);
+  // Step 8: Graph metrics (Brandes + degree centrality, optional)
+  if (enableBrandes) {
+    brandesBetweenness(topics, edges);
+  } else {
+    // Compute degree centrality only
+    const nTopics = topics.length;
+    const degreeMap = new Map<string, number>();
+    for (const e of edges) {
+      degreeMap.set(e.source, (degreeMap.get(e.source) || 0) + 1);
+      degreeMap.set(e.target, (degreeMap.get(e.target) || 0) + 1);
+    }
+    for (const t of topics) {
+      t.degreeCentrality = nTopics > 1
+        ? (degreeMap.get(t.id) || 0) / (nTopics - 1)
+        : 0;
+    }
+    console.log(`  [Knowledge Graph] Brandes disabled, degree centrality only`);
+  }
 
   const isolatedCount = topics.filter((t) => t.degreeCentrality === 0).length;
   const nTopics = topics.length;
@@ -278,9 +350,15 @@ export function buildSemanticKnowledgeGraph(
     bridgeTopicIds,
   };
 
+  // Step 9: Generate skill candidates
+  const skillCandidates = generateSkillCandidates(topics, enrichedSequences);
+  console.log(
+    `  [Knowledge Graph] Skill candidates: ${skillCandidates.length} generated`
+  );
+
   console.log(
     `  [Knowledge Graph] Done. ${nTopics} topics, ${edges.length} edges, ${communities.length} communities, ${isolatedCount} isolated`
   );
 
-  return { nodes: topics, edges, communities, metrics };
+  return { nodes: topics, edges, communities, metrics, enrichedToolSequences: enrichedSequences, skillCandidates };
 }
