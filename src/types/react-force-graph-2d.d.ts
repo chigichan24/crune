@@ -9,13 +9,13 @@ declare module 'react-force-graph-2d' {
     vy?: number
     fx?: number
     fy?: number
-    [key: string]: any
+    [key: string]: unknown
   }
 
   interface LinkObject {
     source?: string | number | NodeObject
     target?: string | number | NodeObject
-    [key: string]: any
+    [key: string]: unknown
   }
 
   interface ForceGraphProps {
@@ -35,7 +35,7 @@ declare module 'react-force-graph-2d' {
     cooldownTicks?: number
     d3AlphaDecay?: number
     d3VelocityDecay?: number
-    [key: string]: any
+    [key: string]: unknown
   }
 
   export default class ForceGraph2D extends Component<ForceGraphProps> {}
