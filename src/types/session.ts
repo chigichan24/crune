@@ -42,9 +42,8 @@ export interface SessionDetail {
 
 export interface SessionMeta {
   project: string
-  projectDir: string
   cwd: string
-  gitBranch: string | null
+  branch: string | null
   slug: string | null
   version: string | null
   createdAt: string
@@ -57,60 +56,25 @@ export interface ConversationTurn {
   turnIndex: number
   timestamp: string
   userPrompt: string
-  assistantBlocks: AssistantBlock[]
+  assistantThinking: string[]
+  assistantTexts: string[]
+  toolCalls: ToolCall[]
+  model?: string
 }
 
-export type AssistantBlock = ThinkingBlock | TextBlock | ToolUseBlock
-
-export interface ThinkingBlock {
-  type: 'thinking'
-  thinking: string // truncated to 5000 chars
-  truncated: boolean
-}
-
-export interface TextBlock {
-  type: 'text'
-  text: string
-}
-
-export interface ToolUseBlock {
-  type: 'tool_use'
-  id: string
-  name: string
-  input: ToolInput
-  result: ToolResult | null
-  subagentId: string | null // non-null if name === 'Agent'
-}
-
-// Tool inputs vary by tool name - store relevant fields
-export interface ToolInput {
-  // Common
-  command?: string // Bash
-  description?: string // Bash, Agent
-  file_path?: string // Read, Edit, Write
-  pattern?: string // Grep, Glob
-  old_string?: string // Edit
-  new_string?: string // Edit
-  content?: string // Write (truncated to 500 chars preview)
-  contentLength?: number // Write (original length)
-  prompt?: string // Agent
-  subagent_type?: string // Agent
-  // Catch-all for other tools
-  [key: string]: unknown
-}
-
-export interface ToolResult {
-  content: string // truncated to 2000 chars
-  truncated: boolean
-  isError: boolean
+export interface ToolCall {
+  toolUseId: string
+  toolName: string
+  input: Record<string, unknown>
+  result?: string
+  subagentId?: string
 }
 
 export interface SubagentSession {
   agentId: string
-  model: string | null
+  agentType: string
   turns: ConversationTurn[]
-  toolCallCount: number
-  toolBreakdown: Record<string, number>
+  model?: string
 }
 
 export interface LinkedPlan {
