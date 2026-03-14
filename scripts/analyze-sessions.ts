@@ -942,6 +942,8 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
     tacitKnowledge: {
       workflowPatterns,
       commonToolSequences,
+      enrichedToolSequences: knowledgeGraph.enrichedToolSequences ?? [],
+      skillCandidates: knowledgeGraph.skillCandidates ?? [],
       painPoints: {
         longSessions,
         hotFiles: hotFiles.slice(0, 20),

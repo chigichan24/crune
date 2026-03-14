@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react'
 import type { KnowledgeGraphMetrics, TopicNode, TacitKnowledge } from '../../types'
 import './TacitKnowledgeView.css'
 
@@ -5,6 +6,32 @@ interface Props {
   knowledge: TacitKnowledge | null
   graphMetrics?: KnowledgeGraphMetrics
   topics?: TopicNode[]
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const blob = new Blob([text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'skill.md'
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }, [text])
+
+  return (
+    <button className="tk-export-btn" onClick={handleCopy}>
+      {copied ? 'Copied!' : label}
+    </button>
+  )
 }
 
 export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
@@ -18,6 +45,8 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
 
   const workflowPatterns = knowledge.workflowPatterns ?? []
   const commonToolSequences = knowledge.commonToolSequences ?? []
+  const enrichedToolSequences = knowledge.enrichedToolSequences ?? []
+  const skillCandidates = knowledge.skillCandidates ?? []
   const longSessions = knowledge.painPoints?.longSessions ?? []
   const hotFiles = knowledge.painPoints?.hotFiles ?? []
 
@@ -35,6 +64,8 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
   const hasContent =
     workflowPatterns.length > 0 ||
     commonToolSequences.length > 0 ||
+    enrichedToolSequences.length > 0 ||
+    skillCandidates.length > 0 ||
     longSessions.length > 0 ||
     hotFiles.length > 0 ||
     isolatedTopics.length > 0 ||
@@ -146,6 +177,74 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
                   <span className="tk-card-badge">
                     {pattern.totalSessions ?? 0} session{(pattern.totalSessions ?? 0) !== 1 ? 's' : ''}
                   </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Skill Candidates */}
+        {skillCandidates.length > 0 && (
+          <div className="tk-section">
+            <h4 className="tk-section-title">Skill Candidates</h4>
+            <p className="tk-section-desc">
+              再利用価値の高いパターンからSkill定義を生成しました
+            </p>
+            <div className="tk-cards">
+              {skillCandidates
+                .sort((a, b) => b.reusabilityScore - a.reusabilityScore)
+                .slice(0, 10)
+                .map((candidate) => {
+                  const topic = topics?.find((t) => t.id === candidate.topicId)
+                  return (
+                    <div key={candidate.topicId} className="tk-card tk-card-skill">
+                      <p className="tk-card-description">
+                        {topic?.label ?? candidate.topicId}
+                      </p>
+                      <div className="tk-card-meta">
+                        <span className="tk-card-badge tk-badge-score">
+                          Score: {Math.round(candidate.reusabilityScore * 100)}%
+                        </span>
+                        {candidate.hookJson && (
+                          <span className="tk-card-badge">Hook</span>
+                        )}
+                      </div>
+                      <CopyButton text={candidate.skillMarkdown} label="Export Skill" />
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* Enriched Tool Sequences */}
+        {enrichedToolSequences.length > 0 && (
+          <div className="tk-section">
+            <h4 className="tk-section-title">Enriched Tool Patterns</h4>
+            <p className="tk-section-desc">
+              パラメータ付きツール使用パターン
+            </p>
+            <div className="tk-cards">
+              {enrichedToolSequences.slice(0, 15).map((seq, i) => (
+                <div key={i} className="tk-card">
+                  <div className="tk-sequence-flow">
+                    {seq.sequence.map((step, j) => (
+                      <span key={j} className="tk-sequence-item">
+                        {j > 0 && (
+                          <span className="tk-sequence-arrow">&rarr;</span>
+                        )}
+                        <span className="tk-tool-name">{step.toolName}</span>
+                        {step.targetPattern && (
+                          <span className="tk-tool-target">{step.targetPattern}</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="tk-sequence-meta">
+                    <span className="tk-card-badge">{seq.count}x</span>
+                    <span className="tk-card-badge">{seq.projects.length} project(s)</span>
+                    <span className="tk-card-badge">{seq.sessionIds.length} session(s)</span>
+                  </div>
                 </div>
               ))}
             </div>

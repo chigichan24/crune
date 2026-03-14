@@ -25,6 +25,8 @@ describe("buildSemanticKnowledgeGraph", () => {
         isolatedTopicCount: 0,
         bridgeTopicIds: [],
       },
+      enrichedToolSequences: [],
+      skillCandidates: [],
     });
   });
 

@@ -251,6 +251,7 @@ export function buildTopicNodes(
       suggestedPrompt,
       toolSignature,
       dominantRole,
+      reusabilityScore: { overall: 0, frequency: 0, timeCost: 0, crossProjectScore: 0, recency: 0 }, // computed later
     });
   }
 

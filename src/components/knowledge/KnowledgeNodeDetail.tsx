@@ -1,11 +1,12 @@
-import { useMemo } from 'react'
-import type { TopicNode, TopicEdge, SemanticEdgeType } from '../../types'
+import { useMemo, useCallback, useState } from 'react'
+import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate } from '../../types'
 import './KnowledgeNodeDetail.css'
 
 interface Props {
   node: TopicNode | null
   edges: TopicEdge[]
   allTopics: TopicNode[]
+  skillCandidates?: SkillCandidate[]
   onSessionSelect: (sessionId: string) => void
   onClose: () => void
 }
@@ -53,9 +54,34 @@ export function KnowledgeNodeDetail({
   node,
   edges,
   allTopics,
+  skillCandidates,
   onSessionSelect,
   onClose,
 }: Props) {
+  const [copied, setCopied] = useState(false)
+
+  const skillCandidate = useMemo(() => {
+    if (!node || !skillCandidates) return null
+    return skillCandidates.find((sc) => sc.topicId === node.id) ?? null
+  }, [node, skillCandidates])
+
+  const handleExportSkill = useCallback(async () => {
+    if (!skillCandidate) return
+    try {
+      await navigator.clipboard.writeText(skillCandidate.skillMarkdown)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback: download as file
+      const blob = new Blob([skillCandidate.skillMarkdown], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `skill-${node?.id ?? 'unknown'}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }, [skillCandidate, node?.id])
   // Group edges by type, resolve connected topic labels
   const edgesByType = useMemo(() => {
     const topicMap = new Map(allTopics.map((t) => [t.id, t]))
@@ -136,6 +162,34 @@ export function KnowledgeNodeDetail({
             {node.dominantRole === 'subagent-delegated' && 'Subagent-Delegated'}
           </span>
         </div>
+
+        {/* Reusability Score */}
+        {node.reusabilityScore && (
+          <div className="knd-field">
+            <span className="knd-field-label">Reusability Score</span>
+            <div className="knd-reusability">
+              <div className="knd-reusability-overall">
+                <span className="knd-reusability-bar" style={{ width: `${Math.round(node.reusabilityScore.overall * 100)}%` }} />
+                <span className="knd-reusability-value">{Math.round(node.reusabilityScore.overall * 100)}%</span>
+              </div>
+              <div className="knd-reusability-breakdown">
+                <span>Frequency: {Math.round(node.reusabilityScore.frequency * 100)}%</span>
+                <span>Time Cost: {Math.round(node.reusabilityScore.timeCost * 100)}%</span>
+                <span>Cross-Project: {Math.round(node.reusabilityScore.crossProjectScore * 100)}%</span>
+                <span>Recency: {Math.round(node.reusabilityScore.recency * 100)}%</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Export Skill */}
+        {skillCandidate && (
+          <div className="knd-export">
+            <button className="knd-export-btn" onClick={handleExportSkill}>
+              {copied ? 'Copied!' : 'Export as Skill'}
+            </button>
+          </div>
+        )}
 
         {/* Projects */}
         {node.projects.length > 0 && (
