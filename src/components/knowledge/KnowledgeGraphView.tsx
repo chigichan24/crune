@@ -459,6 +459,7 @@ export function KnowledgeGraphView({
                 node={selectedNode}
                 edges={selectedNodeEdges}
                 allTopics={overview.knowledgeGraph.nodes}
+                skillCandidates={overview.tacitKnowledge?.skillCandidates}
                 onSessionSelect={onSessionSelect}
                 onClose={handleCloseDetail}
               />

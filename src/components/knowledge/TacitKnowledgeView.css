@@ -178,3 +178,44 @@
   font-size: 10px;
   color: var(--text-secondary);
 }
+
+/* Skill candidates */
+.tk-card-skill {
+  border-color: var(--accent);
+  border-left-width: 3px;
+}
+
+.tk-badge-score {
+  color: var(--success);
+  background-color: rgba(22, 163, 74, 0.08);
+}
+
+.tk-export-btn {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background-color: rgba(37, 99, 235, 0.08);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.tk-export-btn:hover {
+  background-color: rgba(37, 99, 235, 0.15);
+}
+
+/* Enriched tool target pattern */
+.tk-tool-target {
+  font-family: monospace;
+  font-size: 9px;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  padding: 0 3px;
+  border-radius: 2px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
