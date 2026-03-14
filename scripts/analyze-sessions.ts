@@ -80,8 +80,7 @@ interface JsonlLine {
     trackedFileBackups?: Record<string, unknown>;
     timestamp?: string;
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface ContentBlock {
@@ -90,11 +89,9 @@ interface ContentBlock {
   thinking?: string;
   id?: string;
   name?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  input?: Record<string, any>;
+  input?: Record<string, unknown>;
   tool_use_id?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  content?: any;
+  content?: unknown;
 }
 
 /** A tool call within a conversation turn */
