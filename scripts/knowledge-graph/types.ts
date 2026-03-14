@@ -41,6 +41,14 @@ export type SemanticEdgeType =
   | "workflow-continuation"
   | "cross-project-bridge";
 
+export interface ReusabilityScore {
+  overall: number;
+  frequency: number;
+  timeCost: number;
+  crossProjectScore: number;
+  recency: number;
+}
+
 export interface TopicNode {
   id: string;
   label: string;
@@ -60,6 +68,7 @@ export interface TopicNode {
   suggestedPrompt: string;
   toolSignature: { tool: string; weight: number }[];
   dominantRole: "user-driven" | "tool-heavy" | "subagent-delegated";
+  reusabilityScore: ReusabilityScore;
 }
 
 export interface TopicEdge {
@@ -96,6 +105,46 @@ export interface SemanticKnowledgeGraph {
   edges: TopicEdge[];
   communities: KnowledgeCommunity[];
   metrics: KnowledgeGraphMetrics;
+  enrichedToolSequences: EnrichedToolSequence[];
+  skillCandidates: SkillCandidate[];
+}
+
+// ─── Enriched Tool Sequence types ────────────────────────────────────────────
+
+export type ToolCategory =
+  | "read"
+  | "write"
+  | "execute"
+  | "delegate"
+  | "search";
+
+export interface EnrichedToolStep {
+  toolName: string;
+  category: ToolCategory;
+  targetPattern?: string;
+}
+
+export interface EnrichedToolSequence {
+  sequence: EnrichedToolStep[];
+  count: number;
+  sessionIds: string[];
+  projects: string[];
+}
+
+// ─── Skill/Hook generation types ─────────────────────────────────────────────
+
+export interface SkillCandidate {
+  topicId: string;
+  reusabilityScore: number;
+  skillMarkdown: string;
+  hookJson?: string;
+}
+
+// ─── Knowledge graph options ─────────────────────────────────────────────────
+
+export interface KnowledgeGraphOptions {
+  enableLouvain?: boolean;
+  enableBrandes?: boolean;
 }
 
 // ─── Internal result types ──────────────────────────────────────────────────
