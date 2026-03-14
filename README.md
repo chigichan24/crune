@@ -21,8 +21,6 @@ npm run analyze-sessions
 npm run dev
 ```
 
-Open http://localhost:5173.
-
 ## Data Pipeline
 
 `npm run analyze-sessions` reads JSONL session files from `~/.claude/projects/` and outputs structured JSON to `public/data/sessions/`.
