@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import type { ToolCall, SubagentSession } from '../../types'
 import { SubagentBranch } from './SubagentBranch'
 import './ToolCallBlock.css'
 
 interface Props {
-  toolCall: any
-  subagents: Record<string, any>
+  toolCall: ToolCall
+  subagents: Record<string, SubagentSession>
 }
 
 type ToolCategory = 'shell' | 'edit' | 'read' | 'search' | 'agent' | 'other'

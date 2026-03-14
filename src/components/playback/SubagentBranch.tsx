@@ -1,11 +1,12 @@
 import { useState } from 'react'
+import type { SubagentSession } from '../../types'
 import { PlaybackStep } from './PlaybackStep'
 import { usePlanMode } from './PlanModeContext'
 import './SubagentBranch.css'
 
 interface Props {
   agentId: string
-  session: any
+  session: SubagentSession
 }
 
 export function SubagentBranch({ agentId, session }: Props) {
@@ -52,7 +53,7 @@ export function SubagentBranch({ agentId, session }: Props) {
       )}
       {expanded && (
         <div className="subagent-turns">
-          {turns.map((turn: any) => (
+          {turns.map((turn) => (
             <PlaybackStep
               key={turn.turnIndex}
               turn={turn}

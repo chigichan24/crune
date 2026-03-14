@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSessionDetail } from '../../hooks/useSessionDetail.ts'
+import type { ConversationTurn, ToolCall } from '../../types'
 import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
 import { PlanModeContext } from './PlanModeContext.ts'
@@ -12,13 +13,13 @@ interface Props {
 
 type DotColor = 'blue' | 'orange' | 'green'
 
-function getDotColor(turn: any): DotColor {
+function getDotColor(turn: ConversationTurn): DotColor {
   const toolCalls = turn.toolCalls ?? []
-  const hasAgent = toolCalls.some((tc: any) => tc.toolName === 'Agent')
+  const hasAgent = toolCalls.some((tc: ToolCall) => tc.toolName === 'Agent')
   if (hasAgent) return 'green'
 
   const hasPlanTool = toolCalls.some(
-    (tc: any) =>
+    (tc: ToolCall) =>
       tc.toolName === 'EnterPlanMode' ||
       tc.toolName === 'ExitPlanMode' ||
       tc.toolName === 'TaskCreate' ||
@@ -41,12 +42,12 @@ const LEGEND_ITEMS: Array<{ color: DotColor; label: string; description: string 
   { color: 'green', label: 'Agent', description: 'サブエージェントを生成して並列作業' },
 ]
 
-function summarizeTurn(turn: any): string {
+function summarizeTurn(turn: ConversationTurn): string {
   const toolCalls = turn.toolCalls ?? []
   const color = getDotColor(turn)
   const category = LEGEND_ITEMS.find(l => l.color === color)
   const prompt = (turn.userPrompt ?? '').slice(0, 80)
-  const toolNames = [...new Set(toolCalls.map((tc: any) => tc.toolName))].join(', ')
+  const toolNames = [...new Set(toolCalls.map((tc: ToolCall) => tc.toolName))].join(', ')
   const lines = [
     `Turn ${(turn.turnIndex ?? 0) + 1} — ${category?.label ?? 'Standard'}`,
     prompt ? `"${prompt}${(turn.userPrompt ?? '').length > 80 ? '...' : ''}"` : '',
@@ -232,8 +233,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
     return <div className="playback-empty">セッションデータがありません</div>
   }
 
-  const { meta: rawMeta, turns, subagents } = data
-  const meta = rawMeta as any
+  const { meta, turns, subagents } = data
   const isPlanMode = meta.permissionMode === 'plan'
 
   const formatDuration = (minutes: number) => {
@@ -250,9 +250,9 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
         <div className="playback-header-info">
           <h2 className="playback-project">{meta.project}</h2>
           <div className="playback-meta-row">
-            {(meta.branch || meta.gitBranch) && (
+            {meta.branch && (
               <span className="playback-badge playback-badge--branch">
-                {meta.branch || meta.gitBranch}
+                {meta.branch}
               </span>
             )}
             <span className="playback-badge playback-badge--duration">

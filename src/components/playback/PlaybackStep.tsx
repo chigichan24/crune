@@ -1,11 +1,12 @@
 import { useState } from 'react'
+import type { ConversationTurn, SubagentSession } from '../../types'
 import { ToolCallBlock } from './ToolCallBlock'
 import './PlaybackStep.css'
 
 interface Props {
-  turn: any
+  turn: ConversationTurn
   isActive: boolean
-  subagents: Record<string, any>
+  subagents: Record<string, SubagentSession>
 }
 
 function formatTimestamp(iso: string): string {
@@ -52,7 +53,7 @@ export function PlaybackStep({ turn, isActive, subagents }: Props) {
       ))}
 
       {/* Tool calls */}
-      {toolCalls.map((tc: any) => (
+      {toolCalls.map((tc) => (
         <ToolCallBlock
           key={tc.toolUseId}
           toolCall={tc}

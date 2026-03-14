@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react'
+import type { SessionDetail } from '../../types'
 import { usePlanMode } from './PlanModeContext'
 import './PlaybackSidePanel.css'
 
 interface Props {
-  detail: any
+  detail: SessionDetail
 }
 
 function formatDuration(minutes: number): string {
@@ -49,11 +50,12 @@ export function PlaybackSidePanel({ detail }: Props) {
     const files = new Set<string>()
     for (const turn of turns) {
       for (const tc of turn.toolCalls ?? []) {
+        const filePath = tc.input?.file_path
         if (
           (tc.toolName === 'Edit' || tc.toolName === 'Write') &&
-          tc.input?.file_path
+          typeof filePath === 'string'
         ) {
-          files.add(tc.input.file_path)
+          files.add(filePath)
         }
       }
     }
