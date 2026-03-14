@@ -10,31 +10,25 @@ export interface SessionIndex {
 }
 
 export interface ProjectSummary {
-  projectDir: string // raw dir name e.g. "-Users-kazuki-chigita-src-github-com-..."
-  displayName: string // e.g. "chigichan24/crune"
+  name: string // e.g. "chigichan24/crune"
   sessionCount: number
   totalDurationMinutes: number
 }
 
 export interface SessionSummary {
   sessionId: string
-  project: string // displayName
-  projectDir: string
-  slug: string | null
+  project: string
   cwd: string
   gitBranch: string | null
-  version: string | null
+  slug: string | null
   createdAt: string // ISO8601
   lastActiveAt: string // ISO8601
   durationMinutes: number
   turnCount: number
-  toolCallCount: number
   toolBreakdown: Record<string, number>
-  modelsUsed: Record<string, number>
-  filesEdited: string[]
-  subagentCount: number
   firstUserPrompt: string // truncated to 200 chars
-  hasPlan: boolean
+  permissionMode: string | null
+  subagentCount: number
 }
 
 // === Session Detail (loaded on demand for playback) ===
@@ -127,40 +121,35 @@ export interface LinkedPlan {
 // === Session Overview (cross-session analytics) ===
 export interface SessionOverviewData {
   generatedAt: string
-  statistics: OverviewStatistics
-  knowledgeGraph: KnowledgeGraph
-  tacitKnowledge: TacitKnowledge
-}
-
-export interface OverviewStatistics {
   activityHeatmap: number[][] // [7][24] dayOfWeek x hour
   projectDistribution: ProjectDistItem[]
   weeklyToolTrends: WeeklyToolTrend[]
   durationDistribution: DurationBucket[]
   topFiles: TopFile[]
   modelUsage: ModelUsageItem[]
+  knowledgeGraph: KnowledgeGraph
+  tacitKnowledge: TacitKnowledge
 }
 
 export interface ProjectDistItem {
-  project: string
+  name: string
   sessionCount: number
   totalDurationMinutes: number
 }
 
 export interface WeeklyToolTrend {
-  weekLabel: string // e.g. "2025-W01"
+  week: string // e.g. "2025-W01"
   tools: Record<string, number>
 }
 
 export interface DurationBucket {
-  rangeLabel: string // e.g. "0-5min", "5-15min"
+  bucket: string // e.g. "0-5min", "5-15min"
   count: number
 }
 
 export interface TopFile {
-  filePath: string
+  file: string
   editCount: number
-  projects: string[] // which projects edited this file
 }
 
 export interface ModelUsageItem {
