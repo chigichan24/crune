@@ -51,11 +51,11 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
       case 'Bash':
         return (
           <div className="tool-input">
-            {input.description && (
-              <div className="tool-subtitle">{input.description}</div>
+            {input.description != null && (
+              <div className="tool-subtitle">{String(input.description)}</div>
             )}
-            {input.command && (
-              <pre className="tool-code-block">{input.command}</pre>
+            {input.command != null && (
+              <pre className="tool-code-block">{String(input.command)}</pre>
             )}
           </div>
         )
@@ -63,14 +63,14 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
       case 'Edit':
         return (
           <div className="tool-input">
-            {input.file_path && (
-              <div className="tool-file-path">{input.file_path}</div>
+            {input.file_path != null && (
+              <div className="tool-file-path">{String(input.file_path)}</div>
             )}
             {input.old_string != null && (
-              <pre className="tool-diff tool-diff--old">{input.old_string}</pre>
+              <pre className="tool-diff tool-diff--old">{String(input.old_string)}</pre>
             )}
             {input.new_string != null && (
-              <pre className="tool-diff tool-diff--new">{input.new_string}</pre>
+              <pre className="tool-diff tool-diff--new">{String(input.new_string)}</pre>
             )}
           </div>
         )
@@ -78,17 +78,17 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
       case 'Write':
         return (
           <div className="tool-input">
-            {input.file_path && (
-              <div className="tool-file-path">{input.file_path}</div>
+            {input.file_path != null && (
+              <div className="tool-file-path">{String(input.file_path)}</div>
             )}
-            {input.content && (
+            {input.content != null && (
               <pre className="tool-code-block">
                 {truncate(String(input.content), 300)}
               </pre>
             )}
             {input.contentLength != null && (
               <div className="tool-content-length">
-                合計 {input.contentLength} 文字
+                合計 {String(input.contentLength)} 文字
               </div>
             )}
           </div>
@@ -97,8 +97,8 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
       case 'Read':
         return (
           <div className="tool-input">
-            {input.file_path && (
-              <div className="tool-file-path">{input.file_path}</div>
+            {input.file_path != null && (
+              <div className="tool-file-path">{String(input.file_path)}</div>
             )}
           </div>
         )
@@ -107,8 +107,8 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
       case 'Glob':
         return (
           <div className="tool-input">
-            {input.pattern && (
-              <code className="tool-pattern">{input.pattern}</code>
+            {input.pattern != null && (
+              <code className="tool-pattern">{String(input.pattern)}</code>
             )}
             {typeof input.path === 'string' && input.path && (
               <span className="tool-search-path"> in {input.path}</span>
@@ -119,13 +119,13 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
       case 'Agent':
         return (
           <div className="tool-input">
-            {(input.prompt || input.description) && (
+            {(input.prompt != null || input.description != null) && (
               <div className="tool-subtitle">
-                {String(input.prompt || input.description)}
+                {String(input.prompt ?? input.description)}
               </div>
             )}
-            {input.subagent_type && (
-              <span className="tool-agent-type">{input.subagent_type}</span>
+            {input.subagent_type != null && (
+              <span className="tool-agent-type">{String(input.subagent_type)}</span>
             )}
           </div>
         )
@@ -181,7 +181,7 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
       {renderResult()}
       {name === 'Agent' && matchingSubagent && (
         <SubagentBranch
-          agentId={subagentId}
+          agentId={subagentId!}
           session={matchingSubagent}
         />
       )}
