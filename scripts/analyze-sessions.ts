@@ -129,6 +129,8 @@ interface OverviewJson {
   tacitKnowledge: {
     workflowPatterns: { project: string; planModeUsage: number; totalSessions: number }[];
     commonToolSequences: { sequence: string[]; count: number }[];
+    enrichedToolSequences: unknown[];
+    skillCandidates: unknown[];
     painPoints: {
       longSessions: { sessionId: string; durationMinutes: number; medianDuration: number }[];
       hotFiles: { file: string; editCount: number; sessionId: string }[];
