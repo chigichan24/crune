@@ -106,11 +106,8 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, com
   }
 
   const workflowPatterns = knowledge.workflowPatterns ?? []
-  const commonToolSequences = knowledge.commonToolSequences ?? []
   const enrichedToolSequences = knowledge.enrichedToolSequences ?? []
   const skillCandidates = knowledge.skillCandidates ?? []
-  const longSessions = knowledge.painPoints?.longSessions ?? []
-  const hotFiles = knowledge.painPoints?.hotFiles ?? []
 
   // Knowledge graph insights
   const isolatedTopics = topics?.filter((t) => t.degreeCentrality === 0) ?? []
@@ -125,11 +122,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, com
 
   const hasContent =
     workflowPatterns.length > 0 ||
-    commonToolSequences.length > 0 ||
-    enrichedToolSequences.length > 0 ||
     skillCandidates.length > 0 ||
-    longSessions.length > 0 ||
-    hotFiles.length > 0 ||
     isolatedTopics.length > 0 ||
     bridgeTopics.length > 0 ||
     crossProjectTopics.length > 0
@@ -288,111 +281,6 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, com
           </div>
         )}
 
-        {/* Enriched Tool Sequences */}
-        {enrichedToolSequences.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Enriched Tool Patterns</h4>
-            <p className="tk-section-desc">
-              パラメータ付きツール使用パターン
-            </p>
-            <div className="tk-cards">
-              {enrichedToolSequences.slice(0, 15).map((seq, i) => (
-                <div key={i} className="tk-card">
-                  <div className="tk-sequence-flow">
-                    {seq.sequence.map((step, j) => (
-                      <span key={j} className="tk-sequence-item">
-                        {j > 0 && (
-                          <span className="tk-sequence-arrow">&rarr;</span>
-                        )}
-                        <span className="tk-tool-name">{step.toolName}</span>
-                        {step.targetPattern && (
-                          <span className="tk-tool-target">{step.targetPattern}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="tk-sequence-meta">
-                    <span className="tk-card-badge">{seq.count}x</span>
-                    <span className="tk-card-badge">{seq.projects.length} project(s)</span>
-                    <span className="tk-card-badge">{seq.sessionIds.length} session(s)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Common Tool Sequences */}
-        {commonToolSequences.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Common Tool Sequences</h4>
-            <div className="tk-cards">
-              {commonToolSequences.map((seq, i) => (
-                <div key={i} className="tk-card">
-                  <div className="tk-sequence-flow">
-                    {(seq.sequence ?? []).map((tool: string, j: number) => (
-                      <span key={j} className="tk-sequence-item">
-                        {j > 0 && (
-                          <span className="tk-sequence-arrow">&rarr;</span>
-                        )}
-                        <span className="tk-tool-name">{tool}</span>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="tk-sequence-meta">
-                    <span className="tk-card-badge">{seq.count ?? 0}x</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Pain Points - Long Sessions */}
-        {longSessions.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Long Sessions</h4>
-            <div className="tk-cards">
-              {longSessions.map((point, i) => (
-                <div key={i} className="tk-card tk-card-warning">
-                  <div className="tk-pain-header">
-                    <span className="tk-pain-badge">長時間セッション</span>
-                    <span className="tk-pain-metric">
-                      {Math.round(point.durationMinutes ?? 0)}min
-                    </span>
-                  </div>
-                  <p className="tk-card-description">
-                    {point.sessionId.slice(0, 8)}
-                  </p>
-                  <span className="tk-pain-session">
-                    {point.sessionId.slice(0, 8)}...
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Pain Points - Hot Files */}
-        {hotFiles.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Hot Files (1セッション内で5回以上編集)</h4>
-            <div className="tk-cards">
-              {hotFiles.map((point, i) => (
-                <div key={i} className="tk-card tk-card-warning">
-                  <div className="tk-pain-header">
-                    <span className="tk-pain-badge">繰り返し編集</span>
-                    <span className="tk-pain-metric">{point.editCount ?? 0}x</span>
-                  </div>
-                  <p className="tk-card-description">{point.file ?? ''}</p>
-                  <span className="tk-pain-session">
-                    {(point.sessionId ?? '').slice(0, 8)}...
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
