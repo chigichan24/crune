@@ -176,6 +176,23 @@ export function KnowledgeNodeDetail({
         {/* Distill Skill */}
         {skillCandidate && (
           <div className="knd-export">
+            {/* Pre-distilled result (from analyze-sessions) */}
+            {skillCandidate.distilledMarkdown && !distillResult && (
+              <div className="knd-distill-result">
+                <div className="knd-distill-preview">{skillCandidate.distilledMarkdown}</div>
+                <button
+                  className="knd-distill-copy-btn"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(skillCandidate.distilledMarkdown!)
+                    setDistillCopied(true)
+                    setTimeout(() => setDistillCopied(false), 2000)
+                  }}
+                >
+                  {distillCopied ? 'Copied!' : 'Copy Skill'}
+                </button>
+              </div>
+            )}
+            {/* On-demand re-distillation with graph context */}
             <button
               className="knd-distill-btn"
               disabled={distillLoading}
@@ -191,7 +208,7 @@ export function KnowledgeNodeDetail({
                 })
               }}
             >
-              {distillLoading ? 'Distilling...' : 'Distill with Claude'}
+              {distillLoading ? '再蒸留中...' : '再蒸留'}
             </button>
             {distillError && (
               <p className="knd-distill-error">{distillError}</p>
@@ -207,7 +224,7 @@ export function KnowledgeNodeDetail({
                     setTimeout(() => setDistillCopied(false), 2000)
                   }}
                 >
-                  {distillCopied ? 'Copied!' : 'Copy Distilled Skill'}
+                  {distillCopied ? 'Copied!' : 'Copy Skill'}
                 </button>
               </div>
             )}

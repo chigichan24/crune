@@ -70,6 +70,14 @@ function DistillButton({
 
   return (
     <>
+      {/* Pre-distilled result */}
+      {candidate.distilledMarkdown && !result && (
+        <div className="tk-distill-result">
+          <div className="tk-distill-preview">{candidate.distilledMarkdown}</div>
+          <CopyButton text={candidate.distilledMarkdown} label="Copy Skill" />
+        </div>
+      )}
+      {/* Re-distill button */}
       <button
         className="tk-distill-btn"
         disabled={loading}
@@ -83,13 +91,13 @@ function DistillButton({
           })
         }}
       >
-        {loading ? 'Distilling...' : 'Distill with Claude'}
+        {loading ? '再蒸留中...' : '再蒸留'}
       </button>
       {error && <p className="tk-distill-error">{error}</p>}
       {result && (
         <div className="tk-distill-result">
           <div className="tk-distill-preview">{result}</div>
-          <CopyButton text={result} label="Copy Distilled" />
+          <CopyButton text={result} label="Copy Skill" />
         </div>
       )}
     </>
