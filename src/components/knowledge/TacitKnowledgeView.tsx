@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import type { KnowledgeGraphMetrics, TopicNode, TacitKnowledge } from '../../types'
+import type { KnowledgeGraphMetrics, TopicNode, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
+import { useSkillDistillation } from '../../hooks/useSkillDistillation'
 import './TacitKnowledgeView.css'
 
 interface Props {
@@ -31,6 +32,50 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     <button className="tk-export-btn" onClick={handleCopy}>
       {copied ? 'Copied!' : label}
     </button>
+  )
+}
+
+function DistillButton({
+  candidate,
+  topic,
+  enrichedSequences,
+}: {
+  candidate: SkillCandidate
+  topic: TopicNode | undefined
+  enrichedSequences: EnrichedToolSequence[]
+}) {
+  const { distill, loading, result, error, reset } = useSkillDistillation()
+
+  if (!topic) return null
+
+  const relatedSequences = enrichedSequences.filter((seq) =>
+    seq.sessionIds.some((sid) => topic.sessionIds.includes(sid))
+  )
+
+  return (
+    <>
+      <button
+        className="tk-distill-btn"
+        disabled={loading}
+        onClick={() => {
+          reset()
+          distill({
+            skillCandidate: candidate,
+            topicNode: topic,
+            enrichedSequences: relatedSequences,
+          })
+        }}
+      >
+        {loading ? 'Distilling...' : 'Distill with Claude'}
+      </button>
+      {error && <p className="tk-distill-error">{error}</p>}
+      {result && (
+        <div className="tk-distill-result">
+          <div className="tk-distill-preview">{result}</div>
+          <CopyButton text={result} label="Copy Distilled" />
+        </div>
+      )}
+    </>
   )
 }
 
@@ -210,6 +255,11 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
                         )}
                       </div>
                       <CopyButton text={candidate.skillMarkdown} label="Export Skill" />
+                      <DistillButton
+                        candidate={candidate}
+                        topic={topic}
+                        enrichedSequences={enrichedToolSequences}
+                      />
                     </div>
                   )
                 })}

@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useState } from 'react'
-import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate } from '../../types'
+import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence } from '../../types'
+import { useSkillDistillation } from '../../hooks/useSkillDistillation'
 import './KnowledgeNodeDetail.css'
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   edges: TopicEdge[]
   allTopics: TopicNode[]
   skillCandidates?: SkillCandidate[]
+  enrichedSequences?: EnrichedToolSequence[]
   onSessionSelect: (sessionId: string) => void
   onClose: () => void
 }
@@ -55,10 +57,13 @@ export function KnowledgeNodeDetail({
   edges,
   allTopics,
   skillCandidates,
+  enrichedSequences,
   onSessionSelect,
   onClose,
 }: Props) {
   const [copied, setCopied] = useState(false)
+  const [distillCopied, setDistillCopied] = useState(false)
+  const { distill, loading: distillLoading, result: distillResult, error: distillError, reset: resetDistill } = useSkillDistillation()
 
   const skillCandidate = useMemo(() => {
     if (!node || !skillCandidates) return null
@@ -188,6 +193,40 @@ export function KnowledgeNodeDetail({
             <button className="knd-export-btn" onClick={handleExportSkill}>
               {copied ? 'Copied!' : 'Export as Skill'}
             </button>
+            <button
+              className="knd-distill-btn"
+              disabled={distillLoading}
+              onClick={() => {
+                resetDistill()
+                distill({
+                  skillCandidate,
+                  topicNode: node,
+                  enrichedSequences: enrichedSequences?.filter((seq) =>
+                    seq.sessionIds.some((sid) => node.sessionIds.includes(sid))
+                  ),
+                })
+              }}
+            >
+              {distillLoading ? 'Distilling...' : 'Distill with Claude'}
+            </button>
+            {distillError && (
+              <p className="knd-distill-error">{distillError}</p>
+            )}
+            {distillResult && (
+              <div className="knd-distill-result">
+                <div className="knd-distill-preview">{distillResult}</div>
+                <button
+                  className="knd-distill-copy-btn"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(distillResult)
+                    setDistillCopied(true)
+                    setTimeout(() => setDistillCopied(false), 2000)
+                  }}
+                >
+                  {distillCopied ? 'Copied!' : 'Copy Distilled Skill'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
