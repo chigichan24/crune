@@ -30,6 +30,8 @@ interface TopicNode {
   representativePrompts: string[];
   suggestedPrompt: string;
   reusabilityScore: ReusabilityScore;
+  betweennessCentrality: number;
+  degreeCentrality: number;
 }
 
 interface SkillCandidate {
@@ -46,10 +48,26 @@ interface EnrichedSequence {
   projects: string[];
 }
 
+interface ConnectedTopic {
+  id: string;
+  label: string;
+  keywords: string[];
+  edgeType: string; // semantic-similarity | shared-module | workflow-continuation | cross-project-bridge
+  strength: number;
+  direction: 'incoming' | 'outgoing';
+}
+
+interface GraphContext {
+  connectedTopics: ConnectedTopic[];
+  community?: { label: string; memberCount: number };
+  isBridgeTopic: boolean;
+}
+
 interface DistillRequest {
   skillCandidate: SkillCandidate;
   topicNode: TopicNode;
   enrichedSequences?: EnrichedSequence[];
+  graphContext?: GraphContext;
 }
 
 interface DistillResponse {
@@ -61,7 +79,7 @@ interface DistillResponse {
 // ---------- Prompt Builder ----------
 
 export function buildDistillationPrompt(body: DistillRequest): string {
-  const { skillCandidate, topicNode, enrichedSequences } = body;
+  const { skillCandidate, topicNode, enrichedSequences, graphContext } = body;
 
   const topicInfo = [
     `## Topic Information`,
@@ -97,6 +115,84 @@ export function buildDistillationPrompt(body: DistillRequest): string {
     toolPatterns = [`## Enriched Tool Patterns`, ...flows].join("\n");
   }
 
+  // --- Graph context sections ---
+  let graphPosition = "";
+  let connectedTopicsSection = "";
+  if (graphContext) {
+    // Graph Position section
+    const positionLines = [`## Graph Position`];
+
+    const betweenness = topicNode.betweennessCentrality;
+    const degree = topicNode.degreeCentrality;
+
+    if (betweenness > 0.2) {
+      positionLines.push("- This is a critical bridge topic connecting multiple knowledge domains");
+    } else if (betweenness > 0.05) {
+      positionLines.push("- This topic bridges several knowledge domains");
+    } else if (degree > 0.5) {
+      positionLines.push("- This is a hub topic connected to many other topics");
+    } else if (degree === 0) {
+      positionLines.push("- This is an isolated topic with no connections to other topics");
+    } else {
+      positionLines.push("- This is a peripheral topic");
+    }
+
+    if (graphContext.community) {
+      positionLines.push(`- Belongs to community: ${graphContext.community.label} (${graphContext.community.memberCount} topics)`);
+    }
+
+    if (graphContext.isBridgeTopic) {
+      positionLines.push("- Identified as a bridge topic in the knowledge graph");
+    }
+
+    graphPosition = positionLines.join("\n");
+
+    // Connected Topics section
+    if (graphContext.connectedTopics.length > 0) {
+      const grouped: Record<string, string[]> = {};
+      for (const ct of graphContext.connectedTopics) {
+        if (!grouped[ct.edgeType]) {
+          grouped[ct.edgeType] = [];
+        }
+
+        const kw = ct.keywords.join(", ");
+        if (ct.edgeType === "workflow-continuation") {
+          if (ct.direction === "incoming") {
+            grouped[ct.edgeType].push(`- Prerequisite: ${ct.label} [${kw}] (strength: ${ct.strength})`);
+          } else {
+            grouped[ct.edgeType].push(`- Follow-up: ${ct.label} [${kw}] (strength: ${ct.strength})`);
+          }
+        } else if (ct.edgeType === "shared-module") {
+          grouped[ct.edgeType].push(`- Related (shared files): ${ct.label} [${kw}]`);
+        } else if (ct.edgeType === "cross-project-bridge") {
+          grouped[ct.edgeType].push(`- Cross-project link: ${ct.label} [${kw}]`);
+        } else if (ct.edgeType === "semantic-similarity") {
+          grouped[ct.edgeType].push(`- Similar topic (differentiate from): ${ct.label} [${kw}]`);
+        }
+      }
+
+      const lines = [`## Connected Topics`];
+      if (grouped["workflow-continuation"]) {
+        lines.push("### Workflow Continuation");
+        lines.push(...grouped["workflow-continuation"]);
+      }
+      if (grouped["shared-module"]) {
+        lines.push("### Shared Module");
+        lines.push(...grouped["shared-module"]);
+      }
+      if (grouped["cross-project-bridge"]) {
+        lines.push("### Cross-Project Bridge");
+        lines.push(...grouped["cross-project-bridge"]);
+      }
+      if (grouped["semantic-similarity"]) {
+        lines.push("### Semantic Similarity");
+        lines.push(...grouped["semantic-similarity"]);
+      }
+
+      connectedTopicsSection = lines.join("\n");
+    }
+  }
+
   const reference = [
     `## Current Heuristic-Generated Skill (for reference)`,
     "```",
@@ -104,7 +200,7 @@ export function buildDistillationPrompt(body: DistillRequest): string {
     "```",
   ].join("\n");
 
-  const instruction = [
+  const instructionLines = [
     `## Your Task`,
     `Produce a refined SKILL.md for this workflow. Follow these rules strictly:`,
     ``,
@@ -115,9 +211,15 @@ export function buildDistillationPrompt(body: DistillRequest): string {
     `5. Focus on the ESSENCE of what makes this workflow distinct and reusable.`,
     `6. Write the body in Japanese. Skill names, tool names, technical terms, and proper nouns should remain in English.`,
     `7. Output ONLY the markdown content. No code fences wrapping the output, no explanations before or after.`,
-  ].join("\n");
+  ];
 
-  const parts = [topicInfo, prompts, toolSig, toolPatterns, reference, instruction].filter(Boolean);
+  if (graphContext && graphContext.connectedTopics.some(ct => ct.edgeType === "workflow-continuation")) {
+    instructionLines.push(`8. If workflow-continuation connections exist, include \`requires\` and/or \`next\` fields in the YAML frontmatter listing the connected topic labels.`);
+  }
+
+  const instruction = instructionLines.join("\n");
+
+  const parts = [topicInfo, prompts, toolSig, toolPatterns, graphPosition, connectedTopicsSection, reference, instruction].filter(Boolean);
   return parts.join("\n\n");
 }
 
@@ -230,26 +332,30 @@ async function handleDistill(req: IncomingMessage, res: ServerResponse) {
 
 // ---------- Server ----------
 
-const PORT = 3456;
+const isDirectRun = process.argv[1]?.endsWith("skill-server.ts") || process.argv[1]?.endsWith("skill-server.js");
 
-const server = createServer(async (req, res) => {
-  if (req.method === "POST" && req.url === "/api/distill") {
-    await handleDistill(req, res);
-  } else {
-    sendJson(res, 404, { error: "Not found" });
-  }
-});
+if (isDirectRun) {
+  const PORT = 3456;
 
-server.listen(PORT, () => {
-  console.log(`Skill distillation server listening on http://localhost:${PORT}`);
-});
-
-function shutdown() {
-  console.log("\nShutting down...");
-  server.close(() => {
-    process.exit(0);
+  const server = createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/api/distill") {
+      await handleDistill(req, res);
+    } else {
+      sendJson(res, 404, { error: "Not found" });
+    }
   });
-}
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+  server.listen(PORT, () => {
+    console.log(`Skill distillation server listening on http://localhost:${PORT}`);
+  });
+
+  function shutdown() {
+    console.log("\nShutting down...");
+    server.close(() => {
+      process.exit(0);
+    });
+  }
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
