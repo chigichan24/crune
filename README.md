@@ -1,6 +1,8 @@
-# crune
-
-**Claude Code Rune — Traces linger, skills emerge**
+<div align="center">
+  <img src="public/favicon.svg" alt="crune logo" width="80" height="80" />
+  <h1>crune</h1>
+  <p><strong>Claude Code Rune — Traces linger, skills emerge</strong></p>
+</div>
 
 Decipher the traces etched in past sessions and resurrect them as reusable skills. crune is a static web dashboard that analyzes Claude Code session logs, providing session playback, analytics, a semantic knowledge graph, and skill synthesis.
 
