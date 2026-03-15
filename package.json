@@ -1,17 +1,25 @@
 {
-  "name": "crune",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@chigichan24/crune",
+  "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "crune": "./bin/crune.js"
+  },
+  "files": [
+    "dist-cli/",
+    "bin/"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:cli": "tsc -p tsconfig.cli.json",
     "lint": "eslint .",
     "preview": "vite preview",
     "analyze-sessions": "tsx scripts/analyze-sessions.ts",
     "skill-server": "tsx scripts/skill-server.ts",
     "dev:full": "npm run skill-server & npm run dev",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run build:cli"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
