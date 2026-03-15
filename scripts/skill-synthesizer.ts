@@ -237,7 +237,7 @@ export function synthesizeWithClaude(prompt: string, options: SynthesisOptions =
   const timeoutMs = options.timeoutMs ?? 300_000;
 
   return new Promise((resolve) => {
-    const args = ["-p", "--output-format", "text"];
+    const args = ["-p", "--output-format", "text", "--dangerously-skip-permissions"];
     if (options.model) {
       args.push("--model", options.model);
     }
