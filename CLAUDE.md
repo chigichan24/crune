@@ -15,6 +15,8 @@ npm run analyze-sessions   # Generate data from ~/.claude/projects/
 npm run dev                # Vite dev server at localhost:5173
 npm run build              # tsc -b && vite build -> dist/
 npm run lint               # ESLint
+npm run skill-server       # Local distillation server at localhost:3456
+npm run dev:full           # skill-server + Vite dev server together
 ```
 
 ## Architecture
@@ -49,6 +51,38 @@ The knowledge graph builder (`knowledge-graph-builder.ts`) uses a multi-signal e
 - Agglomerative clustering (average linkage) with elbow-detected threshold + oversized cluster splitting
 - Louvain community detection -> Brandes betweenness centrality
 - See [docs/knowledge-graph-algorithm.md](docs/knowledge-graph-algorithm.md) for full details
+
+## Skill Distillation
+
+The pipeline detects recurring workflow patterns and generates reusable Claude Code skill definitions using LLM distillation via `claude -p`.
+
+### Pre-distillation (build time)
+
+`analyze-sessions` automatically distills the top skill candidates during data generation:
+
+```bash
+npm run analyze-sessions                              # Top 5 candidates, default model
+npm run analyze-sessions -- --distill-model haiku     # Use Haiku for speed
+npm run analyze-sessions -- --distill-count 3         # Distill only top 3
+npm run analyze-sessions -- --skip-distill            # Skip distillation entirely
+```
+
+Flags:
+- `--distill-model <model>` --- Use a specific Claude model (e.g. `haiku`, `sonnet`, `opus`)
+- `--distill-count <n>` --- Number of top candidates to distill (default: 5)
+- `--skip-distill` --- Skip LLM distillation for faster builds
+
+Pre-distilled results are stored in `overview.json` as `distilledMarkdown` on each `SkillCandidate` and displayed immediately in the Knowledge Graph UI.
+
+### On-demand re-distillation
+
+The UI provides a "再蒸留" button for on-demand re-distillation with full graph context (connected topics, community, centrality). This requires the local skill server:
+
+```bash
+npm run dev:full    # Runs skill-server + Vite dev server
+```
+
+The skill server (`scripts/skill-server.ts`) accepts POST requests at `/api/distill` and calls `claude -p` with the enriched prompt including graph context.
 
 ## Type Definitions
 
