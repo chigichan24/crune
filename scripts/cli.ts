@@ -259,7 +259,9 @@ function extractSkillName(markdown: string, fallbackLabel: string): string {
 
 // ─── Entry point ───────────────────────────────────────────────────
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+if (!process.env.VITEST) {
+  main().catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  });
+}
