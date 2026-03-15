@@ -28,6 +28,10 @@ export interface SessionSummary {
   toolBreakdown: Record<string, number>
   toolCallCount?: number
   firstUserPrompt: string // truncated to 200 chars
+  summaryText?: string // representative prompt (max 300 chars)
+  keywords?: string[] // top keywords from user prompts
+  scope?: string // common directory prefix of edited files
+  workType?: 'investigation' | 'implementation' | 'debugging' | 'planning'
   permissionMode: string | null
   subagentCount: number
 }
