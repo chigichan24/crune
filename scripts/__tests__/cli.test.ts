@@ -5,7 +5,7 @@ describe("parseCliArgs", () => {
   it("returns defaults when no args given", () => {
     const result = parseCliArgs(["node", "cli.ts"]);
     expect(result.sessionsDir).toMatch(/\.claude\/projects$/);
-    expect(result.outputDir).toMatch(/\.claude\/skills$/);
+    expect(result.outputDir).toMatch(/skills$/);
     expect(result.count).toBe(5);
     expect(result.model).toBeUndefined();
     expect(result.skipSynthesis).toBe(false);
