@@ -37,7 +37,7 @@ interface CliArgs {
 export function parseCliArgs(argv: string[]): CliArgs {
   const args = argv.slice(2);
   let sessionsDir = path.join(os.homedir(), ".claude", "projects");
-  let outputDir = path.resolve("skills");
+  let outputDir = path.join(os.homedir(), ".claude", "skills");
   let count = 5;
   let model: string | undefined;
   let skipSynthesis = false;
@@ -73,7 +73,7 @@ Generate reusable skill definitions from Claude Code session logs.
 
 Options:
   --sessions-dir <path>  Session logs directory (default: ~/.claude/projects)
-  --output-dir <path>    Output directory for skill files (default: ./skills)
+  --output-dir <path>    Output directory for skill files (default: ~/.claude/skills)
   --count <n>            Number of skills to generate (default: 5)
   --model <model>        Claude model for synthesis (e.g., haiku, sonnet)
   --skip-synthesis       Skip LLM synthesis, output heuristic skills only
@@ -225,11 +225,12 @@ async function main(): Promise<void> {
       console.error(`    Heuristic only`);
     }
 
-    // Write skill file
+    // Write skill file as <output-dir>/<skill-name>/SKILL.md
     const skillName = extractSkillName(markdown, label);
-    const outputPath = path.join(config.outputDir, `${skillName}.md`);
+    const skillDir = path.join(config.outputDir, skillName);
+    const outputPath = path.join(skillDir, "SKILL.md");
 
-    fs.mkdirSync(config.outputDir, { recursive: true });
+    fs.mkdirSync(skillDir, { recursive: true });
     fs.writeFileSync(outputPath, markdown, "utf-8");
     console.error(`    ${outputPath}`);
   }
