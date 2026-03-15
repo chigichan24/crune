@@ -255,3 +255,16 @@ export interface HotFile {
   editCount: number
   sessionId: string
 }
+
+// === Skill Distillation (LLM-based) ===
+export interface DistillRequest {
+  skillCandidate: SkillCandidate
+  topicNode: TopicNode
+  enrichedSequences?: EnrichedToolSequence[]
+}
+
+export interface DistillResponse {
+  success: boolean
+  distilledMarkdown?: string
+  error?: string
+}
