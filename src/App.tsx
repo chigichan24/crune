@@ -33,7 +33,7 @@ function App() {
           <img src="/favicon.svg" alt="crune logo" className="app-logo" />
           <div>
             <h1 className="app-title">crune</h1>
-            <p className="app-subtitle">Claude Code Rune — Decode Your Sessions</p>
+            <p className="app-subtitle">Claude Code Rune — Traces linger, skills emerge</p>
           </div>
         </div>
         <nav className="tab-nav">
