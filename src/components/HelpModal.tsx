@@ -128,7 +128,7 @@ export function HelpModal({ onClose }: Props) {
           <span className="help-note-label">Note</span>
           セッションログは <code>~/.claude/projects/</code> から読み込まれます。
           パイプラインは <code>public/data/sessions/</code> 配下に静的JSONファイルを生成します。
-          合成済みスキルはKnowledge Graphビューで即座に確認・コピーできます。
+          合成済みスキルはRuneビューで即座に確認・コピーできます。
         </div>
       </div>
     </div>

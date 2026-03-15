@@ -47,7 +47,7 @@ function App() {
             className={`tab-button ${activeTab === 'knowledge' ? 'active' : ''}`}
             onClick={() => setActiveTab('knowledge')}
           >
-            Knowledge Graph
+            Rune
           </button>
         </nav>
       </header>
