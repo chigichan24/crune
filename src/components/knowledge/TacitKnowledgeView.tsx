@@ -1,11 +1,15 @@
 import { useState, useCallback } from 'react'
-import type { KnowledgeGraphMetrics, TopicNode, TacitKnowledge } from '../../types'
+import type { KnowledgeGraphMetrics, TopicNode, TopicEdge, KnowledgeCommunity, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
+import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
+import { buildGraphContext } from '../../utils/buildGraphContext'
 import './TacitKnowledgeView.css'
 
 interface Props {
   knowledge: TacitKnowledge | null
   graphMetrics?: KnowledgeGraphMetrics
   topics?: TopicNode[]
+  edges?: TopicEdge[]
+  communities?: KnowledgeCommunity[]
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -34,7 +38,73 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   )
 }
 
-export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
+function DistillButton({
+  candidate,
+  topic,
+  enrichedSequences,
+  allEdges,
+  allTopics,
+  communities,
+  bridgeTopicIds,
+}: {
+  candidate: SkillCandidate
+  topic: TopicNode | undefined
+  enrichedSequences: EnrichedToolSequence[]
+  allEdges?: TopicEdge[]
+  allTopics?: TopicNode[]
+  communities?: KnowledgeCommunity[]
+  bridgeTopicIds?: string[]
+}) {
+  const { synthesize, loading, result, error, reset } = useSkillSynthesis()
+
+  if (!topic) return null
+
+  const relatedSequences = enrichedSequences.filter((seq) =>
+    seq.sessionIds.some((sid) => topic.sessionIds.includes(sid))
+  )
+
+  const topicEdges = allEdges?.filter((e) => e.source === topic.id || e.target === topic.id) ?? []
+  const graphContext = allTopics
+    ? buildGraphContext(topic, topicEdges, allTopics, communities, bridgeTopicIds)
+    : undefined
+
+  return (
+    <>
+      {/* Pre-synthesized result */}
+      {candidate.synthesizedMarkdown && !result && (
+        <div className="tk-synth-result">
+          <div className="tk-synth-preview">{candidate.synthesizedMarkdown}</div>
+          <CopyButton text={candidate.synthesizedMarkdown} label="Copy Skill" />
+        </div>
+      )}
+      {/* Re-synthesize button */}
+      <button
+        className="tk-synth-btn"
+        disabled={loading}
+        onClick={() => {
+          reset()
+          synthesize({
+            skillCandidate: candidate,
+            topicNode: topic,
+            enrichedSequences: relatedSequences,
+            graphContext,
+          })
+        }}
+      >
+        {loading ? '再合成中...' : '再合成'}
+      </button>
+      {error && <p className="tk-synth-error">{error}</p>}
+      {result && (
+        <div className="tk-synth-result">
+          <div className="tk-synth-preview">{result}</div>
+          <CopyButton text={result} label="Copy Skill" />
+        </div>
+      )}
+    </>
+  )
+}
+
+export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, communities }: Props) {
   if (!knowledge) {
     return (
       <div className="tacit-knowledge-view">
@@ -44,11 +114,8 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
   }
 
   const workflowPatterns = knowledge.workflowPatterns ?? []
-  const commonToolSequences = knowledge.commonToolSequences ?? []
   const enrichedToolSequences = knowledge.enrichedToolSequences ?? []
   const skillCandidates = knowledge.skillCandidates ?? []
-  const longSessions = knowledge.painPoints?.longSessions ?? []
-  const hotFiles = knowledge.painPoints?.hotFiles ?? []
 
   // Knowledge graph insights
   const isolatedTopics = topics?.filter((t) => t.degreeCentrality === 0) ?? []
@@ -63,11 +130,7 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
 
   const hasContent =
     workflowPatterns.length > 0 ||
-    commonToolSequences.length > 0 ||
-    enrichedToolSequences.length > 0 ||
     skillCandidates.length > 0 ||
-    longSessions.length > 0 ||
-    hotFiles.length > 0 ||
     isolatedTopics.length > 0 ||
     bridgeTopics.length > 0 ||
     crossProjectTopics.length > 0
@@ -209,7 +272,15 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
                           <span className="tk-card-badge">Hook</span>
                         )}
                       </div>
-                      <CopyButton text={candidate.skillMarkdown} label="Export Skill" />
+                      <DistillButton
+                        candidate={candidate}
+                        topic={topic}
+                        enrichedSequences={enrichedToolSequences}
+                        allEdges={edges}
+                        allTopics={topics}
+                        communities={communities}
+                        bridgeTopicIds={graphMetrics?.bridgeTopicIds}
+                      />
                     </div>
                   )
                 })}
@@ -217,111 +288,6 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
           </div>
         )}
 
-        {/* Enriched Tool Sequences */}
-        {enrichedToolSequences.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Enriched Tool Patterns</h4>
-            <p className="tk-section-desc">
-              パラメータ付きツール使用パターン
-            </p>
-            <div className="tk-cards">
-              {enrichedToolSequences.slice(0, 15).map((seq, i) => (
-                <div key={i} className="tk-card">
-                  <div className="tk-sequence-flow">
-                    {seq.sequence.map((step, j) => (
-                      <span key={j} className="tk-sequence-item">
-                        {j > 0 && (
-                          <span className="tk-sequence-arrow">&rarr;</span>
-                        )}
-                        <span className="tk-tool-name">{step.toolName}</span>
-                        {step.targetPattern && (
-                          <span className="tk-tool-target">{step.targetPattern}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="tk-sequence-meta">
-                    <span className="tk-card-badge">{seq.count}x</span>
-                    <span className="tk-card-badge">{seq.projects.length} project(s)</span>
-                    <span className="tk-card-badge">{seq.sessionIds.length} session(s)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Common Tool Sequences */}
-        {commonToolSequences.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Common Tool Sequences</h4>
-            <div className="tk-cards">
-              {commonToolSequences.map((seq, i) => (
-                <div key={i} className="tk-card">
-                  <div className="tk-sequence-flow">
-                    {(seq.sequence ?? []).map((tool: string, j: number) => (
-                      <span key={j} className="tk-sequence-item">
-                        {j > 0 && (
-                          <span className="tk-sequence-arrow">&rarr;</span>
-                        )}
-                        <span className="tk-tool-name">{tool}</span>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="tk-sequence-meta">
-                    <span className="tk-card-badge">{seq.count ?? 0}x</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Pain Points - Long Sessions */}
-        {longSessions.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Long Sessions</h4>
-            <div className="tk-cards">
-              {longSessions.map((point, i) => (
-                <div key={i} className="tk-card tk-card-warning">
-                  <div className="tk-pain-header">
-                    <span className="tk-pain-badge">長時間セッション</span>
-                    <span className="tk-pain-metric">
-                      {Math.round(point.durationMinutes ?? 0)}min
-                    </span>
-                  </div>
-                  <p className="tk-card-description">
-                    {point.sessionId.slice(0, 8)}
-                  </p>
-                  <span className="tk-pain-session">
-                    {point.sessionId.slice(0, 8)}...
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Pain Points - Hot Files */}
-        {hotFiles.length > 0 && (
-          <div className="tk-section">
-            <h4 className="tk-section-title">Hot Files (1セッション内で5回以上編集)</h4>
-            <div className="tk-cards">
-              {hotFiles.map((point, i) => (
-                <div key={i} className="tk-card tk-card-warning">
-                  <div className="tk-pain-header">
-                    <span className="tk-pain-badge">繰り返し編集</span>
-                    <span className="tk-pain-metric">{point.editCount ?? 0}x</span>
-                  </div>
-                  <p className="tk-card-description">{point.file ?? ''}</p>
-                  <span className="tk-pain-session">
-                    {(point.sessionId ?? '').slice(0, 8)}...
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

@@ -115,70 +115,6 @@
   color: var(--text-secondary);
 }
 
-/* Tool sequence flow */
-.tk-sequence-flow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-}
-
-.tk-sequence-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.tk-sequence-arrow {
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-
-.tk-tool-name {
-  font-family: monospace;
-  font-size: 11px;
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
-  padding: 1px 5px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-}
-
-.tk-sequence-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-/* Pain points */
-.tk-pain-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.tk-pain-badge {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--warning);
-  background-color: rgba(217, 119, 6, 0.1);
-  padding: 1px 6px;
-  border-radius: 8px;
-}
-
-.tk-pain-metric {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.tk-pain-session {
-  font-family: monospace;
-  font-size: 10px;
-  color: var(--text-secondary);
-}
-
 /* Skill candidates */
 .tk-card-skill {
   border-color: var(--accent);
@@ -206,16 +142,53 @@
   background-color: rgba(37, 99, 235, 0.15);
 }
 
-/* Enriched tool target pattern */
-.tk-tool-target {
-  font-family: monospace;
-  font-size: 9px;
-  color: var(--text-secondary);
-  background-color: var(--bg-secondary);
-  padding: 0 3px;
-  border-radius: 2px;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.tk-synth-btn {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--brand, #8b5cf6);
+  background-color: rgba(139, 92, 246, 0.08);
+  border: 1px solid var(--brand, #8b5cf6);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
 }
+
+.tk-synth-btn:hover {
+  background-color: rgba(139, 92, 246, 0.15);
+}
+
+.tk-synth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tk-synth-error {
+  font-size: 10px;
+  color: var(--danger, #dc2626);
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+.tk-synth-result {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tk-synth-preview {
+  font-size: 10px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  line-height: 1.5;
+}
+

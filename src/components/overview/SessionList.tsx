@@ -203,7 +203,19 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
                     {s.toolCallCount ?? Object.values(s.toolBreakdown ?? {}).reduce((a: number, b: number) => a + b, 0)}
                   </td>
                   <td className="session-list-td session-list-td--prompt">
-                    {truncate(s.firstUserPrompt, 80)}
+                    <div className="session-list-prompt-cell">
+                      {s.workType && (
+                        <span className={`session-list-work-badge session-list-work-badge--${s.workType}`}>
+                          {s.workType}
+                        </span>
+                      )}
+                      <span className="session-list-summary">
+                        {truncate(s.summaryText || s.firstUserPrompt, 120)}
+                      </span>
+                      {s.scope && (
+                        <span className="session-list-scope">{s.scope}</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

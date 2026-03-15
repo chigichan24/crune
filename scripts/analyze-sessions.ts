@@ -17,22 +17,41 @@ import {
   type SessionInput,
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
+import { buildSynthesisPrompt, synthesizeWithClaude, type SynthesisOptions } from "./skill-synthesizer.js";
+import { generateSessionSummary } from "./session-summarizer.js";
 
 // ─── CLI argument parsing ───────────────────────────────────────────────────
 
-function parseArgs(): { sessionsDir: string; outputDir: string } {
+interface CliArgs {
+  sessionsDir: string;
+  outputDir: string;
+  skipSynthesis: boolean;
+  synthesisModel?: string;
+  synthesisCount: number;
+}
+
+function parseArgs(): CliArgs {
   const args = process.argv.slice(2);
   let sessionsDir = path.join(os.homedir(), ".claude", "projects");
   let outputDir = path.resolve("public", "data", "sessions");
+  let skipSynthesis = false;
+  let synthesisModel: string | undefined;
+  let synthesisCount = 5;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
       sessionsDir = path.resolve(args[++i]);
     } else if (args[i] === "--output-dir" && args[i + 1]) {
       outputDir = path.resolve(args[++i]);
+    } else if (args[i] === "--skip-synthesis") {
+      skipSynthesis = true;
+    } else if (args[i] === "--synthesis-model" && args[i + 1]) {
+      synthesisModel = args[++i];
+    } else if (args[i] === "--synthesis-count" && args[i + 1]) {
+      synthesisCount = Math.max(1, parseInt(args[++i], 10) || 5);
     }
   }
-  return { sessionsDir, outputDir };
+  return { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount };
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -164,6 +183,10 @@ interface SessionSummary {
   turnCount: number;
   toolBreakdown: Record<string, number>;
   firstUserPrompt: string;
+  summaryText?: string;
+  keywords?: string[];
+  scope?: string;
+  workType?: string;
   permissionMode: string;
   subagentCount: number;
 }
@@ -625,6 +648,16 @@ function generateIndex(sessions: ParsedSession[]): IndexJson {
       duration: existing.duration + s.meta.durationMinutes,
     });
 
+    const summaryInfo = generateSessionSummary(
+      s.turns.map((t) => ({ userPrompt: t.userPrompt, permissionMode: s.meta.permissionMode })),
+      {
+        toolBreakdown: s.meta.toolBreakdown,
+        filesEdited: s.meta.filesEdited,
+        permissionMode: s.meta.permissionMode,
+        turnCount: s.meta.turnCount,
+      },
+    );
+
     return {
       sessionId: s.meta.sessionId,
       project: s.projectDisplayName,
@@ -637,6 +670,10 @@ function generateIndex(sessions: ParsedSession[]): IndexJson {
       turnCount: s.meta.turnCount,
       toolBreakdown: s.meta.toolBreakdown,
       firstUserPrompt: s.meta.firstUserPrompt,
+      summaryText: summaryInfo.summary,
+      keywords: summaryInfo.keywords,
+      scope: summaryInfo.scope,
+      workType: summaryInfo.workType,
       permissionMode: s.meta.permissionMode,
       subagentCount: s.meta.subagentCount,
     };
@@ -688,7 +725,13 @@ function generateDetail(session: ParsedSession): DetailJson {
 
 // ─── Task 1.7: overview.json Generation ─────────────────────────────────────
 
-function generateOverview(sessions: ParsedSession[]): OverviewJson {
+interface SynthesisConfig {
+  skip: boolean;
+  model?: string;
+  count: number;
+}
+
+async function generateOverview(sessions: ParsedSession[], synthesisConfig: SynthesisConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
   // Activity heatmap: 7 days x 24 hours
   const heatmap: number[][] = Array.from({ length: 7 }, () =>
     Array(24).fill(0)
@@ -930,6 +973,50 @@ function generateOverview(sessions: ParsedSession[]): OverviewJson {
   }
   hotFiles.sort((a, b) => b.editCount - a.editCount);
 
+  // Pre-synthesize top skill candidates with claude -p
+  if (!synthesisConfig.skip) {
+    const topCandidates = [...knowledgeGraph.skillCandidates]
+      .sort((a, b) => b.reusabilityScore - a.reusabilityScore)
+      .slice(0, synthesisConfig.count);
+
+    const synthOpts: SynthesisOptions = {};
+    if (synthesisConfig.model) {
+      synthOpts.model = synthesisConfig.model;
+    }
+
+    const total = topCandidates.length;
+    if (total > 0) {
+      console.error(`[crune] Synthesizing top ${total} skill candidates${synthesisConfig.model ? ` (model: ${synthesisConfig.model})` : ""}...`);
+    }
+    for (let i = 0; i < topCandidates.length; i++) {
+      const candidate = topCandidates[i];
+      const topic = knowledgeGraph.nodes.find((n) => n.id === candidate.topicId);
+      if (!topic) continue;
+
+      const topicSessionSet = new Set(topic.sessionIds);
+      const relatedSequences = knowledgeGraph.enrichedToolSequences.filter((seq) =>
+        seq.sessionIds.some((sid) => topicSessionSet.has(sid))
+      );
+
+      console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
+      const prompt = buildSynthesisPrompt({
+        skillCandidate: candidate,
+        topicNode: topic as unknown as import("./skill-synthesizer.js").TopicNode,
+        enrichedSequences: relatedSequences,
+      });
+      const result = await synthesizeWithClaude(prompt, synthOpts);
+      if (result.success) {
+        const original = knowledgeGraph.skillCandidates.find((sc) => sc.topicId === candidate.topicId);
+        if (original) {
+          original.synthesizedMarkdown = result.stdout;
+        }
+        console.error(`[crune]   [${i + 1}/${total}] Done.`);
+      } else {
+        console.error(`[crune]   [${i + 1}/${total}] Failed: ${result.error}`);
+      }
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     activityHeatmap: heatmap,
@@ -965,7 +1052,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -1062,7 +1149,11 @@ async function main() {
   );
 
   // overview.json
-  const overviewData = generateOverview(parsedSessions);
+  const overviewData = await generateOverview(parsedSessions, {
+    skip: skipSynthesis,
+    model: synthesisModel,
+    count: synthesisCount,
+  });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));
   const overviewSize = fs.statSync(overviewPath).size;

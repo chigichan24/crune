@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "analyze-sessions": "tsx scripts/analyze-sessions.ts",
+    "skill-server": "tsx scripts/skill-server.ts",
+    "dev:full": "npm run skill-server & npm run dev",
     "test": "vitest run"
   },
   "dependencies": {

@@ -28,6 +28,10 @@ export interface SessionSummary {
   toolBreakdown: Record<string, number>
   toolCallCount?: number
   firstUserPrompt: string // truncated to 200 chars
+  summaryText?: string // representative prompt (max 300 chars)
+  keywords?: string[] // top keywords from user prompts
+  scope?: string // common directory prefix of edited files
+  workType?: 'investigation' | 'implementation' | 'debugging' | 'planning'
   permissionMode: string | null
   subagentCount: number
 }
@@ -216,6 +220,7 @@ export interface SkillCandidate {
   topicId: string
   reusabilityScore: number
   skillMarkdown: string
+  synthesizedMarkdown?: string
   hookJson?: string
 }
 
@@ -254,4 +259,34 @@ export interface HotFile {
   file: string
   editCount: number
   sessionId: string
+}
+
+// === Graph Context for Skill Synthesis ===
+export interface ConnectedTopicInfo {
+  id: string
+  label: string
+  keywords: string[]
+  edgeType: SemanticEdgeType
+  strength: number
+  direction: 'incoming' | 'outgoing'
+}
+
+export interface GraphContext {
+  connectedTopics: ConnectedTopicInfo[]
+  community?: { label: string; memberCount: number }
+  isBridgeTopic: boolean
+}
+
+// === Skill Synthesis (LLM-based) ===
+export interface SynthesisRequest {
+  skillCandidate: SkillCandidate
+  topicNode: TopicNode
+  enrichedSequences?: EnrichedToolSequence[]
+  graphContext?: GraphContext
+}
+
+export interface SynthesisResponse {
+  success: boolean
+  synthesizedMarkdown?: string
+  error?: string
 }

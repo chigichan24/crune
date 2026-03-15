@@ -1,5 +1,7 @@
-import { useMemo, useCallback, useState } from 'react'
-import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate } from '../../types'
+import { useMemo, useState } from 'react'
+import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
+import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
+import { buildGraphContext } from '../../utils/buildGraphContext'
 import './KnowledgeNodeDetail.css'
 
 interface Props {
@@ -7,6 +9,9 @@ interface Props {
   edges: TopicEdge[]
   allTopics: TopicNode[]
   skillCandidates?: SkillCandidate[]
+  enrichedSequences?: EnrichedToolSequence[]
+  communities?: KnowledgeCommunity[]
+  bridgeTopicIds?: string[]
   onSessionSelect: (sessionId: string) => void
   onClose: () => void
 }
@@ -55,33 +60,19 @@ export function KnowledgeNodeDetail({
   edges,
   allTopics,
   skillCandidates,
+  enrichedSequences,
+  communities,
+  bridgeTopicIds,
   onSessionSelect,
   onClose,
 }: Props) {
-  const [copied, setCopied] = useState(false)
+  const [synthCopied, setSynthCopied] = useState(false)
+  const { synthesize, loading: synthLoading, result: synthResult, error: synthError, reset: resetSynth } = useSkillSynthesis()
 
   const skillCandidate = useMemo(() => {
     if (!node || !skillCandidates) return null
     return skillCandidates.find((sc) => sc.topicId === node.id) ?? null
   }, [node, skillCandidates])
-
-  const handleExportSkill = useCallback(async () => {
-    if (!skillCandidate) return
-    try {
-      await navigator.clipboard.writeText(skillCandidate.skillMarkdown)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Fallback: download as file
-      const blob = new Blob([skillCandidate.skillMarkdown], { type: 'text/markdown' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `skill-${node?.id ?? 'unknown'}.md`
-      a.click()
-      URL.revokeObjectURL(url)
-    }
-  }, [skillCandidate, node?.id])
   // Group edges by type, resolve connected topic labels
   const edgesByType = useMemo(() => {
     const topicMap = new Map(allTopics.map((t) => [t.id, t]))
@@ -182,12 +173,61 @@ export function KnowledgeNodeDetail({
           </div>
         )}
 
-        {/* Export Skill */}
+        {/* Distill Skill */}
         {skillCandidate && (
           <div className="knd-export">
-            <button className="knd-export-btn" onClick={handleExportSkill}>
-              {copied ? 'Copied!' : 'Export as Skill'}
+            {/* Pre-synthesized result (from analyze-sessions) */}
+            {skillCandidate.synthesizedMarkdown && !synthResult && (
+              <div className="knd-synth-result">
+                <div className="knd-synth-preview">{skillCandidate.synthesizedMarkdown}</div>
+                <button
+                  className="knd-synth-copy-btn"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(skillCandidate.synthesizedMarkdown!)
+                    setSynthCopied(true)
+                    setTimeout(() => setSynthCopied(false), 2000)
+                  }}
+                >
+                  {synthCopied ? 'Copied!' : 'Copy Skill'}
+                </button>
+              </div>
+            )}
+            {/* On-demand re-synthesis with graph context */}
+            <button
+              className="knd-synth-btn"
+              disabled={synthLoading}
+              onClick={() => {
+                resetSynth()
+                synthesize({
+                  skillCandidate,
+                  topicNode: node,
+                  enrichedSequences: enrichedSequences?.filter((seq) =>
+                    seq.sessionIds.some((sid) => node.sessionIds.includes(sid))
+                  ),
+                  graphContext: buildGraphContext(node, edges, allTopics, communities, bridgeTopicIds),
+                })
+              }}
+            >
+              {synthLoading ? '再合成中...' : '再合成'}
             </button>
+            {synthError && (
+              <p className="knd-synth-error">{synthError}</p>
+            )}
+            {synthResult && (
+              <div className="knd-synth-result">
+                <div className="knd-synth-preview">{synthResult}</div>
+                <button
+                  className="knd-synth-copy-btn"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(synthResult)
+                    setSynthCopied(true)
+                    setTimeout(() => setSynthCopied(false), 2000)
+                  }}
+                >
+                  {synthCopied ? 'Copied!' : 'Copy Skill'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

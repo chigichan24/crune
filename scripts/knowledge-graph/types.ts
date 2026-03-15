@@ -137,6 +137,7 @@ export interface SkillCandidate {
   topicId: string;
   reusabilityScore: number;
   skillMarkdown: string;
+  synthesizedMarkdown?: string;
   hookJson?: string;
 }
 

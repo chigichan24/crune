@@ -395,24 +395,75 @@
   color: var(--text-secondary);
 }
 
-/* Export button */
+/* Distill button */
 .knd-export {
   margin-top: 4px;
 }
-
-.knd-export-btn {
+.knd-synth-btn {
   width: 100%;
   font-size: 11px;
   font-weight: 600;
-  color: var(--accent);
-  background-color: rgba(37, 99, 235, 0.08);
-  border: 1px solid var(--accent);
+  color: var(--brand, #8b5cf6);
+  background-color: rgba(139, 92, 246, 0.08);
+  border: 1px solid var(--brand, #8b5cf6);
   border-radius: 4px;
   padding: 6px 10px;
   cursor: pointer;
   transition: background-color 0.15s;
+  margin-top: 4px;
 }
 
-.knd-export-btn:hover {
-  background-color: rgba(37, 99, 235, 0.15);
+.knd-synth-btn:hover {
+  background-color: rgba(139, 92, 246, 0.15);
+}
+
+.knd-synth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.knd-synth-error {
+  font-size: 11px;
+  color: var(--danger, #dc2626);
+  margin: 4px 0 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.knd-synth-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.knd-synth-preview {
+  font-size: 11px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  line-height: 1.5;
+}
+
+.knd-synth-copy-btn {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--success, #16a34a);
+  background-color: rgba(22, 163, 74, 0.08);
+  border: 1px solid var(--success, #16a34a);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.knd-synth-copy-btn:hover {
+  background-color: rgba(22, 163, 74, 0.15);
 }
