@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
 import { useSkillDistillation } from '../../hooks/useSkillDistillation'
 import { buildGraphContext } from '../../utils/buildGraphContext'
@@ -66,7 +66,6 @@ export function KnowledgeNodeDetail({
   onSessionSelect,
   onClose,
 }: Props) {
-  const [copied, setCopied] = useState(false)
   const [distillCopied, setDistillCopied] = useState(false)
   const { distill, loading: distillLoading, result: distillResult, error: distillError, reset: resetDistill } = useSkillDistillation()
 
@@ -74,24 +73,6 @@ export function KnowledgeNodeDetail({
     if (!node || !skillCandidates) return null
     return skillCandidates.find((sc) => sc.topicId === node.id) ?? null
   }, [node, skillCandidates])
-
-  const handleExportSkill = useCallback(async () => {
-    if (!skillCandidate) return
-    try {
-      await navigator.clipboard.writeText(skillCandidate.skillMarkdown)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Fallback: download as file
-      const blob = new Blob([skillCandidate.skillMarkdown], { type: 'text/markdown' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `skill-${node?.id ?? 'unknown'}.md`
-      a.click()
-      URL.revokeObjectURL(url)
-    }
-  }, [skillCandidate, node?.id])
   // Group edges by type, resolve connected topic labels
   const edgesByType = useMemo(() => {
     const topicMap = new Map(allTopics.map((t) => [t.id, t]))
@@ -192,12 +173,9 @@ export function KnowledgeNodeDetail({
           </div>
         )}
 
-        {/* Export Skill */}
+        {/* Distill Skill */}
         {skillCandidate && (
           <div className="knd-export">
-            <button className="knd-export-btn" onClick={handleExportSkill}>
-              {copied ? 'Copied!' : 'Export as Skill'}
-            </button>
             <button
               className="knd-distill-btn"
               disabled={distillLoading}

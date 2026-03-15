@@ -264,7 +264,6 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, com
                           <span className="tk-card-badge">Hook</span>
                         )}
                       </div>
-                      <CopyButton text={candidate.skillMarkdown} label="Export Skill" />
                       <DistillButton
                         candidate={candidate}
                         topic={topic}

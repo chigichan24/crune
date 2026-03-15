@@ -202,13 +202,17 @@ export function buildDistillationPrompt(body: DistillRequest): string {
 
   const instructionLines = [
     `## Your Task`,
-    `Produce a refined SKILL.md for this workflow. Follow these rules strictly:`,
+    `Produce a refined SKILL.md for this workflow following anthropics/skills conventions. Rules:`,
     ``,
-    `1. Start with YAML frontmatter containing \`name\` and \`description\`. The description must include a when-to-use trigger so Claude knows when to activate this skill.`,
+    `1. Start with YAML frontmatter containing \`name\` and \`description\`. The description MUST include an explicit "when to use" trigger (pushiness) so Claude knows when to activate this skill. Counter under-triggering by being specific about activation context.`,
     `2. Use concise, imperative writing style throughout.`,
-    `3. Provide "why" explanations rather than bare rules --- each guideline should explain the reasoning.`,
+    `3. Structure the body with these sections:`,
+    `   - **Overview**: What this skill automates and why (1-2 sentences)`,
+    `   - **When to Use**: Explicit trigger patterns with concrete examples from the representative prompts above`,
+    `   - **Workflow**: Step-by-step imperative instructions using the detected tool patterns`,
+    `   - **Guidelines**: "Why"-based rules (not bare MUST/NEVER). Each guideline explains reasoning.`,
     `4. Include concrete examples drawn from the representative prompts above.`,
-    `5. Focus on the ESSENCE of what makes this workflow distinct and reusable.`,
+    `5. Focus on the ESSENCE of what makes this workflow distinct and reusable. Progressive disclosure: keep body scannable.`,
     `6. Write the body in Japanese. Skill names, tool names, technical terms, and proper nouns should remain in English.`,
     `7. Output ONLY the markdown content. No code fences wrapping the output, no explanations before or after.`,
   ];
