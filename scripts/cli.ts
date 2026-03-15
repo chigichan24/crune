@@ -67,7 +67,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
 }
 
 function printUsage(): void {
-  console.error(`Usage: crune [options]
+  console.log(`Usage: crune [options]
 
 Generate reusable skill definitions from Claude Code session logs.
 
