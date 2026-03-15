@@ -259,15 +259,7 @@ function extractSkillName(markdown: string, fallbackLabel: string): string {
 
 // ─── Entry point ───────────────────────────────────────────────────
 
-const entryScript = process.argv[1] ?? "";
-const isDirectRun =
-  entryScript.endsWith("/cli.ts") ||
-  entryScript.endsWith("/cli.js") ||
-  entryScript.endsWith("/bin/crune.js");
-
-if (isDirectRun) {
-  main().catch((err) => {
-    console.error("Fatal error:", err);
-    process.exit(1);
-  });
-}
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
