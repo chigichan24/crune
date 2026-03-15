@@ -57,7 +57,7 @@ function parseArgs(): CliArgs {
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** Discovered session file on disk */
-interface SessionFile {
+export interface SessionFile {
   filePath: string;
   sessionId: string;
   projectDir: string;
@@ -66,7 +66,7 @@ interface SessionFile {
 }
 
 /** A single JSONL line parsed to an object */
-interface JsonlLine {
+export interface JsonlLine {
   type: string;
   subtype?: string;
   parentUuid?: string | null;
@@ -102,7 +102,7 @@ interface JsonlLine {
   [key: string]: unknown;
 }
 
-interface ContentBlock {
+export interface ContentBlock {
   type: string;
   text?: string;
   thinking?: string;
@@ -114,7 +114,7 @@ interface ContentBlock {
 }
 
 /** A tool call within a conversation turn */
-interface ToolCall {
+export interface ToolCall {
   toolUseId: string;
   toolName: string;
   input: Record<string, unknown>;
@@ -122,7 +122,7 @@ interface ToolCall {
 }
 
 /** A single conversation turn (user prompt + all assistant responses until next user prompt) */
-interface ConversationTurn {
+export interface ConversationTurn {
   turnIndex: number;
   userPrompt: string;
   timestamp: string;
@@ -133,7 +133,7 @@ interface ConversationTurn {
 }
 
 /** Metadata extracted from a session */
-interface SessionMeta {
+export interface SessionMeta {
   sessionId: string;
   cwd: string;
   gitBranch: string;
@@ -296,7 +296,7 @@ function discoverSessions(sessionsDir: string): SessionFile[] {
   return sessions;
 }
 
-function inferProjectName(dirName: string): string {
+export function inferProjectName(dirName: string): string {
   // Directory names look like: -Users-kazuki-chigita-src-github-com-chigichan24-crune
   // We want: chigichan24/crune (the last two meaningful segments)
   const parts = dirName.split("-").filter(Boolean);
@@ -335,12 +335,12 @@ async function parseJsonlFile(filePath: string): Promise<JsonlLine[]> {
   return lines;
 }
 
-function truncate(text: string, limit: number): string {
+export function truncate(text: string, limit: number): string {
   if (text.length <= limit) return text;
   return text.slice(0, limit) + "\u2026";
 }
 
-function isRealUserMessage(line: JsonlLine): boolean {
+export function isRealUserMessage(line: JsonlLine): boolean {
   if (line.type !== "user") return false;
   if (line.isMeta) return false;
 
@@ -366,14 +366,14 @@ function isRealUserMessage(line: JsonlLine): boolean {
   return false;
 }
 
-function isToolResultMessage(line: JsonlLine): boolean {
+export function isToolResultMessage(line: JsonlLine): boolean {
   if (line.type !== "user") return false;
   const content = line.message?.content;
   if (!Array.isArray(content)) return false;
   return content.some((block: ContentBlock) => block.type === "tool_result");
 }
 
-function extractUserPrompt(line: JsonlLine): string {
+export function extractUserPrompt(line: JsonlLine): string {
   const content = line.message?.content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
@@ -486,7 +486,7 @@ export function buildTurns(lines: JsonlLine[]): ConversationTurn[] {
 
 // ─── Task 1.3: Metadata Extraction ─────────────────────────────────────────
 
-function extractMetadata(
+export function extractMetadata(
   sessionFile: SessionFile,
   lines: JsonlLine[],
   turns: ConversationTurn[]
