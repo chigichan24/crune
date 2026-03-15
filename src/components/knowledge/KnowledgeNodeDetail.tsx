@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useState } from 'react'
-import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence } from '../../types'
+import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
 import { useSkillDistillation } from '../../hooks/useSkillDistillation'
+import { buildGraphContext } from '../../utils/buildGraphContext'
 import './KnowledgeNodeDetail.css'
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
   allTopics: TopicNode[]
   skillCandidates?: SkillCandidate[]
   enrichedSequences?: EnrichedToolSequence[]
+  communities?: KnowledgeCommunity[]
+  bridgeTopicIds?: string[]
   onSessionSelect: (sessionId: string) => void
   onClose: () => void
 }
@@ -58,6 +61,8 @@ export function KnowledgeNodeDetail({
   allTopics,
   skillCandidates,
   enrichedSequences,
+  communities,
+  bridgeTopicIds,
   onSessionSelect,
   onClose,
 }: Props) {
@@ -204,6 +209,7 @@ export function KnowledgeNodeDetail({
                   enrichedSequences: enrichedSequences?.filter((seq) =>
                     seq.sessionIds.some((sid) => node.sessionIds.includes(sid))
                   ),
+                  graphContext: buildGraphContext(node, edges, allTopics, communities, bridgeTopicIds),
                 })
               }}
             >

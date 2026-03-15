@@ -452,6 +452,8 @@ export function KnowledgeGraphView({
                 knowledge={overview.tacitKnowledge}
                 graphMetrics={metrics}
                 topics={overview.knowledgeGraph.nodes}
+                edges={overview.knowledgeGraph.edges}
+                communities={overview.knowledgeGraph.communities}
               />
             )}
             {sidebarTab === 'detail' && selectedNode && (
@@ -461,6 +463,8 @@ export function KnowledgeGraphView({
                 allTopics={overview.knowledgeGraph.nodes}
                 skillCandidates={overview.tacitKnowledge?.skillCandidates}
                 enrichedSequences={overview.tacitKnowledge?.enrichedToolSequences}
+                communities={overview.knowledgeGraph.communities}
+                bridgeTopicIds={metrics.bridgeTopicIds}
                 onSessionSelect={onSessionSelect}
                 onClose={handleCloseDetail}
               />

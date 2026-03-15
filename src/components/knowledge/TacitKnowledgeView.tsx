@@ -1,12 +1,15 @@
 import { useState, useCallback } from 'react'
-import type { KnowledgeGraphMetrics, TopicNode, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
+import type { KnowledgeGraphMetrics, TopicNode, TopicEdge, KnowledgeCommunity, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
 import { useSkillDistillation } from '../../hooks/useSkillDistillation'
+import { buildGraphContext } from '../../utils/buildGraphContext'
 import './TacitKnowledgeView.css'
 
 interface Props {
   knowledge: TacitKnowledge | null
   graphMetrics?: KnowledgeGraphMetrics
   topics?: TopicNode[]
+  edges?: TopicEdge[]
+  communities?: KnowledgeCommunity[]
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -39,10 +42,18 @@ function DistillButton({
   candidate,
   topic,
   enrichedSequences,
+  allEdges,
+  allTopics,
+  communities,
+  bridgeTopicIds,
 }: {
   candidate: SkillCandidate
   topic: TopicNode | undefined
   enrichedSequences: EnrichedToolSequence[]
+  allEdges?: TopicEdge[]
+  allTopics?: TopicNode[]
+  communities?: KnowledgeCommunity[]
+  bridgeTopicIds?: string[]
 }) {
   const { distill, loading, result, error, reset } = useSkillDistillation()
 
@@ -51,6 +62,11 @@ function DistillButton({
   const relatedSequences = enrichedSequences.filter((seq) =>
     seq.sessionIds.some((sid) => topic.sessionIds.includes(sid))
   )
+
+  const topicEdges = allEdges?.filter((e) => e.source === topic.id || e.target === topic.id) ?? []
+  const graphContext = allTopics
+    ? buildGraphContext(topic, topicEdges, allTopics, communities, bridgeTopicIds)
+    : undefined
 
   return (
     <>
@@ -63,6 +79,7 @@ function DistillButton({
             skillCandidate: candidate,
             topicNode: topic,
             enrichedSequences: relatedSequences,
+            graphContext,
           })
         }}
       >
@@ -79,7 +96,7 @@ function DistillButton({
   )
 }
 
-export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
+export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, communities }: Props) {
   if (!knowledge) {
     return (
       <div className="tacit-knowledge-view">
@@ -259,6 +276,10 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics }: Props) {
                         candidate={candidate}
                         topic={topic}
                         enrichedSequences={enrichedToolSequences}
+                        allEdges={edges}
+                        allTopics={topics}
+                        communities={communities}
+                        bridgeTopicIds={graphMetrics?.bridgeTopicIds}
                       />
                     </div>
                   )
