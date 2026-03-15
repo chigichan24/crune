@@ -6,7 +6,9 @@ import {
   isToolResultMessage,
   extractUserPrompt,
   buildTurns,
+  extractMetadata,
   type JsonlLine,
+  type SessionFile,
 } from "../analyze-sessions.js";
 
 describe("inferProjectName", () => {
@@ -274,5 +276,115 @@ describe("buildTurns", () => {
     expect(tc.toolName).toBe("Write");
     expect((tc.input.content as string).length).toBeLessThan(longContent.length);
     expect(tc.input.contentLength).toBe(1000);
+  });
+});
+
+describe("extractMetadata", () => {
+  const baseSessionFile: SessionFile = {
+    filePath: "/tmp/test.jsonl",
+    sessionId: "test-session-id",
+    projectDir: "-Users-foo-github-com-org-repo",
+    projectDisplayName: "org/repo",
+    subagentFiles: ["/tmp/sub1.jsonl", "/tmp/sub2.jsonl"],
+  };
+
+  it("extracts cwd, gitBranch, version, slug from first line that has them", () => {
+    const lines: JsonlLine[] = [
+      { type: "user", cwd: "/home/user/project", gitBranch: "main", version: "1.0.0", slug: "my-plan", timestamp: "2026-01-01T00:00:00Z", message: { content: "hello" } },
+      { type: "user", cwd: "/other/path", gitBranch: "dev", version: "2.0.0", slug: "other-plan", timestamp: "2026-01-01T00:01:00Z", message: { content: "world" } },
+    ];
+    const turns = buildTurns(lines);
+    const meta = extractMetadata(baseSessionFile, lines, turns);
+    expect(meta.cwd).toBe("/home/user/project");
+    expect(meta.gitBranch).toBe("main");
+    expect(meta.version).toBe("1.0.0");
+    expect(meta.slug).toBe("my-plan");
+  });
+
+  it("computes correct createdAt and lastActiveAt", () => {
+    const lines: JsonlLine[] = [
+      { type: "user", timestamp: "2026-01-01T10:00:00Z", message: { content: "first" } },
+      { type: "assistant", timestamp: "2026-01-01T10:05:00Z", message: { content: [{ type: "text", text: "reply" }] } },
+      { type: "user", timestamp: "2026-01-01T10:30:00Z", message: { content: "second" } },
+    ];
+    const turns = buildTurns(lines);
+    const meta = extractMetadata(baseSessionFile, lines, turns);
+    expect(meta.createdAt).toBe("2026-01-01T10:00:00Z");
+    expect(meta.lastActiveAt).toBe("2026-01-01T10:30:00Z");
+  });
+
+  it("computes durationMinutes correctly", () => {
+    const lines: JsonlLine[] = [
+      { type: "user", timestamp: "2026-01-01T10:00:00Z", message: { content: "start" } },
+      { type: "user", timestamp: "2026-01-01T10:45:00Z", message: { content: "end" } },
+    ];
+    const turns = buildTurns(lines);
+    const meta = extractMetadata(baseSessionFile, lines, turns);
+    expect(meta.durationMinutes).toBe(45);
+  });
+
+  it("counts tool breakdown from turns", () => {
+    const lines: JsonlLine[] = [
+      { type: "user", timestamp: "2026-01-01T00:00:00Z", message: { content: "do stuff" } },
+      {
+        type: "assistant",
+        message: {
+          content: [
+            { type: "tool_use", id: "t1", name: "Read", input: { file_path: "/a.ts" } },
+            { type: "tool_use", id: "t2", name: "Read", input: { file_path: "/b.ts" } },
+            { type: "tool_use", id: "t3", name: "Edit", input: { file_path: "/a.ts", old_string: "x", new_string: "y" } },
+          ],
+        },
+      },
+    ];
+    const turns = buildTurns(lines);
+    const meta = extractMetadata(baseSessionFile, lines, turns);
+    expect(meta.toolBreakdown).toEqual({ Read: 2, Edit: 1 });
+  });
+
+  it("tracks filesEdited from Edit/Write toolCalls", () => {
+    const lines: JsonlLine[] = [
+      { type: "user", timestamp: "2026-01-01T00:00:00Z", message: { content: "edit files" } },
+      {
+        type: "assistant",
+        message: {
+          content: [
+            { type: "tool_use", id: "t1", name: "Edit", input: { file_path: "/src/a.ts", old_string: "x", new_string: "y" } },
+            { type: "tool_use", id: "t2", name: "Write", input: { file_path: "/src/b.ts", content: "new file" } },
+            { type: "tool_use", id: "t3", name: "Read", input: { file_path: "/src/c.ts" } },
+          ],
+        },
+      },
+    ];
+    const turns = buildTurns(lines);
+    const meta = extractMetadata(baseSessionFile, lines, turns);
+    expect(meta.filesEdited.sort()).toEqual(["/src/a.ts", "/src/b.ts"]);
+  });
+
+  it("counts modelsUsed from assistant messages", () => {
+    const lines: JsonlLine[] = [
+      { type: "user", timestamp: "2026-01-01T00:00:00Z", message: { content: "hello" } },
+      { type: "assistant", timestamp: "2026-01-01T00:00:01Z", message: { model: "claude-sonnet", content: [{ type: "text", text: "hi" }] } },
+      { type: "user", timestamp: "2026-01-01T00:01:00Z", message: { content: "again" } },
+      { type: "assistant", timestamp: "2026-01-01T00:01:01Z", message: { model: "claude-sonnet", content: [{ type: "text", text: "ok" }] } },
+      { type: "assistant", timestamp: "2026-01-01T00:01:02Z", message: { model: "claude-opus", content: [{ type: "text", text: "deep" }] } },
+    ];
+    const turns = buildTurns(lines);
+    const meta = extractMetadata(baseSessionFile, lines, turns);
+    expect(meta.modelsUsed).toEqual({ "claude-sonnet": 2, "claude-opus": 1 });
+  });
+
+  it("returns sensible defaults for empty turns/lines", () => {
+    const meta = extractMetadata(baseSessionFile, [], []);
+    expect(meta.sessionId).toBe("test-session-id");
+    expect(meta.cwd).toBe("");
+    expect(meta.gitBranch).toBe("");
+    expect(meta.durationMinutes).toBe(0);
+    expect(meta.turnCount).toBe(0);
+    expect(meta.toolBreakdown).toEqual({});
+    expect(meta.filesEdited).toEqual([]);
+    expect(meta.modelsUsed).toEqual({});
+    expect(meta.firstUserPrompt).toBe("");
+    expect(meta.subagentCount).toBe(2);
   });
 });
