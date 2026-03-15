@@ -113,7 +113,8 @@ export function buildDistillationPrompt(body: DistillRequest): string {
     `3. Provide "why" explanations rather than bare rules --- each guideline should explain the reasoning.`,
     `4. Include concrete examples drawn from the representative prompts above.`,
     `5. Focus on the ESSENCE of what makes this workflow distinct and reusable.`,
-    `6. Output ONLY the markdown content. No code fences wrapping the output, no explanations before or after.`,
+    `6. Write the body in Japanese. Skill names, tool names, technical terms, and proper nouns should remain in English.`,
+    `7. Output ONLY the markdown content. No code fences wrapping the output, no explanations before or after.`,
   ].join("\n");
 
   const parts = [topicInfo, prompts, toolSig, toolPatterns, reference, instruction].filter(Boolean);
