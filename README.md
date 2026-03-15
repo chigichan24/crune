@@ -2,9 +2,14 @@
   <img src="public/favicon.svg" alt="crune logo" width="80" height="80" />
   <h1>crune</h1>
   <p><strong>Claude Code Rune — Traces linger, skills emerge</strong></p>
+  <p>
+    <a href="https://www.npmjs.com/package/@chigichan24/crune"><img src="https://img.shields.io/npm/v/@chigichan24/crune.svg" alt="npm version" /></a>
+    <a href="https://www.npmjs.com/package/@chigichan24/crune"><img src="https://img.shields.io/npm/dm/@chigichan24/crune.svg" alt="npm downloads" /></a>
+    <a href="https://github.com/chigichan24/crune/blob/main/LICENSE"><img src="https://img.shields.io/github/license/chigichan24/crune.svg" alt="license" /></a>
+  </p>
 </div>
 
-Decipher the traces etched in past sessions and resurrect them as reusable skills. crune is a static web dashboard that analyzes Claude Code session logs, providing session playback, analytics, a semantic knowledge graph, and skill synthesis.
+Decipher the traces etched in past sessions and resurrect them as reusable skills. crune is a static web dashboard and CLI tool that analyzes Claude Code session logs, providing session playback, analytics, a semantic knowledge graph, and skill synthesis.
 
 ## Features
 
@@ -27,7 +32,31 @@ Decipher the traces etched in past sessions and resurrect them as reusable skill
 
 <img src="docs/rune.png" alt="Knowledge Graph" width="800" />
 
-## Quick Start
+## CLI — Generate Skills via npx
+
+Generate reusable Claude Code skill definitions directly from your session logs. No clone required.
+
+```bash
+npx @chigichan24/crune --dry-run                    # Preview skill candidates
+npx @chigichan24/crune --skip-synthesis              # Generate heuristic skills (no LLM)
+npx @chigichan24/crune --count 3 --model haiku       # LLM-synthesized skills (requires claude CLI)
+npx @chigichan24/crune --output-dir ~/.claude/skills  # Install skills directly
+```
+
+Output follows the [Claude Code skill format](https://docs.anthropic.com/en/docs/claude-code/skills) (`<name>/SKILL.md`), ready to use as `/skill-name` commands.
+
+| Flag | Description |
+|------|-------------|
+| `--sessions-dir <path>` | Session logs directory (default: `~/.claude/projects`) |
+| `--output-dir <path>` | Output directory for skill files (default: `./skills`) |
+| `--count <n>` | Number of skills to generate (default: 5) |
+| `--model <model>` | Claude model for synthesis (e.g. `haiku`, `sonnet`) |
+| `--skip-synthesis` | Skip LLM synthesis, output heuristic skills only |
+| `--dry-run` | Show candidates without writing files |
+
+## Web Dashboard
+
+### Quick Start
 
 ```bash
 npm install
@@ -136,7 +165,9 @@ src/
   hooks/          # Data fetching (useSessionIndex, useSessionDetail, useSessionOverview)
   types/          # TypeScript type definitions
 scripts/
-  analyze-sessions.ts        # JSONL -> JSON pipeline
+  cli.ts                     # npx CLI entry point
+  session-parser.ts          # JSONL parsing, turn building, metadata extraction
+  analyze-sessions.ts        # Dashboard JSON pipeline
   session-summarizer.ts      # Session summarization (local NLP)
   skill-synthesizer.ts       # Skill synthesis (claude -p)
   skill-server.ts            # Synthesis HTTP server
