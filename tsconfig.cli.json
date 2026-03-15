@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist-cli",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": true,
+    "declaration": false,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["scripts/**/*.ts"]
+}

@@ -22,6 +22,7 @@ function makeTopicNode(id: string, project = "default-project"): TopicNode {
     suggestedPrompt: "",
     toolSignature: [],
     dominantRole: "user-driven",
+    reusabilityScore: { overall: 0, frequency: 0, timeCost: 0, crossProjectScore: 0, recency: 0 },
   };
 }
 

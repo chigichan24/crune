@@ -30,6 +30,7 @@ function makeTopicNode(overrides: Partial<TopicNode> = {}): TopicNode {
     suggestedPrompt: "",
     toolSignature: [],
     dominantRole: "user-driven",
+    reusabilityScore: { overall: 0, frequency: 0, timeCost: 0, crossProjectScore: 0, recency: 0 },
     ...overrides,
   };
 }
