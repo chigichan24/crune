@@ -49,7 +49,8 @@ export function parseCliArgs(argv: string[]): CliArgs {
     } else if (args[i] === "--output-dir" && args[i + 1]) {
       outputDir = path.resolve(args[++i]);
     } else if (args[i] === "--count" && args[i + 1]) {
-      count = Math.max(1, parseInt(args[++i], 10) || 5);
+      const parsed = parseInt(args[++i], 10);
+      count = Math.max(1, Number.isNaN(parsed) ? 5 : parsed);
     } else if (args[i] === "--model" && args[i + 1]) {
       model = args[++i];
     } else if (args[i] === "--skip-synthesis") {
