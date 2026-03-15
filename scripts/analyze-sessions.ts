@@ -17,15 +17,25 @@ import {
   type SessionInput,
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
-import { buildDistillationPrompt, distillWithClaude } from "./skill-distiller.js";
+import { buildDistillationPrompt, distillWithClaude, type DistillOptions } from "./skill-distiller.js";
 
 // ─── CLI argument parsing ───────────────────────────────────────────────────
 
-function parseArgs(): { sessionsDir: string; outputDir: string; skipDistill: boolean } {
+interface CliArgs {
+  sessionsDir: string;
+  outputDir: string;
+  skipDistill: boolean;
+  distillModel?: string;
+  distillCount: number;
+}
+
+function parseArgs(): CliArgs {
   const args = process.argv.slice(2);
   let sessionsDir = path.join(os.homedir(), ".claude", "projects");
   let outputDir = path.resolve("public", "data", "sessions");
   let skipDistill = false;
+  let distillModel: string | undefined;
+  let distillCount = 5;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -34,9 +44,13 @@ function parseArgs(): { sessionsDir: string; outputDir: string; skipDistill: boo
       outputDir = path.resolve(args[++i]);
     } else if (args[i] === "--skip-distill") {
       skipDistill = true;
+    } else if (args[i] === "--distill-model" && args[i + 1]) {
+      distillModel = args[++i];
+    } else if (args[i] === "--distill-count" && args[i + 1]) {
+      distillCount = Math.max(1, parseInt(args[++i], 10) || 5);
     }
   }
-  return { sessionsDir, outputDir, skipDistill };
+  return { sessionsDir, outputDir, skipDistill, distillModel, distillCount };
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -692,7 +706,13 @@ function generateDetail(session: ParsedSession): DetailJson {
 
 // ─── Task 1.7: overview.json Generation ─────────────────────────────────────
 
-async function generateOverview(sessions: ParsedSession[], skipDistill = false): Promise<OverviewJson> {
+interface DistillConfig {
+  skip: boolean;
+  model?: string;
+  count: number;
+}
+
+async function generateOverview(sessions: ParsedSession[], distillConfig: DistillConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
   // Activity heatmap: 7 days x 24 hours
   const heatmap: number[][] = Array.from({ length: 7 }, () =>
     Array(24).fill(0)
@@ -935,14 +955,19 @@ async function generateOverview(sessions: ParsedSession[], skipDistill = false):
   hotFiles.sort((a, b) => b.editCount - a.editCount);
 
   // Pre-distill top skill candidates with claude -p
-  if (!skipDistill) {
+  if (!distillConfig.skip) {
     const topCandidates = [...knowledgeGraph.skillCandidates]
       .sort((a, b) => b.reusabilityScore - a.reusabilityScore)
-      .slice(0, 5);
+      .slice(0, distillConfig.count);
 
-    const distillCount = topCandidates.length;
-    if (distillCount > 0) {
-      console.error(`[crune] Distilling top ${distillCount} skill candidates...`);
+    const distillOpts: DistillOptions = {};
+    if (distillConfig.model) {
+      distillOpts.model = distillConfig.model;
+    }
+
+    const total = topCandidates.length;
+    if (total > 0) {
+      console.error(`[crune] Distilling top ${total} skill candidates${distillConfig.model ? ` (model: ${distillConfig.model})` : ""}...`);
     }
     for (let i = 0; i < topCandidates.length; i++) {
       const candidate = topCandidates[i];
@@ -954,22 +979,21 @@ async function generateOverview(sessions: ParsedSession[], skipDistill = false):
         seq.sessionIds.some((sid) => topicSessionSet.has(sid))
       );
 
-      console.error(`[crune]   [${i + 1}/${distillCount}] ${topic.label}...`);
+      console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
       const prompt = buildDistillationPrompt({
         skillCandidate: candidate,
         topicNode: topic as unknown as import("./skill-distiller.js").TopicNode,
         enrichedSequences: relatedSequences,
       });
-      const result = await distillWithClaude(prompt);
+      const result = await distillWithClaude(prompt, distillOpts);
       if (result.success) {
-        // Update the original candidate in the array
         const original = knowledgeGraph.skillCandidates.find((sc) => sc.topicId === candidate.topicId);
         if (original) {
           original.distilledMarkdown = result.stdout;
         }
-        console.error(`[crune]   [${i + 1}/${distillCount}] Done.`);
+        console.error(`[crune]   [${i + 1}/${total}] Done.`);
       } else {
-        console.error(`[crune]   [${i + 1}/${distillCount}] Failed: ${result.error}`);
+        console.error(`[crune]   [${i + 1}/${total}] Failed: ${result.error}`);
       }
     }
   }
@@ -1009,7 +1033,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipDistill } = parseArgs();
+  const { sessionsDir, outputDir, skipDistill, distillModel, distillCount } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -1106,7 +1130,11 @@ async function main() {
   );
 
   // overview.json
-  const overviewData = await generateOverview(parsedSessions, skipDistill);
+  const overviewData = await generateOverview(parsedSessions, {
+    skip: skipDistill,
+    model: distillModel,
+    count: distillCount,
+  });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));
   const overviewSize = fs.statSync(overviewPath).size;

@@ -228,9 +228,21 @@ export function buildDistillationPrompt(body: DistillRequest): string {
 
 // ---------- Distill with Claude CLI ----------
 
-export function distillWithClaude(prompt: string): Promise<{ success: boolean; stdout: string; stderr: string; error?: string }> {
+export interface DistillOptions {
+  model?: string;       // e.g. "haiku", "sonnet", "opus"
+  timeoutMs?: number;   // default: 120_000
+}
+
+export function distillWithClaude(prompt: string, options: DistillOptions = {}): Promise<{ success: boolean; stdout: string; stderr: string; error?: string }> {
+  const timeoutMs = options.timeoutMs ?? 120_000;
+
   return new Promise((resolve) => {
-    const child = spawn("claude", ["-p", "--output-format", "text"], {
+    const args = ["-p", "--output-format", "text"];
+    if (options.model) {
+      args.push("--model", options.model);
+    }
+
+    const child = spawn("claude", args, {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -255,9 +267,9 @@ export function distillWithClaude(prompt: string): Promise<{ success: boolean; s
         success: false,
         stdout: "",
         stderr: "",
-        error: "Distillation timed out (120s)",
+        error: `Distillation timed out (${timeoutMs / 1000}s)`,
       });
-    }, 120_000);
+    }, timeoutMs);
 
     child.on("close", (code) => {
       clearTimeout(timeout);
