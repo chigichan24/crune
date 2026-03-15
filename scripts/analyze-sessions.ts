@@ -18,6 +18,7 @@ import {
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
 import { buildDistillationPrompt, distillWithClaude, type DistillOptions } from "./skill-distiller.js";
+import { generateSessionSummary } from "./session-summarizer.js";
 
 // ─── CLI argument parsing ───────────────────────────────────────────────────
 
@@ -182,6 +183,10 @@ interface SessionSummary {
   turnCount: number;
   toolBreakdown: Record<string, number>;
   firstUserPrompt: string;
+  summaryText?: string;
+  keywords?: string[];
+  scope?: string;
+  workType?: string;
   permissionMode: string;
   subagentCount: number;
 }
@@ -643,6 +648,16 @@ function generateIndex(sessions: ParsedSession[]): IndexJson {
       duration: existing.duration + s.meta.durationMinutes,
     });
 
+    const summaryInfo = generateSessionSummary(
+      s.turns.map((t) => ({ userPrompt: t.userPrompt, permissionMode: s.meta.permissionMode })),
+      {
+        toolBreakdown: s.meta.toolBreakdown,
+        filesEdited: s.meta.filesEdited,
+        permissionMode: s.meta.permissionMode,
+        turnCount: s.meta.turnCount,
+      },
+    );
+
     return {
       sessionId: s.meta.sessionId,
       project: s.projectDisplayName,
@@ -655,6 +670,10 @@ function generateIndex(sessions: ParsedSession[]): IndexJson {
       turnCount: s.meta.turnCount,
       toolBreakdown: s.meta.toolBreakdown,
       firstUserPrompt: s.meta.firstUserPrompt,
+      summaryText: summaryInfo.summary,
+      keywords: summaryInfo.keywords,
+      scope: summaryInfo.scope,
+      workType: summaryInfo.workType,
       permissionMode: s.meta.permissionMode,
       subagentCount: s.meta.subagentCount,
     };
