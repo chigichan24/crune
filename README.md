@@ -15,6 +15,18 @@ Decipher the traces etched in past sessions and resurrect them as reusable skill
 - **Session Summarization** --- Automatic session summary and classification (no LLM required)
 - **Skill Synthesis** --- Synthesize reusable skill definitions from the knowledge graph ([algorithm details](docs/skill-generation-algorithm.md))
 
+### Overview Dashboard
+
+<img src="docs/overview.png" alt="Overview Dashboard" width="800" />
+
+### Session Playback
+
+<img src="docs/playback.png" alt="Session Playback" width="800" />
+
+### Semantic Knowledge Graph (Rune)
+
+<img src="docs/rune.png" alt="Knowledge Graph" width="800" />
+
 ## Quick Start
 
 ```bash
