@@ -258,10 +258,11 @@ function extractSkillName(markdown: string, fallbackLabel: string): string {
 
 // ─── Entry point ───────────────────────────────────────────────────
 
+const entryScript = process.argv[1] ?? "";
 const isDirectRun =
-  process.argv[1] &&
-  (process.argv[1].endsWith("/cli.ts") ||
-    process.argv[1].endsWith("/cli.js"));
+  entryScript.endsWith("/cli.ts") ||
+  entryScript.endsWith("/cli.js") ||
+  entryScript.endsWith("/bin/crune.js");
 
 if (isDirectRun) {
   main().catch((err) => {
