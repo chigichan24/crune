@@ -256,11 +256,28 @@ export interface HotFile {
   sessionId: string
 }
 
+// === Graph Context for Distillation ===
+export interface ConnectedTopicInfo {
+  id: string
+  label: string
+  keywords: string[]
+  edgeType: SemanticEdgeType
+  strength: number
+  direction: 'incoming' | 'outgoing'
+}
+
+export interface GraphContext {
+  connectedTopics: ConnectedTopicInfo[]
+  community?: { label: string; memberCount: number }
+  isBridgeTopic: boolean
+}
+
 // === Skill Distillation (LLM-based) ===
 export interface DistillRequest {
   skillCandidate: SkillCandidate
   topicNode: TopicNode
   enrichedSequences?: EnrichedToolSequence[]
+  graphContext?: GraphContext
 }
 
 export interface DistillResponse {
