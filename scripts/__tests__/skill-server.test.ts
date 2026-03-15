@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDistillationPrompt } from "../skill-server.js";
+import { buildDistillationPrompt } from "../skill-distiller.js";
 
 // Minimal mock TopicNode
 function makeTopicNode(overrides: Record<string, unknown> = {}) {
