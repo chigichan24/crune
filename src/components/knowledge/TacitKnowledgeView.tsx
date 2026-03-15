@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { KnowledgeGraphMetrics, TopicNode, TopicEdge, KnowledgeCommunity, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
-import { useSkillDistillation } from '../../hooks/useSkillDistillation'
+import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
 import './TacitKnowledgeView.css'
 
@@ -55,7 +55,7 @@ function DistillButton({
   communities?: KnowledgeCommunity[]
   bridgeTopicIds?: string[]
 }) {
-  const { distill, loading, result, error, reset } = useSkillDistillation()
+  const { synthesize, loading, result, error, reset } = useSkillSynthesis()
 
   if (!topic) return null
 
@@ -70,20 +70,20 @@ function DistillButton({
 
   return (
     <>
-      {/* Pre-distilled result */}
-      {candidate.distilledMarkdown && !result && (
-        <div className="tk-distill-result">
-          <div className="tk-distill-preview">{candidate.distilledMarkdown}</div>
-          <CopyButton text={candidate.distilledMarkdown} label="Copy Skill" />
+      {/* Pre-synthesized result */}
+      {candidate.synthesizedMarkdown && !result && (
+        <div className="tk-synth-result">
+          <div className="tk-synth-preview">{candidate.synthesizedMarkdown}</div>
+          <CopyButton text={candidate.synthesizedMarkdown} label="Copy Skill" />
         </div>
       )}
-      {/* Re-distill button */}
+      {/* Re-synthesize button */}
       <button
-        className="tk-distill-btn"
+        className="tk-synth-btn"
         disabled={loading}
         onClick={() => {
           reset()
-          distill({
+          synthesize({
             skillCandidate: candidate,
             topicNode: topic,
             enrichedSequences: relatedSequences,
@@ -91,12 +91,12 @@ function DistillButton({
           })
         }}
       >
-        {loading ? '再蒸留中...' : '再蒸留'}
+        {loading ? '再合成中...' : '再合成'}
       </button>
-      {error && <p className="tk-distill-error">{error}</p>}
+      {error && <p className="tk-synth-error">{error}</p>}
       {result && (
-        <div className="tk-distill-result">
-          <div className="tk-distill-preview">{result}</div>
+        <div className="tk-synth-result">
+          <div className="tk-synth-preview">{result}</div>
           <CopyButton text={result} label="Copy Skill" />
         </div>
       )}

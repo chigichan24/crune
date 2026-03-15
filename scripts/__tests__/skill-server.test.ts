@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDistillationPrompt } from "../skill-distiller.js";
+import { buildSynthesisPrompt } from "../skill-synthesizer.js";
 
 // Minimal mock TopicNode
 function makeTopicNode(overrides: Record<string, unknown> = {}) {
@@ -33,9 +33,9 @@ function makeSkillCandidate(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("buildDistillationPrompt", () => {
+describe("buildSynthesisPrompt", () => {
   it("should NOT contain Graph Position or Connected Topics without graphContext", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode(),
     });
@@ -45,7 +45,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain bridge interpretation for high betweenness centrality", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode({ betweennessCentrality: 0.25 }),
       graphContext: {
@@ -60,7 +60,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain bridge interpretation for moderate betweenness", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode({ betweennessCentrality: 0.1 }),
       graphContext: {
@@ -73,7 +73,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain hub interpretation for high degree centrality", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode({ betweennessCentrality: 0.01, degreeCentrality: 0.6 }),
       graphContext: {
@@ -86,7 +86,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain isolated interpretation for zero degree centrality", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode({ betweennessCentrality: 0.01, degreeCentrality: 0 }),
       graphContext: {
@@ -99,7 +99,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain peripheral interpretation for low centrality values", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode({ betweennessCentrality: 0.01, degreeCentrality: 0.1 }),
       graphContext: {
@@ -112,7 +112,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain Prerequisite and Follow-up for workflow-continuation edges", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode(),
       graphContext: {
@@ -147,7 +147,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain all edge type groups with mixed edge types", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode(),
       graphContext: {
@@ -196,7 +196,7 @@ describe("buildDistillationPrompt", () => {
   });
 
   it("should contain community label and member count", () => {
-    const prompt = buildDistillationPrompt({
+    const prompt = buildSynthesisPrompt({
       skillCandidate: makeSkillCandidate(),
       topicNode: makeTopicNode(),
       graphContext: {

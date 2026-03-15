@@ -9,7 +9,7 @@ Claude Codeのセッションログを可視化する静的Webダッシュボー
 - **Semantic Knowledge Graph** --- TF-IDF + Tool-IDF + 構造的特徴量、Truncated SVD、凝集型クラスタリング、Louvainコミュニティ検出、Brandes中心性（[アルゴリズム詳細](docs/knowledge-graph-algorithm.md)）
 - **Tacit Knowledge** --- ワークフローパターン、ツールシーケンス、ペインポイント（長時間セッション、頻繁に編集されるファイル）の抽出
 - **Session Summarization** --- セッションの自動要約・分類（LLM不要）
-- **Skill Distillation** --- ナレッジグラフからの再利用可能スキルの蒸留・エクスポート
+- **Skill Synthesis** --- ナレッジグラフからの再利用可能スキルの合成・エクスポート
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ npm run dev
   -> extract metadata, subagents, linked plans
   -> session summarization (centrality-based representative prompt, workType classification)
   -> TF-IDF + Tool-IDF + structural features -> Truncated SVD -> agglomerative clustering -> Louvain
-  -> skill distillation (reusability score top-N -> claude -p)
+  -> skill synthesis (reusability score top-N -> claude -p)
   -> output:
        public/data/sessions/index.json      (session list)
        public/data/sessions/overview.json   (cross-session analytics + knowledge graph)
@@ -59,26 +59,26 @@ npm run analyze-sessions -- --sessions-dir /path/to/sessions --output-dir /path/
 - **キーワード抽出**: セッション内容から主要キーワードを自動抽出
 - **スコープ推定**: 編集されたファイルの共通ディレクトリからセッションのスコープを推定
 
-## Skill Distillation
+## Skill Synthesis
 
-ナレッジグラフの分析結果から、再利用可能なスキルを自動的に蒸留します。[anthropics/skills](https://github.com/anthropics/skills)形式に準拠しています。
+ナレッジグラフの分析結果から、再利用可能なスキルを自動的に合成します。[anthropics/skills](https://github.com/anthropics/skills)形式に準拠しています。
 
-- **事前蒸留**: `analyze-sessions` 実行時にreusabilityスコア上位5件を `claude -p` で事前蒸留
-- **即時表示**: UIで蒸留済みスキルを即座に表示・クリップボードへコピー可能
-- **オンデマンド再蒸留**: 「再蒸留」ボタンでグラフコンテキスト付きの完全版をオンデマンド生成
-- **ローカルサーバー**: `npm run skill-server` でスキル蒸留用APIサーバーを起動（localhost:3456）
+- **事前合成**: `analyze-sessions` 実行時にreusabilityスコア上位5件を `claude -p` で事前合成
+- **即時表示**: UIで合成済みスキルを即座に表示・クリップボードへコピー可能
+- **オンデマンド再合成**: 「再合成」ボタンでグラフコンテキスト付きの完全版をオンデマンド生成
+- **ローカルサーバー**: `npm run skill-server` でスキル合成用APIサーバーを起動（localhost:3456）
 
-蒸留オプション:
+合成オプション:
 
 ```bash
 # モデル指定（例: haikuで高速化）
-npm run analyze-sessions -- --distill-model haiku
+npm run analyze-sessions -- --synthesis-model haiku
 
-# 蒸留するスキル候補数を変更（デフォルト: 5）
-npm run analyze-sessions -- --distill-count 10
+# 合成するスキル候補数を変更（デフォルト: 5）
+npm run analyze-sessions -- --synthesis-count 10
 
-# LLM蒸留をスキップ（グラフ構築のみ）
-npm run analyze-sessions -- --skip-distill
+# LLM合成をスキップ（グラフ構築のみ）
+npm run analyze-sessions -- --skip-synthesis
 ```
 
 ## Scripts
@@ -90,16 +90,16 @@ npm run analyze-sessions -- --skip-distill
 | `npm run preview` | プロダクションビルドのプレビュー |
 | `npm run lint` | ESLintの実行 |
 | `npm run analyze-sessions` | データパイプラインの実行 |
-| `npm run skill-server` | スキル蒸留用ローカルサーバー（localhost:3456） |
+| `npm run skill-server` | スキル合成用ローカルサーバー（localhost:3456） |
 | `npm run dev:full` | skill-server + Vite dev serverを同時起動 |
 
-### analyze-sessionsの蒸留オプション
+### analyze-sessionsの合成オプション
 
 | Flag | Description |
 |------|-------------|
-| `--distill-model <model>` | 蒸留に使うモデル指定（例: `haiku` で高速化） |
-| `--distill-count <n>` | 蒸留するスキル候補数（デフォルト: 5） |
-| `--skip-distill` | LLM蒸留をスキップ |
+| `--synthesis-model <model>` | 合成に使うモデル指定（例: `haiku` で高速化） |
+| `--synthesis-count <n>` | 合成するスキル候補数（デフォルト: 5） |
+| `--skip-synthesis` | LLM合成をスキップ |
 
 ## Tech Stack
 
@@ -116,14 +116,14 @@ src/
   components/
     overview/     # ダッシュボードカード、セッション一覧、チャート
     playback/     # セッションリプレイ、ツールコールブロック、サブエージェントブランチ
-    knowledge/    # フォースグラフ、ノード詳細、暗黙知、スキル蒸留
+    knowledge/    # フォースグラフ、ノード詳細、暗黙知、スキル合成
   hooks/          # データ取得 (useSessionIndex, useSessionDetail, useSessionOverview)
   types/          # TypeScript型定義
 scripts/
   analyze-sessions.ts        # JSONL -> JSON パイプライン
   session-summarizer.ts      # セッション要約（ローカルNLP）
-  skill-distiller.ts         # スキル蒸留（claude -p）
-  skill-server.ts            # 蒸留用HTTPサーバー
+  skill-synthesizer.ts         # スキル合成（claude -p）
+  skill-server.ts            # 合成用HTTPサーバー
   knowledge-graph-builder.ts # セマンティック埋め込み + グラフ構築
 public/
   data/sessions/             # 生成されたJSON（gitignore対象）

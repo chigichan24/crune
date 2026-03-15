@@ -142,7 +142,7 @@
   background-color: rgba(37, 99, 235, 0.15);
 }
 
-.tk-distill-btn {
+.tk-synth-btn {
   font-size: 10px;
   font-weight: 600;
   color: var(--brand, #8b5cf6);
@@ -154,30 +154,30 @@
   transition: background-color 0.15s;
 }
 
-.tk-distill-btn:hover {
+.tk-synth-btn:hover {
   background-color: rgba(139, 92, 246, 0.15);
 }
 
-.tk-distill-btn:disabled {
+.tk-synth-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.tk-distill-error {
+.tk-synth-error {
   font-size: 10px;
   color: var(--danger, #dc2626);
   margin-top: 4px;
   word-break: break-word;
 }
 
-.tk-distill-result {
+.tk-synth-result {
   margin-top: 4px;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.tk-distill-preview {
+.tk-synth-preview {
   font-size: 10px;
   color: var(--text-primary);
   background: var(--bg-secondary);

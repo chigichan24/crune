@@ -17,7 +17,7 @@ import {
   type SessionInput,
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
-import { buildDistillationPrompt, distillWithClaude, type DistillOptions } from "./skill-distiller.js";
+import { buildSynthesisPrompt, synthesizeWithClaude, type SynthesisOptions } from "./skill-synthesizer.js";
 import { generateSessionSummary } from "./session-summarizer.js";
 
 // ─── CLI argument parsing ───────────────────────────────────────────────────
@@ -25,33 +25,33 @@ import { generateSessionSummary } from "./session-summarizer.js";
 interface CliArgs {
   sessionsDir: string;
   outputDir: string;
-  skipDistill: boolean;
-  distillModel?: string;
-  distillCount: number;
+  skipSynthesis: boolean;
+  synthesisModel?: string;
+  synthesisCount: number;
 }
 
 function parseArgs(): CliArgs {
   const args = process.argv.slice(2);
   let sessionsDir = path.join(os.homedir(), ".claude", "projects");
   let outputDir = path.resolve("public", "data", "sessions");
-  let skipDistill = false;
-  let distillModel: string | undefined;
-  let distillCount = 5;
+  let skipSynthesis = false;
+  let synthesisModel: string | undefined;
+  let synthesisCount = 5;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
       sessionsDir = path.resolve(args[++i]);
     } else if (args[i] === "--output-dir" && args[i + 1]) {
       outputDir = path.resolve(args[++i]);
-    } else if (args[i] === "--skip-distill") {
-      skipDistill = true;
-    } else if (args[i] === "--distill-model" && args[i + 1]) {
-      distillModel = args[++i];
-    } else if (args[i] === "--distill-count" && args[i + 1]) {
-      distillCount = Math.max(1, parseInt(args[++i], 10) || 5);
+    } else if (args[i] === "--skip-synthesis") {
+      skipSynthesis = true;
+    } else if (args[i] === "--synthesis-model" && args[i + 1]) {
+      synthesisModel = args[++i];
+    } else if (args[i] === "--synthesis-count" && args[i + 1]) {
+      synthesisCount = Math.max(1, parseInt(args[++i], 10) || 5);
     }
   }
-  return { sessionsDir, outputDir, skipDistill, distillModel, distillCount };
+  return { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount };
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -725,13 +725,13 @@ function generateDetail(session: ParsedSession): DetailJson {
 
 // ─── Task 1.7: overview.json Generation ─────────────────────────────────────
 
-interface DistillConfig {
+interface SynthesisConfig {
   skip: boolean;
   model?: string;
   count: number;
 }
 
-async function generateOverview(sessions: ParsedSession[], distillConfig: DistillConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
+async function generateOverview(sessions: ParsedSession[], synthesisConfig: SynthesisConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
   // Activity heatmap: 7 days x 24 hours
   const heatmap: number[][] = Array.from({ length: 7 }, () =>
     Array(24).fill(0)
@@ -973,20 +973,20 @@ async function generateOverview(sessions: ParsedSession[], distillConfig: Distil
   }
   hotFiles.sort((a, b) => b.editCount - a.editCount);
 
-  // Pre-distill top skill candidates with claude -p
-  if (!distillConfig.skip) {
+  // Pre-synthesize top skill candidates with claude -p
+  if (!synthesisConfig.skip) {
     const topCandidates = [...knowledgeGraph.skillCandidates]
       .sort((a, b) => b.reusabilityScore - a.reusabilityScore)
-      .slice(0, distillConfig.count);
+      .slice(0, synthesisConfig.count);
 
-    const distillOpts: DistillOptions = {};
-    if (distillConfig.model) {
-      distillOpts.model = distillConfig.model;
+    const synthOpts: SynthesisOptions = {};
+    if (synthesisConfig.model) {
+      synthOpts.model = synthesisConfig.model;
     }
 
     const total = topCandidates.length;
     if (total > 0) {
-      console.error(`[crune] Distilling top ${total} skill candidates${distillConfig.model ? ` (model: ${distillConfig.model})` : ""}...`);
+      console.error(`[crune] Synthesizing top ${total} skill candidates${synthesisConfig.model ? ` (model: ${synthesisConfig.model})` : ""}...`);
     }
     for (let i = 0; i < topCandidates.length; i++) {
       const candidate = topCandidates[i];
@@ -999,16 +999,16 @@ async function generateOverview(sessions: ParsedSession[], distillConfig: Distil
       );
 
       console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
-      const prompt = buildDistillationPrompt({
+      const prompt = buildSynthesisPrompt({
         skillCandidate: candidate,
-        topicNode: topic as unknown as import("./skill-distiller.js").TopicNode,
+        topicNode: topic as unknown as import("./skill-synthesizer.js").TopicNode,
         enrichedSequences: relatedSequences,
       });
-      const result = await distillWithClaude(prompt, distillOpts);
+      const result = await synthesizeWithClaude(prompt, synthOpts);
       if (result.success) {
         const original = knowledgeGraph.skillCandidates.find((sc) => sc.topicId === candidate.topicId);
         if (original) {
-          original.distilledMarkdown = result.stdout;
+          original.synthesizedMarkdown = result.stdout;
         }
         console.error(`[crune]   [${i + 1}/${total}] Done.`);
       } else {
@@ -1052,7 +1052,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipDistill, distillModel, distillCount } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -1150,9 +1150,9 @@ async function main() {
 
   // overview.json
   const overviewData = await generateOverview(parsedSessions, {
-    skip: skipDistill,
-    model: distillModel,
-    count: distillCount,
+    skip: skipSynthesis,
+    model: synthesisModel,
+    count: synthesisCount,
   });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));

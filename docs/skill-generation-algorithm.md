@@ -1,11 +1,11 @@
 # Skill Generation Algorithm
 
-ナレッジグラフのトピックノードから再利用可能なClaude Codeスキル定義を生成するパイプライン。Reusabilityスコアによる優先度付け、ヒューリスティックによるスキル骨格生成、LLM蒸留による洗練の3段階で構成される。
+ナレッジグラフのトピックノードから再利用可能なClaude Codeスキル定義を生成するパイプライン。Reusabilityスコアによる優先度付け、ヒューリスティックによるスキル骨格生成、LLM合成による洗練の3段階で構成される。
 
 実装:
 - [`scripts/knowledge-graph/reusability.ts`](../scripts/knowledge-graph/reusability.ts) --- Reusabilityスコア
 - [`scripts/knowledge-graph/skill-generator.ts`](../scripts/knowledge-graph/skill-generator.ts) --- ヒューリスティック生成
-- [`scripts/skill-distiller.ts`](../scripts/skill-distiller.ts) --- LLM蒸留プロンプト構築 + `claude -p` 呼び出し
+- [`scripts/skill-synthesizeer.ts`](../scripts/skill-synthesizeer.ts) --- LLM合成プロンプト構築 + `claude -p` 呼び出し
 - [`scripts/session-summarizer.ts`](../scripts/session-summarizer.ts) --- セッション要約（スキルとは独立だが同パイプラインで実行）
 
 ---
@@ -16,7 +16,7 @@
 Topic Nodes (from knowledge graph)
   → Step 1: Reusability Scoring
   → Step 2: Heuristic Skill Generation (all topics)
-  → Step 3: LLM Distillation (top-N by reusability, optional)
+  → Step 3: LLM Synthesis (top-N by reusability, optional)
   → SkillCandidate[] in overview.json
 ```
 
@@ -80,42 +80,42 @@ Use when you need to {action}. {roleHint} {projectScope}. Detected from {N} sess
 
 ---
 
-## Step 3: LLM Distillation
+## Step 3: LLM Synthesis
 
-ヒューリスティック生成の結果を `claude -p` で洗練する。事前蒸留（ビルド時）とオンデマンド蒸留（UI操作時）の2パスがある。
+ヒューリスティック生成の結果を `claude -p` で洗練する。事前合成（ビルド時）とオンデマンド合成（UI操作時）の2パスがある。
 
-### Pre-distillation (Build Time)
+### Pre-synthesizeation (Build Time)
 
-`analyze-sessions` 実行時に、reusabilityスコア上位N件（デフォルト5）を蒸留する。
+`analyze-sessions` 実行時に、reusabilityスコア上位N件（デフォルト5）を合成する。
 
-- `--distill-model <model>` でモデル指定可能（例: `haiku` で高速化）
-- `--distill-count <n>` で件数変更
-- `--skip-distill` でスキップ
+- `--synthesize-model <model>` でモデル指定可能（例: `haiku` で高速化）
+- `--synthesize-count <n>` で件数変更
+- `--skip-synthesize` でスキップ
 
-結果は `SkillCandidate.distilledMarkdown` に格納される。
+結果は `SkillCandidate.synthesizeedMarkdown` に格納される。
 
-### On-demand Re-distillation (UI)
+### On-demand Re-synthesizeation (UI)
 
-UIの「再蒸留」ボタンから、グラフコンテキスト付きの完全版を生成する。ローカルサーバー（`scripts/skill-server.ts`、port 3456）経由。
+UIの「再合成」ボタンから、グラフコンテキスト付きの完全版を生成する。ローカルサーバー（`scripts/skill-server.ts`、port 3456）経由。
 
-### Distillation Prompt Structure
+### Synthesis Prompt Structure
 
-蒸留プロンプトは以下のセクションで構成される:
+合成プロンプトは以下のセクションで構成される:
 
 ```
 1. Topic Information       --- label, keywords, dominantRole, projects, sessionCount, duration
 2. Representative Prompts  --- ユーザーの実際のプロンプト（最大3件）
 3. Tool Signature          --- Tool-IDF加重の上位ツール
 4. Enriched Tool Patterns  --- 検出されたツールフロー（上位5件）
-5. Graph Position          --- 中心性の解釈（オンデマンド蒸留時のみ）
-6. Connected Topics        --- エッジタイプ別の接続トピック（オンデマンド蒸留時のみ）
+5. Graph Position          --- 中心性の解釈（オンデマンド合成時のみ）
+6. Connected Topics        --- エッジタイプ別の接続トピック（オンデマンド合成時のみ）
 7. Current Heuristic Skill --- Step 2の結果を参考情報として提供
 8. Instructions            --- anthropics/skills形式の出力要件
 ```
 
 ### Graph Context (On-demand Only)
 
-オンデマンド蒸留では、フロントエンドが以下のグラフコンテキストを構築して送信する:
+オンデマンド合成では、フロントエンドが以下のグラフコンテキストを構築して送信する:
 
 **Graph Position**: トピックの中心性を解釈
 | Condition | Interpretation |
@@ -127,7 +127,7 @@ UIの「再蒸留」ボタンから、グラフコンテキスト付きの完全
 | else | 周辺トピック |
 
 **Connected Topics**: エッジタイプ別にグループ化
-| Edge Type | Distillation Hint |
+| Edge Type | Synthesis Hint |
 |-----------|-------------------|
 | `workflow-continuation` (incoming) | 前提スキル → `requires` frontmatter候補 |
 | `workflow-continuation` (outgoing) | 後続スキル → `next` frontmatter候補 |

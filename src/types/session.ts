@@ -220,7 +220,7 @@ export interface SkillCandidate {
   topicId: string
   reusabilityScore: number
   skillMarkdown: string
-  distilledMarkdown?: string
+  synthesizedMarkdown?: string
   hookJson?: string
 }
 
@@ -261,7 +261,7 @@ export interface HotFile {
   sessionId: string
 }
 
-// === Graph Context for Distillation ===
+// === Graph Context for Skill Synthesis ===
 export interface ConnectedTopicInfo {
   id: string
   label: string
@@ -277,16 +277,16 @@ export interface GraphContext {
   isBridgeTopic: boolean
 }
 
-// === Skill Distillation (LLM-based) ===
-export interface DistillRequest {
+// === Skill Synthesis (LLM-based) ===
+export interface SynthesisRequest {
   skillCandidate: SkillCandidate
   topicNode: TopicNode
   enrichedSequences?: EnrichedToolSequence[]
   graphContext?: GraphContext
 }
 
-export interface DistillResponse {
+export interface SynthesisResponse {
   success: boolean
-  distilledMarkdown?: string
+  synthesizedMarkdown?: string
   error?: string
 }

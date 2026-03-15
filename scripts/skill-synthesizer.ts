@@ -62,22 +62,22 @@ export interface GraphContext {
   isBridgeTopic: boolean;
 }
 
-export interface DistillRequest {
+export interface SynthesisRequest {
   skillCandidate: SkillCandidate;
   topicNode: TopicNode;
   enrichedSequences?: EnrichedSequence[];
   graphContext?: GraphContext;
 }
 
-export interface DistillResponse {
+export interface SynthesisResponse {
   success: boolean;
-  distilledMarkdown?: string;
+  synthesizedMarkdown?: string;
   error?: string;
 }
 
 // ---------- Prompt Builder ----------
 
-export function buildDistillationPrompt(body: DistillRequest): string {
+export function buildSynthesisPrompt(body: SynthesisRequest): string {
   const { skillCandidate, topicNode, enrichedSequences, graphContext } = body;
 
   const topicInfo = [
@@ -228,12 +228,12 @@ export function buildDistillationPrompt(body: DistillRequest): string {
 
 // ---------- Distill with Claude CLI ----------
 
-export interface DistillOptions {
+export interface SynthesisOptions {
   model?: string;       // e.g. "haiku", "sonnet", "opus"
   timeoutMs?: number;   // default: 120_000
 }
 
-export function distillWithClaude(prompt: string, options: DistillOptions = {}): Promise<{ success: boolean; stdout: string; stderr: string; error?: string }> {
+export function synthesizeWithClaude(prompt: string, options: SynthesisOptions = {}): Promise<{ success: boolean; stdout: string; stderr: string; error?: string }> {
   const timeoutMs = options.timeoutMs ?? 120_000;
 
   return new Promise((resolve) => {
@@ -267,7 +267,7 @@ export function distillWithClaude(prompt: string, options: DistillOptions = {}):
         success: false,
         stdout: "",
         stderr: "",
-        error: `Distillation timed out (${timeoutMs / 1000}s)`,
+        error: `Synthesis timed out (${timeoutMs / 1000}s)`,
       });
     }, timeoutMs);
 

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/distill': 'http://localhost:3456',
+      '/api/synthesize': 'http://localhost:3456',
     },
   },
 })

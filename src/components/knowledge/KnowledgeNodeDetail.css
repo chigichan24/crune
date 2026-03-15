@@ -399,7 +399,7 @@
 .knd-export {
   margin-top: 4px;
 }
-.knd-distill-btn {
+.knd-synth-btn {
   width: 100%;
   font-size: 11px;
   font-weight: 600;
@@ -413,16 +413,16 @@
   margin-top: 4px;
 }
 
-.knd-distill-btn:hover {
+.knd-synth-btn:hover {
   background-color: rgba(139, 92, 246, 0.15);
 }
 
-.knd-distill-btn:disabled {
+.knd-synth-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.knd-distill-error {
+.knd-synth-error {
   font-size: 11px;
   color: var(--danger, #dc2626);
   margin: 4px 0 0;
@@ -430,14 +430,14 @@
   word-break: break-word;
 }
 
-.knd-distill-result {
+.knd-synth-result {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-top: 6px;
 }
 
-.knd-distill-preview {
+.knd-synth-preview {
   font-size: 11px;
   color: var(--text-primary);
   background: var(--bg-tertiary);
@@ -452,7 +452,7 @@
   line-height: 1.5;
 }
 
-.knd-distill-copy-btn {
+.knd-synth-copy-btn {
   font-size: 10px;
   font-weight: 600;
   color: var(--success, #16a34a);
@@ -464,6 +464,6 @@
   transition: background-color 0.15s;
 }
 
-.knd-distill-copy-btn:hover {
+.knd-synth-copy-btn:hover {
   background-color: rgba(22, 163, 74, 0.15);
 }

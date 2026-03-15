@@ -1,6 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { buildDistillationPrompt, distillWithClaude } from "./skill-distiller.js";
-import type { DistillRequest, DistillResponse } from "./skill-distiller.js";
+import { buildSynthesisPrompt, synthesizeWithClaude } from "./skill-synthesizer.js";
+import type { SynthesisRequest, SynthesisResponse } from "./skill-synthesizer.js";
 
 // ---------- Helpers ----------
 
@@ -13,15 +13,15 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-function sendJson(res: ServerResponse, status: number, body: DistillResponse | { error: string }) {
+function sendJson(res: ServerResponse, status: number, body: SynthesisResponse | { error: string }) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
 }
 
 // ---------- Request Handler ----------
 
-async function handleDistill(req: IncomingMessage, res: ServerResponse) {
-  let body: DistillRequest;
+async function handleSynthesize(req: IncomingMessage, res: ServerResponse) {
+  let body: SynthesisRequest;
   try {
     const raw = await readBody(req);
     body = JSON.parse(raw);
@@ -35,15 +35,15 @@ async function handleDistill(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  const prompt = buildDistillationPrompt(body);
-  const result = await distillWithClaude(prompt);
+  const prompt = buildSynthesisPrompt(body);
+  const result = await synthesizeWithClaude(prompt);
 
   if (!result.success) {
     sendJson(res, 500, { success: false, error: result.error });
     return;
   }
 
-  sendJson(res, 200, { success: true, distilledMarkdown: result.stdout });
+  sendJson(res, 200, { success: true, synthesizedMarkdown: result.stdout });
 }
 
 // ---------- Server ----------
@@ -54,15 +54,15 @@ if (isDirectRun) {
   const PORT = 3456;
 
   const server = createServer(async (req, res) => {
-    if (req.method === "POST" && req.url === "/api/distill") {
-      await handleDistill(req, res);
+    if (req.method === "POST" && req.url === "/api/synthesize") {
+      await handleSynthesize(req, res);
     } else {
       sendJson(res, 404, { error: "Not found" });
     }
   });
 
   server.listen(PORT, () => {
-    console.log(`Skill distillation server listening on http://localhost:${PORT}`);
+    console.log(`Skill synthesis server listening on http://localhost:${PORT}`);
   });
 
   function shutdown() {

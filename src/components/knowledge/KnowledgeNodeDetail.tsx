@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
-import { useSkillDistillation } from '../../hooks/useSkillDistillation'
+import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
 import './KnowledgeNodeDetail.css'
 
@@ -66,8 +66,8 @@ export function KnowledgeNodeDetail({
   onSessionSelect,
   onClose,
 }: Props) {
-  const [distillCopied, setDistillCopied] = useState(false)
-  const { distill, loading: distillLoading, result: distillResult, error: distillError, reset: resetDistill } = useSkillDistillation()
+  const [synthCopied, setSynthCopied] = useState(false)
+  const { synthesize, loading: synthLoading, result: synthResult, error: synthError, reset: resetSynth } = useSkillSynthesis()
 
   const skillCandidate = useMemo(() => {
     if (!node || !skillCandidates) return null
@@ -176,29 +176,29 @@ export function KnowledgeNodeDetail({
         {/* Distill Skill */}
         {skillCandidate && (
           <div className="knd-export">
-            {/* Pre-distilled result (from analyze-sessions) */}
-            {skillCandidate.distilledMarkdown && !distillResult && (
-              <div className="knd-distill-result">
-                <div className="knd-distill-preview">{skillCandidate.distilledMarkdown}</div>
+            {/* Pre-synthesized result (from analyze-sessions) */}
+            {skillCandidate.synthesizedMarkdown && !synthResult && (
+              <div className="knd-synth-result">
+                <div className="knd-synth-preview">{skillCandidate.synthesizedMarkdown}</div>
                 <button
-                  className="knd-distill-copy-btn"
+                  className="knd-synth-copy-btn"
                   onClick={async () => {
-                    await navigator.clipboard.writeText(skillCandidate.distilledMarkdown!)
-                    setDistillCopied(true)
-                    setTimeout(() => setDistillCopied(false), 2000)
+                    await navigator.clipboard.writeText(skillCandidate.synthesizedMarkdown!)
+                    setSynthCopied(true)
+                    setTimeout(() => setSynthCopied(false), 2000)
                   }}
                 >
-                  {distillCopied ? 'Copied!' : 'Copy Skill'}
+                  {synthCopied ? 'Copied!' : 'Copy Skill'}
                 </button>
               </div>
             )}
-            {/* On-demand re-distillation with graph context */}
+            {/* On-demand re-synthesis with graph context */}
             <button
-              className="knd-distill-btn"
-              disabled={distillLoading}
+              className="knd-synth-btn"
+              disabled={synthLoading}
               onClick={() => {
-                resetDistill()
-                distill({
+                resetSynth()
+                synthesize({
                   skillCandidate,
                   topicNode: node,
                   enrichedSequences: enrichedSequences?.filter((seq) =>
@@ -208,23 +208,23 @@ export function KnowledgeNodeDetail({
                 })
               }}
             >
-              {distillLoading ? '再蒸留中...' : '再蒸留'}
+              {synthLoading ? '再合成中...' : '再合成'}
             </button>
-            {distillError && (
-              <p className="knd-distill-error">{distillError}</p>
+            {synthError && (
+              <p className="knd-synth-error">{synthError}</p>
             )}
-            {distillResult && (
-              <div className="knd-distill-result">
-                <div className="knd-distill-preview">{distillResult}</div>
+            {synthResult && (
+              <div className="knd-synth-result">
+                <div className="knd-synth-preview">{synthResult}</div>
                 <button
-                  className="knd-distill-copy-btn"
+                  className="knd-synth-copy-btn"
                   onClick={async () => {
-                    await navigator.clipboard.writeText(distillResult)
-                    setDistillCopied(true)
-                    setTimeout(() => setDistillCopied(false), 2000)
+                    await navigator.clipboard.writeText(synthResult)
+                    setSynthCopied(true)
+                    setTimeout(() => setSynthCopied(false), 2000)
                   }}
                 >
-                  {distillCopied ? 'Copied!' : 'Copy Skill'}
+                  {synthCopied ? 'Copied!' : 'Copy Skill'}
                 </button>
               </div>
             )}
