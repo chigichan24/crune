@@ -84,10 +84,29 @@ npm run dev:full    # Runs skill-server + Vite dev server
 
 The skill server (`scripts/skill-server.ts`) accepts POST requests at `/api/distill` and calls `claude -p` with the enriched prompt including graph context.
 
+## Session Summarization
+
+`scripts/session-summarizer.ts` generates per-session summaries locally without LLM, using plan mode prompts as the primary source.
+
+Algorithm:
+1. Collect all user prompts from plan mode turns (fallback: all user prompts)
+2. Select representative prompt via Jaccard centrality with position weighting (`1/(1+index)`)
+3. Extract top-5 keywords via tokenizer + stopword filtering
+4. Classify `workType` from tool histogram:
+   - `investigation` --- Read/Grep/Glob dominant (70%+)
+   - `implementation` --- Edit/Write dominant (40%+)
+   - `debugging` --- Bash dominant (40%+) with some writes
+   - `planning` --- plan mode with few turns and no writes
+5. Compute `scope` from longest common directory prefix of edited files
+
+Output fields on `SessionSummary`: `summaryText`, `keywords`, `scope`, `workType`
+
 ## Type Definitions
 
 All domain types are in `src/types/session.ts`. Key types:
-- `SessionIndex`, `SessionSummary` --- session list
+- `SessionIndex`, `SessionSummary` --- session list (includes `summaryText`, `keywords`, `scope`, `workType`)
 - `SessionDetail`, `ConversationTurn`, `AssistantBlock` --- playback data
 - `KnowledgeGraph`, `TopicNode`, `TopicEdge` --- graph data
-- `TacitKnowledge`, `WorkflowPattern`, `PainPoint` --- extracted insights
+- `SkillCandidate` --- includes `skillMarkdown` (heuristic) and `distilledMarkdown` (LLM-distilled)
+- `GraphContext`, `ConnectedTopicInfo` --- graph context for distillation
+- `TacitKnowledge`, `WorkflowPattern` --- extracted insights
