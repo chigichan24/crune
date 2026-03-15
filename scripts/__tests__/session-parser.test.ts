@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inferProjectName } from "../analyze-sessions.js";
+import { inferProjectName, truncate } from "../analyze-sessions.js";
 
 describe("inferProjectName", () => {
   it("extracts org/repo from github-com pattern", () => {
@@ -26,5 +26,25 @@ describe("inferProjectName", () => {
 
   it("returns empty string for empty input", () => {
     expect(inferProjectName("")).toBe("");
+  });
+});
+
+describe("truncate", () => {
+  it("returns unchanged text shorter than limit", () => {
+    expect(truncate("hello", 10)).toBe("hello");
+  });
+
+  it("returns unchanged text exactly at limit", () => {
+    expect(truncate("12345", 5)).toBe("12345");
+  });
+
+  it("truncates text longer than limit with ellipsis", () => {
+    const result = truncate("hello world", 5);
+    expect(result).toBe("hello\u2026");
+    expect(result.length).toBe(6);
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(truncate("", 10)).toBe("");
   });
 });
