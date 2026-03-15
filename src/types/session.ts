@@ -216,6 +216,7 @@ export interface SkillCandidate {
   topicId: string
   reusabilityScore: number
   skillMarkdown: string
+  distilledMarkdown?: string
   hookJson?: string
 }
 
