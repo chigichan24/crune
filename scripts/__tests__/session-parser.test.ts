@@ -9,7 +9,7 @@ import {
   extractMetadata,
   type JsonlLine,
   type SessionFile,
-} from "../analyze-sessions.js";
+} from "../session-parser.js";
 
 describe("inferProjectName", () => {
   it("extracts org/repo from github-com pattern", () => {
