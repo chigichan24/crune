@@ -234,7 +234,7 @@ export interface SynthesisOptions {
 }
 
 export function synthesizeWithClaude(prompt: string, options: SynthesisOptions = {}): Promise<{ success: boolean; stdout: string; stderr: string; error?: string }> {
-  const timeoutMs = options.timeoutMs ?? 120_000;
+  const timeoutMs = options.timeoutMs ?? 300_000;
 
   return new Promise((resolve) => {
     const args = ["-p", "--output-format", "text"];
