@@ -170,7 +170,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
               <th className="session-list-th">Branch</th>
               <th className="session-list-th session-list-th--right">Duration</th>
               <th className="session-list-th session-list-th--right">Tools</th>
-              <th className="session-list-th">First Prompt</th>
+              <th className="session-list-th">Summary</th>
             </tr>
           </thead>
           <tbody>
@@ -210,7 +210,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
                         </span>
                       )}
                       <span className="session-list-summary">
-                        {truncate(s.summaryText || s.firstUserPrompt, 120)}
+                        {truncate(s.firstUserPrompt || s.summaryText, 120)}
                       </span>
                       {s.scope && (
                         <span className="session-list-scope">{s.scope}</span>
