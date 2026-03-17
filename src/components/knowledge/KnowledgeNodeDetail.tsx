@@ -17,10 +17,17 @@ interface Props {
 }
 
 const EDGE_TYPE_LABELS: Record<SemanticEdgeType, string> = {
-  'semantic-similarity': 'Semantic Similarity',
-  'shared-module': 'Shared Module',
-  'workflow-continuation': 'Workflow Continuation',
-  'cross-project-bridge': 'Cross-Project Bridge',
+  'semantic-similarity': '意味的類似',
+  'shared-module': 'モジュール共有',
+  'workflow-continuation': 'ワークフロー継続',
+  'cross-project-bridge': 'プロジェクト横断',
+}
+
+const EDGE_TYPE_DESCRIPTIONS: Record<SemanticEdgeType, string> = {
+  'semantic-similarity': '内容やキーワードが意味的に類似したトピック',
+  'shared-module': '同じファイルやモジュールを編集したトピック',
+  'workflow-continuation': '時間的に連続する作業フローのトピック',
+  'cross-project-bridge': '異なるプロジェクト間をまたぐ関連トピック',
 }
 
 const EDGE_COLORS: Record<SemanticEdgeType, string> = {
@@ -327,6 +334,7 @@ export function KnowledgeNodeDetail({
                     ({connections.length})
                   </span>
                 </div>
+                <p className="knd-edge-type-desc">{EDGE_TYPE_DESCRIPTIONS[type]}</p>
                 <ul className="knd-edge-list">
                   {connections.map((conn) => (
                     <li key={conn.topicId} className="knd-edge-item">

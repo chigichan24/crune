@@ -276,6 +276,14 @@
   color: var(--text-secondary);
 }
 
+.knd-edge-type-desc {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin: 0;
+  padding-left: 14px;
+  line-height: 1.4;
+}
+
 .knd-edge-list {
   list-style: none;
   padding-left: 14px;

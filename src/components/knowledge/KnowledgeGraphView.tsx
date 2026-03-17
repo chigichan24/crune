@@ -61,10 +61,17 @@ const EDGE_COLORS: Record<SemanticEdgeType, string> = {
 }
 
 const EDGE_TYPE_LABELS: Record<SemanticEdgeType, string> = {
-  'semantic-similarity': 'Semantic',
-  'shared-module': 'Module',
-  'workflow-continuation': 'Workflow',
-  'cross-project-bridge': 'Cross-Project',
+  'semantic-similarity': '意味的類似',
+  'shared-module': 'モジュール共有',
+  'workflow-continuation': 'ワークフロー',
+  'cross-project-bridge': 'プロジェクト横断',
+}
+
+const EDGE_TYPE_DESCRIPTIONS: Record<SemanticEdgeType, string> = {
+  'semantic-similarity': '内容やキーワードが似ている',
+  'shared-module': '同じファイルを編集',
+  'workflow-continuation': '時間的に連続する作業',
+  'cross-project-bridge': '別プロジェクト間の関連',
 }
 
 const ALL_EDGE_TYPES: SemanticEdgeType[] = [
@@ -383,6 +390,7 @@ export function KnowledgeGraphView({
                           backgroundColor: active ? `${color}18` : undefined,
                         } as React.CSSProperties}
                         onClick={() => toggleEdgeType(edgeType)}
+                        title={EDGE_TYPE_DESCRIPTIONS[edgeType]}
                       >
                         <span
                           className="kg-chip-line"
@@ -392,6 +400,19 @@ export function KnowledgeGraphView({
                       </button>
                     )
                   })}
+                </div>
+                <div className="kg-edge-type-legend">
+                  {ALL_EDGE_TYPES.map((edgeType) => (
+                    <div key={edgeType} className="kg-edge-type-legend-item">
+                      <span
+                        className="kg-edge-type-legend-line"
+                        style={{ backgroundColor: EDGE_COLORS[edgeType] }}
+                      />
+                      <span className="kg-edge-type-legend-text">
+                        {EDGE_TYPE_LABELS[edgeType]}: {EDGE_TYPE_DESCRIPTIONS[edgeType]}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
