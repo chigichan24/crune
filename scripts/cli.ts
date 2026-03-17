@@ -20,6 +20,7 @@ import {
 import {
   buildSynthesisPrompt,
   synthesizeWithClaude,
+  stripSynthesisPreamble,
   type TopicNode as SynthTopicNode,
 } from "./skill-synthesizer.js";
 
@@ -214,7 +215,7 @@ async function main(): Promise<void> {
       });
 
       if (result.success) {
-        markdown = result.stdout;
+        markdown = stripSynthesisPreamble(result.stdout);
         console.error(`    Synthesized`);
       } else {
         console.error(

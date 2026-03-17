@@ -37,6 +37,8 @@ npm run dev:full           # skill-server + Vite dev server together
 
 `analyze-sessions.ts` reads from `~/.claude/projects/` by default. Override with `--sessions-dir` and `--output-dir` flags.
 
+Before analysis, `/insights` is automatically executed via `claude -p` to refresh facets data in `~/.claude/usage-data/facets/`. Use `--skip-facets` to skip this step.
+
 Output structure:
 ```
 public/data/sessions/
@@ -48,9 +50,20 @@ public/data/sessions/
 The knowledge graph builder (`knowledge-graph-builder.ts`) uses a multi-signal embedding approach:
 - Text TF-IDF (weight 0.50) + Tool-IDF (weight 0.25) + structural features (weight 0.25), concatenated with sqrt-weighting
 - Truncated SVD via Gram matrix power iteration (k = min(80, max(20, m/4)))
-- Agglomerative clustering (average linkage) with elbow-detected threshold + oversized cluster splitting
+- Agglomerative clustering (average linkage) with elbow-detected threshold + oversized cluster splitting + **facets-based narrow cluster merging**
 - Louvain community detection -> Brandes betweenness centrality
 - See [docs/knowledge-graph-algorithm.md](docs/knowledge-graph-algorithm.md) for full details
+
+### /insights Integration
+
+The pipeline reads `/insights` facets data (`~/.claude/usage-data/facets/`) to improve accuracy:
+- **Topic labels**: Uses `underlying_goal` from facets instead of TF-IDF keywords when available
+- **Narrow cluster merging**: Merges small clusters (≤2 sessions) that share normalized goal categories
+- **Reusability scoring**: Adds `successRate` and `helpfulness` signals (weight 0.10 each) derived from `outcome` and `claude_helpfulness`
+- **Synthesis prompt enrichment**: Includes goals, friction details, and success rate in the LLM synthesis prompt
+- **Session list**: Shows `brief_summary` from facets instead of raw first user prompt
+
+Facets reader (`scripts/knowledge-graph/facets-reader.ts`) normalizes 50+ raw goal categories into ~10 canonical categories (feature, bugfix, refactoring, documentation, review, testing, ci, git_ops, setup, other).
 
 ## Skill Synthesis
 
@@ -71,12 +84,16 @@ Flags:
 - `--synthesize-model <model>` --- Use a specific Claude model (e.g. `haiku`, `sonnet`, `opus`)
 - `--synthesize-count <n>` --- Number of top candidates to synthesize (default: 5)
 - `--skip-synthesize` --- Skip LLM synthesis for faster builds
+- `--facets-dir <path>` --- Custom facets directory (default: `~/.claude/usage-data/facets`)
+- `--skip-facets` --- Skip `/insights` refresh and facets integration
 
-Pre-synthesizeed results are stored in `overview.json` as `synthesizeedMarkdown` on each `SkillCandidate` and displayed immediately in the Knowledge Graph UI.
+Pre-synthesized results are stored in `overview.json` as `synthesizedMarkdown` on each `SkillCandidate` and displayed immediately in the Knowledge Graph UI. Synthesis output is post-processed by `stripSynthesisPreamble()` to remove any LLM preamble before the YAML frontmatter.
+
+Synthesis calls use `--no-session-persistence` to prevent creating spurious JSONL session files.
 
 ### On-demand re-synthesis
 
-The UI provides a "再合成" button for on-demand re-synthesis with full graph context (connected topics, community, centrality). This requires the local skill server:
+The UI provides a "再合成" button for on-demand re-synthesis with full graph context (connected topics, community, centrality). Synthesis state resets automatically when the selected topic changes. This requires the local skill server:
 
 ```bash
 npm run dev:full    # Runs skill-server + Vite dev server
@@ -85,6 +102,8 @@ npm run dev:full    # Runs skill-server + Vite dev server
 The skill server (`scripts/skill-server.ts`) accepts POST requests at `/api/synthesize` and calls `claude -p` with the enriched prompt including graph context.
 
 ## Session Summarization
+
+セッション一覧の `firstUserPrompt` フィールドは、facetsデータが利用可能な場合は `/insights` の `brief_summary`（LLM生成の要約）で置き換えられる。facetsがないセッションは従来通り最初のユーザープロンプトを表示する。
 
 `scripts/session-summarizer.ts` generates per-session summaries locally without LLM, using plan mode prompts as the primary source.
 
@@ -107,6 +126,11 @@ All domain types are in `src/types/session.ts`. Key types:
 - `SessionIndex`, `SessionSummary` --- session list (includes `summaryText`, `keywords`, `scope`, `workType`)
 - `SessionDetail`, `ConversationTurn`, `AssistantBlock` --- playback data
 - `KnowledgeGraph`, `TopicNode`, `TopicEdge` --- graph data
-- `SkillCandidate` --- includes `skillMarkdown` (heuristic) and `synthesizeedMarkdown` (LLM-synthesizeed)
+- `ReusabilityScore` --- includes `successRate?` and `helpfulness?` (facets-derived, optional)
+- `SkillCandidate` --- includes `skillMarkdown` (heuristic) and `synthesizedMarkdown` (LLM-synthesized)
 - `GraphContext`, `ConnectedTopicInfo` --- graph context for synthesis
 - `TacitKnowledge`, `WorkflowPattern` --- extracted insights
+
+Pipeline-internal types in `scripts/knowledge-graph/types.ts`:
+- `FacetsData` --- parsed `/insights` facets data per session
+- `FacetsInsightsSummary` --- aggregated facets for a topic (goals, categories, success rate, frictions)

@@ -134,7 +134,9 @@
 }
 
 .session-list-td--prompt {
-  max-width: 360px;
+  max-width: 480px;
+  min-width: 240px;
+  white-space: normal;
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -149,7 +151,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   line-height: 1.4;
 }

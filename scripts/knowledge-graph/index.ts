@@ -19,7 +19,9 @@ import { cosineDistance } from "./similarity.js";
 import {
   agglomerativeClusteringFromDistMatrix,
   splitOversizedClusters,
+  mergeNarrowClusters,
 } from "./clustering.js";
+import { readFacetsDir } from "./facets-reader.js";
 import { buildTopicNodes } from "./topic-nodes.js";
 import { buildTopicEdges } from "./edges.js";
 import { louvainDetection, brandesBetweenness } from "./community.js";
@@ -46,6 +48,8 @@ export type {
   EnrichedToolStep,
   EnrichedToolSequence,
   SkillCandidate,
+  FacetsData,
+  FacetsInsightsSummary,
 } from "./types.js";
 
 export { tokenize, splitCamelCase, extractPathTokens, isNoiseToken } from "./tokenizer.js";
@@ -58,6 +62,7 @@ export {
   findElbowThreshold,
   clusterWithThresholdFromDistMatrix,
   splitOversizedClusters,
+  mergeNarrowClusters,
 } from "./clustering.js";
 export {
   extractDominantAction,
@@ -77,6 +82,7 @@ export { louvainDetection, brandesBetweenness } from "./community.js";
 export { computeReusabilityScores } from "./reusability.js";
 export { abstractToolCall, extractEnrichedSequences } from "./tool-pattern.js";
 export { generateSkillMarkdown, generateHookJson, generateSkillCandidates } from "./skill-generator.js";
+export { readFacetsDir, normalizeGoalCategory, helpfulnessToScore, aggregateFacetsForTopic } from "./facets-reader.js";
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 
@@ -84,9 +90,15 @@ export function buildSemanticKnowledgeGraph(
   sessions: SessionInput[],
   options: KnowledgeGraphOptions = {}
 ): SemanticKnowledgeGraph {
-  const { enableLouvain = true, enableBrandes = true } = options;
+  const { enableLouvain = true, enableBrandes = true, facetsDir } = options;
 
   console.log(`  [Knowledge Graph] Processing ${sessions.length} sessions...`);
+
+  // Read facets data if directory is provided
+  const facetsMap = facetsDir ? readFacetsDir(facetsDir) : new Map();
+  if (facetsDir) {
+    console.log(`  [Knowledge Graph] Facets: ${facetsMap.size} sessions with /insights data`);
+  }
 
   // Edge case: too few sessions
   if (sessions.length === 0) {
@@ -166,9 +178,10 @@ export function buildSemanticKnowledgeGraph(
       [sessionIds.map((_, i) => i)],
       activeSessions,
       emptyTfidf,
-      toolIdf
+      toolIdf,
+      facetsMap
     );
-    computeReusabilityScores(singleTopic);
+    computeReusabilityScores(singleTopic, new Date(), facetsMap);
     const skillCandidates = generateSkillCandidates(singleTopic, enrichedSequences);
     return {
       nodes: singleTopic,
@@ -261,6 +274,22 @@ export function buildSemanticKnowledgeGraph(
       activeSessions.length,
       svdDist
     );
+
+    // Merge narrow clusters using facets goal categories
+    if (facetsMap.size > 0) {
+      const beforeCount = clusterMembers.length;
+      clusterMembers = mergeNarrowClusters(
+        clusterMembers,
+        sessionIds,
+        facetsMap,
+        svdDist
+      );
+      if (clusterMembers.length < beforeCount) {
+        console.log(
+          `  [Knowledge Graph] Merged narrow clusters: ${beforeCount} → ${clusterMembers.length} topics`
+        );
+      }
+    }
   }
 
   console.log(
@@ -268,10 +297,10 @@ export function buildSemanticKnowledgeGraph(
   );
 
   // Step 5: Build topic nodes
-  const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf);
+  const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf, facetsMap);
 
   // Step 5b: Compute reusability scores
-  computeReusabilityScores(topics);
+  computeReusabilityScores(topics, new Date(), facetsMap);
   console.log(
     `  [Knowledge Graph] Reusability scores computed for ${topics.length} topics`
   );

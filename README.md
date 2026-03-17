@@ -17,7 +17,7 @@ Decipher the traces etched in past sessions and resurrect them as reusable skill
 - **Overview Dashboard** --- Activity heatmap, project distribution, tool usage trends, duration distribution, model usage, and top edited files
 - **Semantic Knowledge Graph** --- TF-IDF + Tool-IDF + structural features, Truncated SVD, agglomerative clustering, Louvain community detection, Brandes centrality ([algorithm details](docs/knowledge-graph-algorithm.md))
 - **Tacit Knowledge** --- Extracted workflow patterns, tool sequences, and pain points (long sessions, hot files)
-- **Session Summarization** --- Automatic session summary and classification (no LLM required)
+- **Session Summarization** --- Automatic session summary and classification (no LLM required), enriched with `/insights` facets data when available
 - **Skill Synthesis** --- Synthesize reusable skill definitions from the knowledge graph ([algorithm details](docs/skill-generation-algorithm.md))
 
 ### Overview Dashboard
@@ -77,8 +77,10 @@ npm run dev
   -> parse & build turns
   -> extract metadata, subagents, linked plans
   -> session summarization (centrality-based representative prompt, workType classification)
-  -> TF-IDF + Tool-IDF + structural features -> Truncated SVD -> agglomerative clustering -> Louvain
-  -> skill synthesis (reusability score top-N -> claude -p)
+  -> TF-IDF + Tool-IDF + structural features -> Truncated SVD -> agglomerative clustering
+  -> /insights facets integration (narrow cluster merging, goal-based labeling)
+  -> Louvain community detection
+  -> skill synthesis (reusability score top-N -> claude -p, enriched with facets insights)
   -> output:
        public/data/sessions/index.json      (session list)
        public/data/sessions/overview.json   (cross-session analytics + knowledge graph)
@@ -91,9 +93,20 @@ Custom paths:
 npm run analyze-sessions -- --sessions-dir /path/to/sessions --output-dir /path/to/output
 ```
 
+### /insights Integration
+
+Before analysis, `analyze-sessions` automatically runs `/insights` to refresh facets data. This enriches the pipeline with:
+- **Better topic labels** using LLM-generated `underlying_goal` instead of TF-IDF keywords
+- **Narrow cluster merging** based on shared goal categories
+- **Quality-aware reusability scoring** using session outcome and helpfulness
+- **Richer synthesis prompts** with friction details and success rates
+- **Session summaries** using `brief_summary` from facets
+
+Skip with `--skip-facets` or customize the facets path with `--facets-dir <path>`.
+
 ## Session Summarization
 
-The session list displays auto-generated summaries, processed entirely locally without LLM.
+The session list displays auto-generated summaries. When `/insights` facets data is available, the LLM-generated `brief_summary` is used. Otherwise, summaries are processed locally without LLM.
 
 - **Representative prompt selection**: Selects the most representative prompt from plan mode turns using Jaccard centrality with position weighting
 - **workType classification**: Automatically classifies each session into one of four types:
@@ -138,13 +151,15 @@ npm run analyze-sessions -- --skip-synthesis
 | `npm run skill-server` | Skill synthesis local server (localhost:3456) |
 | `npm run dev:full` | skill-server + Vite dev server together |
 
-### Synthesis options for analyze-sessions
+### Options for analyze-sessions
 
 | Flag | Description |
 |------|-------------|
 | `--synthesis-model <model>` | Model to use for synthesis (e.g. `haiku` for speed) |
 | `--synthesis-count <n>` | Number of candidates to synthesize (default: 5) |
 | `--skip-synthesis` | Skip LLM synthesis |
+| `--facets-dir <path>` | Custom facets directory (default: `~/.claude/usage-data/facets`) |
+| `--skip-facets` | Skip `/insights` refresh and facets integration |
 
 ## Tech Stack
 
@@ -172,6 +187,8 @@ scripts/
   skill-synthesizer.ts       # Skill synthesis (claude -p)
   skill-server.ts            # Synthesis HTTP server
   knowledge-graph-builder.ts # Semantic embedding + graph construction
+  knowledge-graph/
+    facets-reader.ts         # /insights facets data reader + normalization
 public/
   data/sessions/             # Generated JSON (gitignored)
 ```

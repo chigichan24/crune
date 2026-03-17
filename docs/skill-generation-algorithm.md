@@ -5,7 +5,8 @@
 実装:
 - [`scripts/knowledge-graph/reusability.ts`](../scripts/knowledge-graph/reusability.ts) --- Reusabilityスコア
 - [`scripts/knowledge-graph/skill-generator.ts`](../scripts/knowledge-graph/skill-generator.ts) --- ヒューリスティック生成
-- [`scripts/skill-synthesizeer.ts`](../scripts/skill-synthesizeer.ts) --- LLM合成プロンプト構築 + `claude -p` 呼び出し
+- [`scripts/skill-synthesizer.ts`](../scripts/skill-synthesizer.ts) --- LLM合成プロンプト構築 + `claude -p` 呼び出し + preamble除去
+- [`scripts/knowledge-graph/facets-reader.ts`](../scripts/knowledge-graph/facets-reader.ts) --- `/insights` facetsデータ読み込み・正規化
 - [`scripts/session-summarizer.ts`](../scripts/session-summarizer.ts) --- セッション要約（スキルとは独立だが同パイプラインで実行）
 
 ---
@@ -28,15 +29,30 @@ Topic Nodes (from knowledge graph)
 
 ### Signals
 
+facetsデータが利用可能な場合は6シグナル、未取得時は4シグナルで計算する。
+
+#### Base signals (always)
+
+| Signal | Weight (no facets) | Weight (with facets) | Formula | Rationale |
+|--------|-------------------|---------------------|---------|-----------|
+| **Frequency** | 0.35 | 0.30 | `sessionCount / max(sessionCount)` | 頻繁に繰り返されるパターンほど自動化の価値が高い |
+| **Time Cost** | 0.25 | 0.20 | `avgDuration / max(avgDuration)` | 1回あたりの所要時間が長いパターンほど自動化の効果が大きい |
+| **Cross-Project** | 0.25 | 0.20 | `(projectCount - 1) / (max(projectCount) - 1)` | 複数プロジェクトにまたがるパターンは汎用性が高い |
+| **Recency** | 0.15 | 0.10 | `1 - daysSinceLastSeen / max(daysSinceLastSeen)` | 最近使われたパターンは現在の作業に関連する可能性が高い |
+
+#### Facets-derived signals (when `/insights` data available)
+
 | Signal | Weight | Formula | Rationale |
 |--------|--------|---------|-----------|
-| **Frequency** | 0.35 | `sessionCount / max(sessionCount)` | 頻繁に繰り返されるパターンほど自動化の価値が高い |
-| **Time Cost** | 0.25 | `avgDuration / max(avgDuration)` | 1回あたりの所要時間が長いパターンほど自動化の効果が大きい |
-| **Cross-Project** | 0.25 | `(projectCount - 1) / (max(projectCount) - 1)` | 複数プロジェクトにまたがるパターンは汎用性が高い |
-| **Recency** | 0.15 | `1 - daysSinceLastSeen / max(daysSinceLastSeen)` | 最近使われたパターンは現在の作業に関連する可能性が高い |
+| **Success Rate** | 0.10 | facets `outcome` が `fully_achieved` or `mostly_achieved` の割合（facets未取得セッションは0.5） | 成功率の低いパターンは自動化に適さない |
+| **Helpfulness** | 0.10 | `claude_helpfulness` を数値化した平均（essential=1.0, very_helpful=0.8, moderately_helpful=0.5, slightly_helpful=0.25, unhelpful=0.0。未取得は0.5） | Claudeの貢献度が高いパターンほど自動化の価値が高い |
 
 ```
-overall = 0.35 * frequency + 0.25 * timeCost + 0.25 * crossProject + 0.15 * recency
+# With facets:
+overall = 0.30*frequency + 0.20*timeCost + 0.20*crossProject + 0.10*recency + 0.10*successRate + 0.10*helpfulness
+
+# Without facets (backward-compatible):
+overall = 0.35*frequency + 0.25*timeCost + 0.25*crossProject + 0.15*recency
 ```
 
 すべてのスコアは `[0, 1]` に正規化され、小数第3位に丸められる。
@@ -109,9 +125,18 @@ UIの「再合成」ボタンから、グラフコンテキスト付きの完全
 4. Enriched Tool Patterns  --- 検出されたツールフロー（上位5件）
 5. Graph Position          --- 中心性の解釈（オンデマンド合成時のみ）
 6. Connected Topics        --- エッジタイプ別の接続トピック（オンデマンド合成時のみ）
-7. Current Heuristic Skill --- Step 2の結果を参考情報として提供
-8. Instructions            --- anthropics/skills形式の出力要件
+7. Session Insights        --- /insights facetsからの目標、カテゴリ、成功率、friction情報（facets利用可能時のみ）
+8. Current Heuristic Skill --- Step 2の結果を参考情報として提供
+9. Instructions            --- anthropics/skills形式の出力要件
 ```
+
+### Output Post-processing
+
+LLMが出力の前にpreambleテキスト（例: "Now I have a thorough understanding..."）を付加することがあるため、`stripSynthesisPreamble()` で最初の `---`（YAML frontmatter）より前のテキストを除去する。
+
+### Session Persistence
+
+合成呼び出しには `--no-session-persistence` フラグを付与し、`claude -p` がJSONLセッションファイルを生成しないようにする。これにより、合成セッションが通常セッションに混入する問題を防ぐ。
 
 ### Graph Context (On-demand Only)
 

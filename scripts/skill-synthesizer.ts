@@ -62,11 +62,21 @@ export interface GraphContext {
   isBridgeTopic: boolean;
 }
 
+export interface FacetsInsightsSummary {
+  aggregatedGoals: string[];
+  normalizedCategories: string[];
+  successRate: number;
+  helpfulnessScore: number;
+  commonFrictions: string[];
+  frictionDetails: string[];
+}
+
 export interface SynthesisRequest {
   skillCandidate: SkillCandidate;
   topicNode: TopicNode;
   enrichedSequences?: EnrichedSequence[];
   graphContext?: GraphContext;
+  facetsInsights?: FacetsInsightsSummary;
 }
 
 export interface SynthesisResponse {
@@ -78,7 +88,7 @@ export interface SynthesisResponse {
 // ---------- Prompt Builder ----------
 
 export function buildSynthesisPrompt(body: SynthesisRequest): string {
-  const { skillCandidate, topicNode, enrichedSequences, graphContext } = body;
+  const { skillCandidate, topicNode, enrichedSequences, graphContext, facetsInsights } = body;
 
   const topicInfo = [
     `## Topic Information`,
@@ -222,8 +232,44 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
 
   const instruction = instructionLines.join("\n");
 
-  const parts = [topicInfo, prompts, toolSig, toolPatterns, graphPosition, connectedTopicsSection, reference, instruction].filter(Boolean);
+  // --- Facets insights section ---
+  let facetsSection = "";
+  if (facetsInsights) {
+    const lines = [`## Session Insights (from /insights analysis)`];
+    if (facetsInsights.aggregatedGoals.length > 0) {
+      lines.push(`- **Underlying Goals:** ${facetsInsights.aggregatedGoals.join("; ")}`);
+    }
+    if (facetsInsights.normalizedCategories.length > 0) {
+      lines.push(`- **Goal Categories:** ${facetsInsights.normalizedCategories.join(", ")}`);
+    }
+    lines.push(`- **Success Rate:** ${(facetsInsights.successRate * 100).toFixed(0)}% of sessions achieved their goal`);
+    lines.push(`- **Helpfulness Score:** ${(facetsInsights.helpfulnessScore * 100).toFixed(0)}%`);
+    if (facetsInsights.commonFrictions.length > 0) {
+      lines.push(`- **Common Frictions:** ${facetsInsights.commonFrictions.join(", ")}`);
+      for (const detail of facetsInsights.frictionDetails.slice(0, 2)) {
+        lines.push(`  - ${detail}`);
+      }
+    }
+    facetsSection = lines.join("\n");
+  }
+
+  const parts = [topicInfo, prompts, toolSig, toolPatterns, graphPosition, connectedTopicsSection, facetsSection, reference, instruction].filter(Boolean);
   return parts.join("\n\n");
+}
+
+// ---------- Post-process synthesis output ----------
+
+/**
+ * Strip preamble text that the model sometimes emits before the actual
+ * YAML-frontmatter skill markdown (e.g. "Now I have a thorough understanding…").
+ * Valid skill output always starts with "---".
+ */
+export function stripSynthesisPreamble(raw: string): string {
+  const trimmed = raw.trimStart();
+  if (trimmed.startsWith("---")) return trimmed;
+  const idx = trimmed.indexOf("\n---");
+  if (idx !== -1) return trimmed.slice(idx + 1);
+  return trimmed;
 }
 
 // ---------- Distill with Claude CLI ----------
@@ -237,7 +283,7 @@ export function synthesizeWithClaude(prompt: string, options: SynthesisOptions =
   const timeoutMs = options.timeoutMs ?? 300_000;
 
   return new Promise((resolve) => {
-    const args = ["-p", "--output-format", "text", "--permission-mode", "acceptEdits"];
+    const args = ["-p", "--output-format", "text", "--permission-mode", "acceptEdits", "--no-session-persistence"];
     if (options.model) {
       args.push("--model", options.model);
     }

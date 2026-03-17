@@ -42,6 +42,7 @@ export {
   findElbowThreshold,
   clusterWithThresholdFromDistMatrix,
   splitOversizedClusters,
+  mergeNarrowClusters,
   // Topic nodes
   extractDominantAction,
   selectRepresentativePrompts,
@@ -57,4 +58,13 @@ export {
   // Community
   louvainDetection,
   brandesBetweenness,
+  // Reusability
+  computeReusabilityScores,
+  // Facets
+  type FacetsData,
+  type FacetsInsightsSummary,
+  readFacetsDir,
+  normalizeGoalCategory,
+  helpfulnessToScore,
+  aggregateFacetsForTopic,
 } from "./knowledge-graph/index.js";

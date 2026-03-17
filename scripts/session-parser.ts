@@ -198,6 +198,25 @@ export function inferProjectName(dirName: string): string {
 
 // ─── JSONL Parser + Turn Builder ────────────────────────────────────────────
 
+/**
+ * Check if a JSONL file is a non-interactive session created by `claude -p`.
+ * These sessions contain `queue-operation` entries and should be excluded
+ * from the dashboard to prevent synthesis prompts from appearing as sessions.
+ */
+export function isNonInteractiveSession(filePath: string): boolean {
+  try {
+    // Read only the first 4KB to check for queue-operation (always near the top)
+    const fd = fs.openSync(filePath, "r");
+    const buf = Buffer.alloc(4096);
+    const bytesRead = fs.readSync(fd, buf, 0, 4096, 0);
+    fs.closeSync(fd);
+    const head = buf.toString("utf-8", 0, bytesRead);
+    return head.includes('"type":"queue-operation"');
+  } catch {
+    return false;
+  }
+}
+
 export async function parseJsonlFile(filePath: string): Promise<JsonlLine[]> {
   const lines: JsonlLine[] = [];
   const stream = fs.createReadStream(filePath, { encoding: "utf-8" });
