@@ -1,6 +1,6 @@
 {
   "name": "@chigichan24/crune",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "bin": {
     "crune": "./bin/crune.js"
