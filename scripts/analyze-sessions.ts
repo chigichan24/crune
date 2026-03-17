@@ -13,6 +13,8 @@ import * as path from "node:path";
 import * as os from "node:os";
 import {
   buildSemanticKnowledgeGraph,
+  readFacetsDir,
+  aggregateFacetsForTopic,
   type SessionInput,
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
@@ -38,6 +40,8 @@ interface CliArgs {
   skipSynthesis: boolean;
   synthesisModel?: string;
   synthesisCount: number;
+  facetsDir: string;
+  skipFacets: boolean;
 }
 
 function parseArgs(): CliArgs {
@@ -47,6 +51,8 @@ function parseArgs(): CliArgs {
   let skipSynthesis = false;
   let synthesisModel: string | undefined;
   let synthesisCount = 5;
+  let facetsDir = path.join(os.homedir(), ".claude", "usage-data", "facets");
+  let skipFacets = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -55,13 +61,23 @@ function parseArgs(): CliArgs {
       outputDir = path.resolve(args[++i]);
     } else if (args[i] === "--skip-synthesis") {
       skipSynthesis = true;
+    } else if (args[i] === "--skip-synthesize") {
+      skipSynthesis = true;
     } else if (args[i] === "--synthesis-model" && args[i + 1]) {
+      synthesisModel = args[++i];
+    } else if (args[i] === "--synthesize-model" && args[i + 1]) {
       synthesisModel = args[++i];
     } else if (args[i] === "--synthesis-count" && args[i + 1]) {
       synthesisCount = Math.max(1, parseInt(args[++i], 10) || 5);
+    } else if (args[i] === "--synthesize-count" && args[i + 1]) {
+      synthesisCount = Math.max(1, parseInt(args[++i], 10) || 5);
+    } else if (args[i] === "--facets-dir" && args[i + 1]) {
+      facetsDir = path.resolve(args[++i]);
+    } else if (args[i] === "--skip-facets") {
+      skipFacets = true;
     }
   }
-  return { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount };
+  return { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets };
 }
 
 // ─── Output types ───────────────────────────────────────────────────────────
@@ -234,6 +250,7 @@ interface SynthesisConfig {
   skip: boolean;
   model?: string;
   count: number;
+  facetsDir?: string;
 }
 
 async function generateOverview(sessions: ParsedSession[], synthesisConfig: SynthesisConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
@@ -396,7 +413,9 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       subagentCount: s.meta.subagentCount,
     },
   }));
-  const knowledgeGraph = buildSemanticKnowledgeGraph(sessionInputs);
+  const knowledgeGraph = buildSemanticKnowledgeGraph(sessionInputs, {
+    facetsDir: synthesisConfig.facetsDir,
+  });
 
   // Top files
   const topFiles = [...fileEditCounts.entries()]
@@ -504,10 +523,17 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       );
 
       console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
+
+      // Build facets insights for this topic if facets data is available
+      const facetsInsights = synthesisConfig.facetsDir
+        ? aggregateFacetsForTopic(topic.sessionIds, readFacetsDir(synthesisConfig.facetsDir))
+        : undefined;
+
       const prompt = buildSynthesisPrompt({
         skillCandidate: candidate,
         topicNode: topic as unknown as import("./skill-synthesizer.js").TopicNode,
         enrichedSequences: relatedSequences,
+        facetsInsights: facetsInsights as unknown as import("./skill-synthesizer.js").FacetsInsightsSummary | undefined,
       });
       const result = await synthesizeWithClaude(prompt, synthOpts);
       if (result.success) {
@@ -557,10 +583,22 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
+  console.error(`[crune] Facets dir:   ${skipFacets ? "(skipped)" : facetsDir}`);
+
+  // Step 0: Refresh /insights data if facets are enabled
+  if (!skipFacets) {
+    console.error(`\n[crune] Refreshing /insights data...`);
+    const refreshResult = await synthesizeWithClaude("/insights", { timeoutMs: 300_000 });
+    if (refreshResult.success) {
+      console.error(`[crune] /insights data refreshed.`);
+    } else {
+      console.error(`[crune] /insights refresh failed (continuing without): ${refreshResult.error ?? "unknown"}`);
+    }
+  }
 
   // Step 1: Discover sessions
   console.error(`\n[crune] Discovering sessions...`);
@@ -658,6 +696,7 @@ async function main() {
     skip: skipSynthesis,
     model: synthesisModel,
     count: synthesisCount,
+    facetsDir: skipFacets ? undefined : facetsDir,
   });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));

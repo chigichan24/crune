@@ -26,3 +26,4 @@ dist-ssr
 
 # Session data
 public/data/sessions/
+.claude/worktrees/

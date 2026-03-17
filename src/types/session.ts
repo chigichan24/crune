@@ -139,6 +139,8 @@ export interface ReusabilityScore {
   timeCost: number
   crossProjectScore: number
   recency: number
+  successRate?: number
+  helpfulness?: number
 }
 
 export interface TopicNode {

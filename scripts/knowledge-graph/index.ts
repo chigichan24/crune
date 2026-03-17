@@ -19,7 +19,9 @@ import { cosineDistance } from "./similarity.js";
 import {
   agglomerativeClusteringFromDistMatrix,
   splitOversizedClusters,
+  mergeNarrowClusters,
 } from "./clustering.js";
+import { readFacetsDir } from "./facets-reader.js";
 import { buildTopicNodes } from "./topic-nodes.js";
 import { buildTopicEdges } from "./edges.js";
 import { louvainDetection, brandesBetweenness } from "./community.js";
@@ -88,9 +90,15 @@ export function buildSemanticKnowledgeGraph(
   sessions: SessionInput[],
   options: KnowledgeGraphOptions = {}
 ): SemanticKnowledgeGraph {
-  const { enableLouvain = true, enableBrandes = true } = options;
+  const { enableLouvain = true, enableBrandes = true, facetsDir } = options;
 
   console.log(`  [Knowledge Graph] Processing ${sessions.length} sessions...`);
+
+  // Read facets data if directory is provided
+  const facetsMap = facetsDir ? readFacetsDir(facetsDir) : new Map();
+  if (facetsDir) {
+    console.log(`  [Knowledge Graph] Facets: ${facetsMap.size} sessions with /insights data`);
+  }
 
   // Edge case: too few sessions
   if (sessions.length === 0) {
@@ -172,7 +180,7 @@ export function buildSemanticKnowledgeGraph(
       emptyTfidf,
       toolIdf
     );
-    computeReusabilityScores(singleTopic);
+    computeReusabilityScores(singleTopic, new Date(), facetsMap);
     const skillCandidates = generateSkillCandidates(singleTopic, enrichedSequences);
     return {
       nodes: singleTopic,
@@ -265,6 +273,22 @@ export function buildSemanticKnowledgeGraph(
       activeSessions.length,
       svdDist
     );
+
+    // Merge narrow clusters using facets goal categories
+    if (facetsMap.size > 0) {
+      const beforeCount = clusterMembers.length;
+      clusterMembers = mergeNarrowClusters(
+        clusterMembers,
+        sessionIds,
+        facetsMap,
+        svdDist
+      );
+      if (clusterMembers.length < beforeCount) {
+        console.log(
+          `  [Knowledge Graph] Merged narrow clusters: ${beforeCount} → ${clusterMembers.length} topics`
+        );
+      }
+    }
   }
 
   console.log(
@@ -275,7 +299,7 @@ export function buildSemanticKnowledgeGraph(
   const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf);
 
   // Step 5b: Compute reusability scores
-  computeReusabilityScores(topics);
+  computeReusabilityScores(topics, new Date(), facetsMap);
   console.log(
     `  [Knowledge Graph] Reusability scores computed for ${topics.length} topics`
   );
