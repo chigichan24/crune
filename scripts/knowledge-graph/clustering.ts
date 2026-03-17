@@ -2,6 +2,9 @@
  * Agglomerative clustering with average linkage and automatic elbow detection.
  */
 
+import type { FacetsData } from "./types.js";
+import { normalizeGoalCategory } from "./facets-reader.js";
+
 export function agglomerativeClusteringFromDistMatrix(
   sessionIds: string[],
   precomputedDist: Map<string, number>
@@ -207,4 +210,125 @@ export function splitOversizedClusters(
   }
 
   return result;
+}
+
+/**
+ * Merge narrow (≤ maxNarrowSize sessions) clusters that share normalized goal
+ * categories from facets data. This addresses the "too narrow scope" issue
+ * where the clustering algorithm creates single-session topics.
+ *
+ * Algorithm:
+ * 1. Identify narrow clusters (≤ maxNarrowSize members)
+ * 2. For each pair of narrow clusters, check if they share normalized goal categories
+ * 3. Merge if they share ≥1 category AND average inter-cluster distance < distanceThreshold
+ * 4. Stop merging if merged size exceeds maxMergedSize
+ */
+export function mergeNarrowClusters(
+  clusters: number[][],
+  sessionIds: string[],
+  facetsMap: Map<string, FacetsData>,
+  precomputedDist: Map<string, number>,
+  maxNarrowSize: number = 2,
+  distanceThreshold: number = 0.7,
+  maxMergedSize: number = 8
+): number[][] {
+  // Separate clusters into narrow and large
+  const largeClusters: number[][] = [];
+  const narrowClusters: number[][] = [];
+
+  for (const cluster of clusters) {
+    if (cluster.length > maxNarrowSize) {
+      largeClusters.push(cluster);
+    } else {
+      narrowClusters.push([...cluster]);
+    }
+  }
+
+  // If no narrow clusters, return as-is
+  if (narrowClusters.length === 0) {
+    return clusters;
+  }
+
+  // For each narrow cluster, collect normalized goal categories
+  const clusterCategories: Set<string>[] = narrowClusters.map((cluster) => {
+    const cats = new Set<string>();
+    for (const idx of cluster) {
+      const sid = sessionIds[idx];
+      const facets = facetsMap.get(sid);
+      if (facets && facets.goalCategories) {
+        for (const rawCat of Object.keys(facets.goalCategories)) {
+          cats.add(normalizeGoalCategory(rawCat));
+        }
+      }
+    }
+    return cats;
+  });
+
+  // Helper: compute average inter-cluster distance
+  const avgInterClusterDist = (clusterA: number[], clusterB: number[]): number => {
+    let sum = 0;
+    let count = 0;
+    for (const i of clusterA) {
+      for (const j of clusterB) {
+        const lo = Math.min(i, j);
+        const hi = Math.max(i, j);
+        const d = precomputedDist.get(`${lo}:${hi}`) ?? 1.0;
+        sum += d;
+        count++;
+      }
+    }
+    return count > 0 ? sum / count : 1.0;
+  };
+
+  // Helper: check if two category sets share at least one category
+  const sharesCategory = (a: Set<string>, b: Set<string>): boolean => {
+    for (const cat of a) {
+      if (b.has(cat)) return true;
+    }
+    return false;
+  };
+
+  // Track which narrow clusters have been consumed
+  const consumed = new Set<number>();
+
+  // Greedily merge narrow clusters
+  for (let i = 0; i < narrowClusters.length; i++) {
+    if (consumed.has(i)) continue;
+    // Skip if this cluster has no facets categories
+    if (clusterCategories[i].size === 0) continue;
+
+    for (let j = i + 1; j < narrowClusters.length; j++) {
+      if (consumed.has(j)) continue;
+      // Skip if target cluster has no facets categories
+      if (clusterCategories[j].size === 0) continue;
+
+      // Check shared categories
+      if (!sharesCategory(clusterCategories[i], clusterCategories[j])) continue;
+
+      // Check merged size
+      if (narrowClusters[i].length + narrowClusters[j].length > maxMergedSize) continue;
+
+      // Check distance
+      const dist = avgInterClusterDist(narrowClusters[i], narrowClusters[j]);
+      if (dist >= distanceThreshold) continue;
+
+      // Merge j into i
+      narrowClusters[i].push(...narrowClusters[j]);
+      // Merge categories
+      for (const cat of clusterCategories[j]) {
+        clusterCategories[i].add(cat);
+      }
+      consumed.add(j);
+    }
+  }
+
+  // Collect surviving narrow clusters
+  const mergedNarrow: number[][] = [];
+  for (let i = 0; i < narrowClusters.length; i++) {
+    if (!consumed.has(i)) {
+      mergedNarrow.push(narrowClusters[i]);
+    }
+  }
+
+  return [...largeClusters, ...mergedNarrow];
 }

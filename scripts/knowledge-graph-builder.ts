@@ -42,6 +42,7 @@ export {
   findElbowThreshold,
   clusterWithThresholdFromDistMatrix,
   splitOversizedClusters,
+  mergeNarrowClusters,
   // Topic nodes
   extractDominantAction,
   selectRepresentativePrompts,

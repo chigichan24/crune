@@ -60,6 +60,7 @@ export {
   findElbowThreshold,
   clusterWithThresholdFromDistMatrix,
   splitOversizedClusters,
+  mergeNarrowClusters,
 } from "./clustering.js";
 export {
   extractDominantAction,
