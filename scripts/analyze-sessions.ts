@@ -156,7 +156,7 @@ interface OverviewJson {
 
 // ─── Task 1.5: index.json Generation ────────────────────────────────────────
 
-function generateIndex(sessions: ParsedSession[]): IndexJson {
+function generateIndex(sessions: ParsedSession[], facetsMap?: Map<string, import("./knowledge-graph-builder.js").FacetsData>): IndexJson {
   const projectMap = new Map<string, { count: number; duration: number }>();
 
   const sessionSummaries: SessionSummary[] = sessions.map((s) => {
@@ -190,7 +190,7 @@ function generateIndex(sessions: ParsedSession[]): IndexJson {
       durationMinutes: s.meta.durationMinutes,
       turnCount: s.meta.turnCount,
       toolBreakdown: s.meta.toolBreakdown,
-      firstUserPrompt: s.meta.firstUserPrompt,
+      firstUserPrompt: facetsMap?.get(s.meta.sessionId)?.briefSummary || s.meta.firstUserPrompt,
       summaryText: summaryInfo.summary,
       keywords: summaryInfo.keywords,
       scope: summaryInfo.scope,
@@ -667,7 +667,8 @@ async function main() {
   fs.mkdirSync(path.join(outputDir, "detail"), { recursive: true });
 
   // index.json
-  const indexData = generateIndex(parsedSessions);
+  const indexFacetsMap = skipFacets ? undefined : readFacetsDir(facetsDir);
+  const indexData = generateIndex(parsedSessions, indexFacetsMap);
   const indexPath = path.join(outputDir, "index.json");
   fs.writeFileSync(indexPath, JSON.stringify(indexData, null, 2));
   const indexSize = fs.statSync(indexPath).size;
