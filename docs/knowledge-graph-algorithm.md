@@ -119,6 +119,20 @@ SVD潜在空間でのcosine距離を用いた凝集型クラスタリング。
 
 5セッション未満の場合は各セッションが独立したトピックになる。
 
+### Narrow Cluster Merging (Facets-based)
+
+`/insights` のfacetsデータが利用可能な場合、oversized cluster splitting の直後に narrow cluster merging を実行する。
+
+実装: [`scripts/knowledge-graph/clustering.ts`](../scripts/knowledge-graph/clustering.ts) の `mergeNarrowClusters()`
+
+1. セッション数 ≤ 2 のクラスタを「narrow」と判定
+2. narrow クラスタ間で、少なくとも片方にfacetsデータがあるペアを検査
+3. `goal_categories` を正規化（50+種 → ~10カテゴリ: feature, bugfix, refactoring, documentation, review, testing, ci, git_ops, setup, other）
+4. 正規化カテゴリが1つ以上共通 AND クラスタ間の平均cosine距離 < 0.7 の場合にマージ
+5. マージ後のサイズが8を超えないことを確認
+
+これにより、セッション分析が狭すぎるスコープのトピックを生成する問題（issue #13）を解消する。
+
 ---
 
 ## Step 4: Topic Node Construction
@@ -128,7 +142,7 @@ SVD潜在空間でのcosine距離を用いた凝集型クラスタリング。
 | Field | Method |
 |-------|--------|
 | **Keywords** | TF-IDFセントロイド（クラスタ内セッションベクトルの平均）の上位5語 |
-| **Label** | top-3 keywords + プロジェクト情報 |
+| **Label** | facetsの `underlying_goal`（最も短いもの、80文字制限）+ プロジェクト情報。facets未取得時はtop-3 keywords + プロジェクト情報にフォールバック |
 | **Representative Prompts** | セントロイドとのcosine類似度が高いセッションのuser promptから上位3件（重複除去） |
 | **Suggested Prompt** | 支配的アクション動詞（日英対応） + top-3 keywords + Tool-IDF加重top-3ツールを組み合わせたテンプレート |
 | **Tool Signature** | `log(1 + count) * idf(tool)` の上位5ツール |
