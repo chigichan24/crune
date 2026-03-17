@@ -47,6 +47,8 @@ export interface ReusabilityScore {
   timeCost: number;
   crossProjectScore: number;
   recency: number;
+  successRate?: number;
+  helpfulness?: number;
 }
 
 export interface TopicNode {
@@ -146,6 +148,7 @@ export interface SkillCandidate {
 export interface KnowledgeGraphOptions {
   enableLouvain?: boolean;
   enableBrandes?: boolean;
+  facetsDir?: string;
 }
 
 // ─── Internal result types ──────────────────────────────────────────────────
@@ -176,4 +179,28 @@ export interface LatentDimension {
   varianceRatio: number;
   topTerms: { term: string; weight: number }[];
   topTools: { tool: string; weight: number }[];
+}
+
+// ─── Facets types (from /insights) ──────────────────────────────────────────
+
+export interface FacetsData {
+  sessionId: string;
+  underlyingGoal: string;
+  goalCategories: Record<string, number>;
+  outcome: string;
+  claudeHelpfulness: string;
+  sessionType: string;
+  frictionCounts: Record<string, number>;
+  frictionDetail: string;
+  primarySuccess: string;
+  briefSummary: string;
+}
+
+export interface FacetsInsightsSummary {
+  aggregatedGoals: string[];
+  normalizedCategories: string[];
+  successRate: number;
+  helpfulnessScore: number;
+  commonFrictions: string[];
+  frictionDetails: string[];
 }

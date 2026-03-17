@@ -46,6 +46,8 @@ export type {
   EnrichedToolStep,
   EnrichedToolSequence,
   SkillCandidate,
+  FacetsData,
+  FacetsInsightsSummary,
 } from "./types.js";
 
 export { tokenize, splitCamelCase, extractPathTokens, isNoiseToken } from "./tokenizer.js";
@@ -77,6 +79,7 @@ export { louvainDetection, brandesBetweenness } from "./community.js";
 export { computeReusabilityScores } from "./reusability.js";
 export { abstractToolCall, extractEnrichedSequences } from "./tool-pattern.js";
 export { generateSkillMarkdown, generateHookJson, generateSkillCandidates } from "./skill-generator.js";
+export { readFacetsDir, normalizeGoalCategory, helpfulnessToScore, aggregateFacetsForTopic } from "./facets-reader.js";
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 

@@ -57,4 +57,11 @@ export {
   // Community
   louvainDetection,
   brandesBetweenness,
+  // Facets
+  type FacetsData,
+  type FacetsInsightsSummary,
+  readFacetsDir,
+  normalizeGoalCategory,
+  helpfulnessToScore,
+  aggregateFacetsForTopic,
 } from "./knowledge-graph/index.js";
