@@ -210,7 +210,7 @@ export function SessionList({ sessions, projects, onSessionSelect }: Props) {
                         </span>
                       )}
                       <span className="session-list-summary">
-                        {truncate(s.firstUserPrompt || s.summaryText, 200)}
+                        {truncate(s.firstUserPrompt || s.summaryText || "", 200)}
                       </span>
                       {s.scope && (
                         <span className="session-list-scope">{s.scope}</span>
