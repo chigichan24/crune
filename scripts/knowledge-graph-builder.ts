@@ -58,6 +58,8 @@ export {
   // Community
   louvainDetection,
   brandesBetweenness,
+  // Reusability
+  computeReusabilityScores,
   // Facets
   type FacetsData,
   type FacetsInsightsSummary,
