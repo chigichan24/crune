@@ -257,6 +257,21 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
   return parts.join("\n\n");
 }
 
+// ---------- Post-process synthesis output ----------
+
+/**
+ * Strip preamble text that the model sometimes emits before the actual
+ * YAML-frontmatter skill markdown (e.g. "Now I have a thorough understanding…").
+ * Valid skill output always starts with "---".
+ */
+export function stripSynthesisPreamble(raw: string): string {
+  const trimmed = raw.trimStart();
+  if (trimmed.startsWith("---")) return trimmed;
+  const idx = trimmed.indexOf("\n---");
+  if (idx !== -1) return trimmed.slice(idx + 1);
+  return trimmed;
+}
+
 // ---------- Distill with Claude CLI ----------
 
 export interface SynthesisOptions {

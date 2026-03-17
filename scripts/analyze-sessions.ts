@@ -18,7 +18,7 @@ import {
   type SessionInput,
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
-import { buildSynthesisPrompt, synthesizeWithClaude, type SynthesisOptions } from "./skill-synthesizer.js";
+import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions } from "./skill-synthesizer.js";
 import { generateSessionSummary } from "./session-summarizer.js";
 import {
   discoverSessions,
@@ -539,7 +539,7 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       if (result.success) {
         const original = knowledgeGraph.skillCandidates.find((sc) => sc.topicId === candidate.topicId);
         if (original) {
-          original.synthesizedMarkdown = result.stdout;
+          original.synthesizedMarkdown = stripSynthesisPreamble(result.stdout);
         }
         console.error(`[crune]   [${i + 1}/${total}] Done.`);
       } else {

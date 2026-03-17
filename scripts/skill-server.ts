@@ -1,5 +1,5 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { buildSynthesisPrompt, synthesizeWithClaude } from "./skill-synthesizer.js";
+import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble } from "./skill-synthesizer.js";
 import type { SynthesisRequest, SynthesisResponse } from "./skill-synthesizer.js";
 
 // ---------- Helpers ----------
@@ -43,7 +43,7 @@ async function handleSynthesize(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  sendJson(res, 200, { success: true, synthesizedMarkdown: result.stdout });
+  sendJson(res, 200, { success: true, synthesizedMarkdown: stripSynthesisPreamble(result.stdout) });
 }
 
 // ---------- Server ----------
