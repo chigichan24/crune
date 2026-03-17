@@ -2,7 +2,7 @@
  * Topic node construction from session clusters.
  */
 
-import type { SessionInput, TopicNode, ToolIdfResult, TfidfResult } from "./types.js";
+import type { SessionInput, TopicNode, ToolIdfResult, TfidfResult, FacetsData } from "./types.js";
 import { ACTION_VERBS_EN, ACTION_VERBS_JA } from "./constants.js";
 import { cosineSimilarity } from "./similarity.js";
 
@@ -144,11 +144,33 @@ export function classifyDominantRole(
   return "user-driven";
 }
 
+/**
+ * Build a concise label from facets underlying_goal strings.
+ * Picks the shortest goal (most concise), truncates at 80 chars.
+ */
+function buildFacetsLabel(
+  memberSessions: SessionInput[],
+  facetsMap: Map<string, FacetsData>
+): string | undefined {
+  const goals: string[] = [];
+  for (const s of memberSessions) {
+    const f = facetsMap.get(s.sessionId);
+    if (f?.underlyingGoal) goals.push(f.underlyingGoal);
+  }
+  if (goals.length === 0) return undefined;
+
+  // Pick the shortest goal as the most concise summary
+  goals.sort((a, b) => a.length - b.length);
+  const best = goals[0];
+  return best.length > 80 ? best.slice(0, 77) + "..." : best;
+}
+
 export function buildTopicNodes(
   clusterMembers: number[][],
   sessions: SessionInput[],
   tfidf: TfidfResult,
-  toolIdf: ToolIdfResult
+  toolIdf: ToolIdfResult,
+  facetsMap?: Map<string, FacetsData>
 ): TopicNode[] {
   const topics: TopicNode[] = [];
 
@@ -188,12 +210,17 @@ export function buildTopicNodes(
     const dominantProject = sortedProjects[0]?.[0] ?? "";
     const allProjects = [...new Set(memberSessions.map((s) => s.projectDisplayName))];
 
-    // Label: top 2-3 keywords + project
-    const labelKeywords = keywords.slice(0, 3).join(", ");
+    // Label: prefer facets goal, fall back to TF-IDF keywords
     const projectSuffix = allProjects.length > 1
       ? `(${allProjects.length} projects)`
       : `(${dominantProject.split("/").pop() || dominantProject})`;
-    const label = `${labelKeywords} ${projectSuffix}`;
+    const facetsLabel = facetsMap && facetsMap.size > 0
+      ? buildFacetsLabel(memberSessions, facetsMap)
+      : undefined;
+    const labelKeywords = keywords.slice(0, 3).join(", ");
+    const label = facetsLabel
+      ? `${facetsLabel} ${projectSuffix}`
+      : `${labelKeywords} ${projectSuffix}`;
 
     // Aggregate metadata
     const sessionIds = memberSessions.map((s) => s.sessionId);

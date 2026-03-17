@@ -178,7 +178,8 @@ export function buildSemanticKnowledgeGraph(
       [sessionIds.map((_, i) => i)],
       activeSessions,
       emptyTfidf,
-      toolIdf
+      toolIdf,
+      facetsMap
     );
     computeReusabilityScores(singleTopic, new Date(), facetsMap);
     const skillCandidates = generateSkillCandidates(singleTopic, enrichedSequences);
@@ -296,7 +297,7 @@ export function buildSemanticKnowledgeGraph(
   );
 
   // Step 5: Build topic nodes
-  const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf);
+  const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf, facetsMap);
 
   // Step 5b: Compute reusability scores
   computeReusabilityScores(topics, new Date(), facetsMap);
