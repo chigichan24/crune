@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
@@ -68,6 +68,10 @@ export function KnowledgeNodeDetail({
 }: Props) {
   const [synthCopied, setSynthCopied] = useState(false)
   const { synthesize, loading: synthLoading, result: synthResult, error: synthError, reset: resetSynth } = useSkillSynthesis()
+
+  useEffect(() => {
+    resetSynth()
+  }, [node?.id, resetSynth])
 
   const skillCandidate = useMemo(() => {
     if (!node || !skillCandidates) return null
