@@ -27,6 +27,7 @@ import {
   extractMetadata,
   parseSubagents,
   loadLinkedPlan,
+  isNonInteractiveSession,
   type ConversationTurn,
   type SubagentSession,
   type ParsedSession,
@@ -610,13 +611,20 @@ async function main() {
     process.exit(1);
   }
 
+  // Step 1.5: Filter out non-interactive sessions (claude -p synthesis, /insights)
+  const interactiveSessions = sessionFiles.filter((sf) => !isNonInteractiveSession(sf.filePath));
+  const skippedCount = sessionFiles.length - interactiveSessions.length;
+  if (skippedCount > 0) {
+    console.error(`[crune] Skipped ${skippedCount} non-interactive sessions (claude -p)`);
+  }
+
   // Step 2: Parse each session with metadata and subagents
   const parsedSessions: ParsedSession[] = [];
 
-  for (let i = 0; i < sessionFiles.length; i++) {
-    const sf = sessionFiles[i];
+  for (let i = 0; i < interactiveSessions.length; i++) {
+    const sf = interactiveSessions[i];
     console.error(
-      `[crune] Processing session ${i + 1}/${sessionFiles.length}: ${sf.sessionId}`
+      `[crune] Processing session ${i + 1}/${interactiveSessions.length}: ${sf.sessionId}`
     );
 
     try {
