@@ -10,13 +10,13 @@
 
   --border: #e7e5e4;
 
-  /* Brand — purple, logo and app title only */
-  --brand: #7c3aed;
+  /* Brand — amber, logo and app title only */
+  --brand: #d97706;
 
-  /* Interactive — blue, buttons/links/focus/active states */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-subtle: #eff6ff;
+  /* Interactive — amber, unified with brand */
+  --accent: #d97706;
+  --accent-hover: #b45309;
+  --accent-subtle: #fffbeb;
 
   /* Status — only for actual state indicators */
   --success: #16a34a;

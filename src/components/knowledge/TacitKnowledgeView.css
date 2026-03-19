@@ -145,9 +145,9 @@
 .tk-synth-btn {
   font-size: 10px;
   font-weight: 600;
-  color: var(--brand, #8b5cf6);
-  background-color: rgba(139, 92, 246, 0.08);
-  border: 1px solid var(--brand, #8b5cf6);
+  color: var(--brand, #d97706);
+  background-color: rgba(217, 119, 6, 0.08);
+  border: 1px solid var(--brand, #d97706);
   border-radius: 4px;
   padding: 3px 8px;
   cursor: pointer;
@@ -155,7 +155,7 @@
 }
 
 .tk-synth-btn:hover {
-  background-color: rgba(139, 92, 246, 0.15);
+  background-color: rgba(217, 119, 6, 0.15);
 }
 
 .tk-synth-btn:disabled {
