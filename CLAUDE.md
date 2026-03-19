@@ -29,7 +29,7 @@ npm run dev:full           # skill-server + Vite dev server together
 ## Key Conventions
 
 - UI text is in Japanese (commit `abc92e1`)
-- Color variables have semantic roles: `--accent` (blue, interactive), `--brand` (purple, logo only), `--success/warning/danger` (status), `--chart-1..6` (data visualization)
+- Color variables have semantic roles: `--accent` (amber, interactive), `--brand` (amber, logo only — unified with accent), `--success/warning/danger` (status), `--chart-1..6` (data visualization)
 - Tool call display logic is centralized in `ToolCallBlock.tsx` with per-tool rendering (Bash, Edit, Write, Read, Grep, Glob, Agent)
 - Expand/collapse pattern: `useState(false)` + conditional render (no animation), see `SubagentBranch.tsx`
 

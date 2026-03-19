@@ -183,8 +183,8 @@
 }
 
 .session-list-work-badge--planning {
-  color: var(--brand, #8b5cf6);
-  background-color: rgba(139, 92, 246, 0.1);
+  color: var(--brand, #d97706);
+  background-color: rgba(217, 119, 6, 0.1);
 }
 
 .session-list-scope {
