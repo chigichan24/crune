@@ -23,6 +23,7 @@ import {
   stripSynthesisPreamble,
   type TopicNode as SynthTopicNode,
 } from "./skill-synthesizer.js";
+import { evaluateSkill } from "./skill-evaluator.js";
 
 // ─── CLI argument parsing ─────────────────────────────────────────
 
@@ -33,6 +34,8 @@ interface CliArgs {
   model?: string;
   skipSynthesis: boolean;
   dryRun: boolean;
+  skipEval: boolean;
+  evalModel?: string;
 }
 
 export function parseCliArgs(argv: string[]): CliArgs {
@@ -43,6 +46,8 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let model: string | undefined;
   let skipSynthesis = false;
   let dryRun = false;
+  let skipEval = false;
+  let evalModel: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -58,13 +63,17 @@ export function parseCliArgs(argv: string[]): CliArgs {
       skipSynthesis = true;
     } else if (args[i] === "--dry-run") {
       dryRun = true;
+    } else if (args[i] === "--skip-eval") {
+      skipEval = true;
+    } else if (args[i] === "--eval-model" && args[i + 1]) {
+      evalModel = args[++i];
     } else if (args[i] === "--help" || args[i] === "-h") {
       printUsage();
       process.exit(0);
     }
   }
 
-  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun };
+  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, skipEval, evalModel };
 }
 
 function printUsage(): void {
@@ -79,6 +88,8 @@ Options:
   --model <model>        Claude model for synthesis (e.g., haiku, sonnet)
   --skip-synthesis       Skip LLM synthesis, output heuristic skills only
   --dry-run              Show candidates without writing files
+  --skip-eval            Skip skill evaluation pipeline (structural + rubric)
+  --eval-model <model>   Claude model for rubric scoring (defaults to --model)
   -h, --help             Show this help message`);
 }
 
@@ -196,6 +207,7 @@ async function main(): Promise<void> {
     console.error(`  -> ${label}`);
 
     let markdown = candidate.skillMarkdown;
+    let synthesisHappened = false;
 
     if (!config.skipSynthesis && topic) {
       // Find enriched sequences related to this topic's sessions
@@ -216,6 +228,7 @@ async function main(): Promise<void> {
 
       if (result.success) {
         markdown = stripSynthesisPreamble(result.stdout);
+        synthesisHappened = true;
         console.error(`    Synthesized`);
       } else {
         console.error(
@@ -224,6 +237,48 @@ async function main(): Promise<void> {
       }
     } else if (config.skipSynthesis) {
       console.error(`    Heuristic only`);
+    }
+
+    // Evaluate skill (structural always; rubric only if synthesis ran).
+    if (!config.skipEval) {
+      const evalOptions = {
+        model: config.evalModel ?? config.model,
+        // Skip the LLM rubric when synthesis was skipped/failed — heuristic
+        // markdown is not the target of the rubric.
+        skipRubric: !synthesisHappened,
+      };
+      const evalResult = await evaluateSkill(markdown, evalOptions);
+      if (!evalResult.structural.valid) {
+        console.error(
+          `    Eval: structural FAIL (${evalResult.structural.issues.length} issue(s))`
+        );
+        for (const issue of evalResult.structural.issues.slice(0, 5)) {
+          console.error(`      - [${issue.field}] ${issue.message}`);
+        }
+        console.error(
+          "    Hint: review SKILL.md frontmatter (name/description); file written anyway"
+        );
+      } else if (evalResult.rubric?.ok && typeof evalResult.rubric.score === "number") {
+        const score = evalResult.rubric.score;
+        const overall = evalResult.overallScore ?? score;
+        console.error(
+          `    Eval: structural OK | rubric ${score}/100 | overall ${overall}/100`
+        );
+        if (score < 60) {
+          console.error("    Hint: low rubric score — consider re-synthesizing");
+          for (const h of (evalResult.rubric.hints ?? []).slice(0, 3)) {
+            console.error(`      - ${h}`);
+          }
+        }
+      } else if (evalResult.rubric?.skipped) {
+        console.error(`    Eval: structural OK | rubric skipped`);
+      } else if (evalResult.rubric && !evalResult.rubric.ok) {
+        console.error(
+          `    Eval: structural OK | rubric error: ${evalResult.rubric.error ?? "unknown"}`
+        );
+      } else {
+        console.error(`    Eval: structural OK`);
+      }
     }
 
     // Write skill file as <output-dir>/<skill-name>/SKILL.md

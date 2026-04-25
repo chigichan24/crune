@@ -224,6 +224,46 @@ export interface SkillCandidate {
   skillMarkdown: string
   synthesizedMarkdown?: string
   hookJson?: string
+  evaluation?: SkillEvaluation
+}
+
+// === Skill Evaluation (issue #20) ===
+export interface SkillEvaluationStructuralIssue {
+  field: string
+  message: string
+}
+
+export interface SkillEvaluationStructural {
+  valid: boolean
+  issues: SkillEvaluationStructuralIssue[]
+}
+
+export interface SkillEvaluationRubricBreakdown {
+  nameQuality: number
+  descriptionTriggering: number
+  instructionsConcrete: number
+  noPreambleNoise: number
+}
+
+export interface SkillEvaluationRubric {
+  ok: boolean
+  score?: number
+  breakdown?: SkillEvaluationRubricBreakdown
+  hints?: string[]
+  error?: string
+  skipped?: boolean
+}
+
+export interface SkillEvaluationSmokeFiring {
+  skipped: boolean
+  message?: string
+}
+
+export interface SkillEvaluation {
+  structural: SkillEvaluationStructural
+  rubric?: SkillEvaluationRubric
+  smokeFiring?: SkillEvaluationSmokeFiring
+  overallScore?: number
 }
 
 // === Tacit Knowledge ===
