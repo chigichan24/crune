@@ -133,6 +133,13 @@ export function TaskCreateRenderer({ input }: { input: Input }) {
   )
 }
 
+// Allow only characters that are safe inside a CSS class name modifier.
+// Anything else collapses to "unknown" so we never inject extra classes
+// from upstream-controlled status strings.
+function sanitizeStatusModifier(status: string): string {
+  return /^[a-zA-Z0-9_-]+$/.test(status) ? status : 'unknown'
+}
+
 export function TaskUpdateRenderer({ input }: { input: Input }) {
   const taskId = asString(input.taskId)
   const status = asString(input.status)
@@ -142,7 +149,9 @@ export function TaskUpdateRenderer({ input }: { input: Input }) {
       <div className="tool-task-row">
         {taskId && <span className="tool-task-id">#{taskId}</span>}
         {status && (
-          <span className={`tool-task-status tool-task-status--${status}`}>
+          <span
+            className={`tool-task-status tool-task-status--${sanitizeStatusModifier(status)}`}
+          >
             {status}
           </span>
         )}
