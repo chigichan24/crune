@@ -289,14 +289,30 @@ Scoring rubric (skill-creator alignment):
 If the SKILL.md is fundamentally broken (not a SKILL.md), return score 0 with a hint explaining why.`;
 
 export function buildRubricPrompt(markdown: string): string {
+  // SKILL.md content commonly contains triple-backtick code fences in its
+  // body. Wrap the embedded markdown with a longer fence so nested triple
+  // backticks do not terminate the outer block (CommonMark allows the inner
+  // fences as long as their length is shorter than the outer).
+  const fence = pickEnclosingFence(markdown);
   return [
     RUBRIC_PROMPT_HEADER,
     "",
     "## SKILL.md to evaluate",
-    "```",
+    fence,
     markdown,
-    "```",
+    fence,
   ].join("\n");
+}
+
+function pickEnclosingFence(markdown: string): string {
+  // Find the longest run of backticks at line start in the input, then use
+  // a fence that is one backtick longer (minimum 4).
+  let longest = 0;
+  for (const line of markdown.split("\n")) {
+    const m = line.match(/^(`+)/);
+    if (m && m[1].length > longest) longest = m[1].length;
+  }
+  return "`".repeat(Math.max(4, longest + 1));
 }
 
 const RubricResponseSchema = z.object({

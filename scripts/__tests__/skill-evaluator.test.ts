@@ -235,4 +235,25 @@ describe("buildRubricPrompt", () => {
     expect(prompt).toContain("noPreambleNoise");
     expect(prompt).toContain("refactor-tests");
   });
+
+  it("uses an enclosing fence longer than any backtick run inside the markdown", () => {
+    // Skill body containing triple-backtick code blocks must not break the
+    // outer fence — pick a longer fence (>=4 backticks).
+    const skillWithFences = `---
+name: my-skill
+description: A reasonable description with enough detail to pass the minimum length check.
+---
+
+## Example
+
+\`\`\`bash
+echo "hello"
+\`\`\`
+`;
+    const prompt = buildRubricPrompt(skillWithFences);
+    // The outer fence must be at least 4 backticks long to wrap the inner ```.
+    expect(prompt).toMatch(/\n````+\n[\s\S]*?\n````+\n?/);
+    // The inner ``` must still be present verbatim.
+    expect(prompt).toContain("```bash");
+  });
 });
