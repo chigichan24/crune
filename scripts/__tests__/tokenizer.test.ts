@@ -256,13 +256,16 @@ describe("tokenize", () => {
   // filler words that the old hand-rolled list let through.
   it("drops newly added NLTK-parity stop words", () => {
     const tokens = tokenize(
-      "actually really back even ever say seem tell yeah right thing the test"
+      "really back even ever say seem tell yeah right thing the test"
     );
     // Sanity: substantive vocab survives.
     expect(tokens).toContain("test");
-    // The new entries must be filtered.
+    // The new entries must be filtered. Note: `actually` is intentionally NOT
+    // listed — it is not a member of STOP_WORDS. The literal surface form is
+    // absent from the output only because Porter stems it to `actual`.
+    // Asserting `not.toContain("actually")` would therefore pass even without
+    // the new stop-word list, hiding regressions.
     for (const w of [
-      "actually",
       "really",
       "back",
       "even",
