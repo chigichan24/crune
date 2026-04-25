@@ -232,7 +232,14 @@ export function validateStructure(markdown: string): StructuralResult {
   const fm = result.data;
 
   // Body sanity: must contain something past the closing '---'.
-  const closeMatch = markdown.match(/^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/);
+  // Tolerate optional UTF-8 BOM and files that end immediately after the
+  // closing fence (no trailing newline) — the previous regex required a
+  // newline after the closing fence and falsely reported "empty body" when
+  // a real body was present without a trailing blank line.
+  const stripped = markdown.replace(/^\uFEFF/, "");
+  const closeMatch = stripped.match(
+    /^---\s*\n[\s\S]*?\n---\s*(?:\n([\s\S]*))?$/
+  );
   const body = closeMatch?.[1] ?? "";
   if (body.trim().length === 0) {
     issues.push({

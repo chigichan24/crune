@@ -145,6 +145,16 @@ description: A reasonable description with enough detail to pass minimum length 
     expect(result.issues.some((i) => i.field === "body")).toBe(true);
   });
 
+  it("accepts body when file ends without trailing newline after closing fence", () => {
+    // No trailing newline after the body and no blank line between fence
+    // and body — previously misreported as "empty body".
+    const md =
+      "---\nname: my-skill\ndescription: A reasonable description with enough detail to pass minimum length check.\n---\nbody content";
+    const result = validateStructure(md);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
   it("accepts indented list form for allowed-tools", () => {
     const md = `---
 name: my-skill
