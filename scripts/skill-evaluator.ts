@@ -388,17 +388,26 @@ export function scoreWithRubric(
 
     const child = spawn("claude", args, { stdio: ["pipe", "pipe", "pipe"] });
 
-    let notFound = false;
+    let spawnFailed = false;
 
     child.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "ENOENT") {
-        notFound = true;
-        resolve({
-          ok: false,
-          error: "claude CLI not found. Install Claude Code first.",
-        });
-      }
+      // Capture any spawn-time failure (ENOENT, EACCES, EPERM, ...). The
+      // 'close' event still fires after 'error' with code = null, so we set
+      // a flag and let the close handler short-circuit with a meaningful
+      // message instead of "claude exited with code null".
+      if (spawnFailed) return;
+      spawnFailed = true;
+      const message =
+        err.code === "ENOENT"
+          ? "claude CLI not found. Install Claude Code first."
+          : `failed to spawn claude: ${err.message}`;
+      resolve({ ok: false, error: message });
     });
+
+    // Without an 'error' listener on stdin, a spawn failure causes Node to
+    // crash the host process when we call stdin.write below. Swallow it —
+    // the 'error' handler on the child already produced a structured result.
+    child.stdin.on("error", () => {});
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
@@ -415,7 +424,7 @@ export function scoreWithRubric(
 
     child.on("close", (code) => {
       clearTimeout(timeout);
-      if (notFound) return;
+      if (spawnFailed) return;
       const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
       const stderr = Buffer.concat(stderrChunks).toString("utf-8");
       if (code !== 0) {
@@ -464,8 +473,14 @@ export function scoreWithRubric(
       });
     });
 
-    child.stdin.write(prompt);
-    child.stdin.end();
+    // Best-effort write. If spawn failed, stdin may already be destroyed —
+    // the registered 'error' listeners catch the resulting EPIPE/ECONNRESET.
+    try {
+      child.stdin.write(prompt);
+      child.stdin.end();
+    } catch {
+      // Already surfaced via the child 'error' handler above.
+    }
   });
 }
 
