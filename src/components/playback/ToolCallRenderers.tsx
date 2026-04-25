@@ -362,10 +362,19 @@ export function EnterPlanModeRenderer({ input }: { input: Input }) {
 
 // ─── Monitor / ScheduleWakeup ───────────────────────────────────────────────
 
+function asScalarString(value: unknown): string | null {
+  if (value == null) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return null
+}
+
 export function MonitorRenderer({ input }: { input: Input }) {
   // Monitor typically takes a command-like spec; fall back to scalar args.
-  const command = asString(input.command ?? input.spec)
-  const description = asString(input.description ?? input.until)
+  // Avoid stringifying nested objects to "[object Object]"; let the generic
+  // renderer handle structured payloads instead.
+  const command = asScalarString(input.command ?? input.spec)
+  const description = asScalarString(input.description ?? input.until)
   if (!command && !description) {
     return <GenericInputRenderer input={input} />
   }
