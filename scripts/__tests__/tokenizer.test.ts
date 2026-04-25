@@ -134,8 +134,43 @@ describe("tokenize", () => {
     expect(tokens).toContain("variable");
   });
 
-  it("handles Japanese text without crashing", () => {
-    expect(() => tokenize("セッションの分析を実行する")).not.toThrow();
+  it("segments Japanese text into meaningful word-ish units (Issue #29)", () => {
+    // Before this fix, the entire Japanese run collapsed into one token
+    // because `\s+` cannot split text without whitespace. With
+    // Intl.Segmenter, common kanji compounds like 分析 / 実行 surface as
+    // individual tokens.
+    const tokens = tokenize("セッションの分析を実行する");
+    expect(tokens).toContain("セッション");
+    expect(tokens).toContain("分析");
+    expect(tokens).toContain("実行");
+    // The whole sentence should NOT survive as one giant token.
+    expect(tokens).not.toContain("セッションの分析を実行する");
+  });
+
+  it("segments mixed Japanese / English text on both sides", () => {
+    const tokens = tokenize("TypeScriptの型エラーを修正");
+    // English side: lowercased CamelCase split
+    expect(tokens).toContain("type");
+    expect(tokens).toContain("script");
+    // Japanese side: 2-char kanji compounds preserved
+    expect(tokens).toContain("エラー");
+    expect(tokens).toContain("修正");
+  });
+
+  it("does not collapse a long Japanese paragraph into a single oversized token (Issue #29 regression)", () => {
+    // Reproduces the exact bug from #29: the issue's example string used
+    // to land in the vocabulary as one token. After the fix every token
+    // should be word-sized, not paragraph-sized.
+    const text =
+      "セッションの分析を実行する。次にテストを書く。" +
+      "実装が完了したらリファクタリングを行い、最後にコードレビューを依頼する。";
+    const tokens = tokenize(text);
+    expect(tokens.length).toBeGreaterThan(3);
+    for (const t of tokens) {
+      expect(t.length).toBeLessThanOrEqual(20);
+    }
+    // The whole paragraph must not survive as a single token.
+    expect(tokens).not.toContain(text);
   });
 
   it("filters out noise tokens", () => {
