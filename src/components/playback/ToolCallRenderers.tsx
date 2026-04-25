@@ -335,12 +335,16 @@ export function ExitPlanModeRenderer({ input }: { input: Input }) {
         <div className="tool-plan-allowed">
           <span className="tool-plan-allowed-label">許可 ({allowed.length})</span>
           <ul className="tool-plan-allowed-list">
-            {allowed.slice(0, 5).map((p, i) => (
-              <li key={i}>
-                {p.tool && <span className="tool-task-tag">{p.tool}</span>}{' '}
-                {p.prompt && <span>{truncate(p.prompt, 120)}</span>}
-              </li>
-            ))}
+            {allowed.slice(0, 5).map((p, i) => {
+              const tool = typeof p.tool === 'string' ? p.tool : null
+              const prompt = typeof p.prompt === 'string' ? p.prompt : null
+              return (
+                <li key={i}>
+                  {tool && <span className="tool-task-tag">{tool}</span>}{' '}
+                  {prompt && <span>{truncate(prompt, 120)}</span>}
+                </li>
+              )
+            })}
             {allowed.length > 5 && <li>…他 {allowed.length - 5} 件</li>}
           </ul>
         </div>
