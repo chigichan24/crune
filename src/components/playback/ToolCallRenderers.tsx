@@ -174,11 +174,14 @@ export function AskUserQuestionRenderer({ input }: { input: Input }) {
 
   return (
     <div className="tool-input">
-      {questions.map((q, i) => (
+      {questions.map((q, i) => {
+        const header = typeof q.header === 'string' ? q.header : null
+        const question = typeof q.question === 'string' ? q.question : null
+        return (
         <div key={i} className="tool-question">
-          {q.header && <div className="tool-question-header">{q.header}</div>}
-          {q.question && (
-            <div className="tool-question-text">{truncate(q.question, 280)}</div>
+          {header && <div className="tool-question-header">{header}</div>}
+          {question && (
+            <div className="tool-question-text">{truncate(question, 280)}</div>
           )}
           {Array.isArray(q.options) && q.options.length > 0 && (() => {
             const safeOptions = q.options.filter(
@@ -215,7 +218,8 @@ export function AskUserQuestionRenderer({ input }: { input: Input }) {
             )
           })()}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
