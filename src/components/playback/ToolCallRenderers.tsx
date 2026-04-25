@@ -260,24 +260,29 @@ export function WebFetchRenderer({ input }: { input: Input }) {
   )
 }
 
+function toStringDomains(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((d): d is string => typeof d === 'string' && d.length > 0)
+}
+
 export function WebSearchRenderer({ input }: { input: Input }) {
   const query = asString(input.query)
-  const allowed = Array.isArray(input.allowed_domains) ? input.allowed_domains : []
-  const blocked = Array.isArray(input.blocked_domains) ? input.blocked_domains : []
+  const allowed = toStringDomains(input.allowed_domains)
+  const blocked = toStringDomains(input.blocked_domains)
   return (
     <div className="tool-input">
       {query && <div className="tool-query">{truncate(query, 240)}</div>}
       {allowed.length > 0 && (
         <div className="tool-web-domains">
           <span className="tool-web-domain-label">allow:</span>{' '}
-          {allowed.slice(0, 5).map(String).join(', ')}
+          {allowed.slice(0, 5).join(', ')}
           {allowed.length > 5 && ` …+${allowed.length - 5}`}
         </div>
       )}
       {blocked.length > 0 && (
         <div className="tool-web-domains">
           <span className="tool-web-domain-label">block:</span>{' '}
-          {blocked.slice(0, 5).map(String).join(', ')}
+          {blocked.slice(0, 5).join(', ')}
           {blocked.length > 5 && ` …+${blocked.length - 5}`}
         </div>
       )}
