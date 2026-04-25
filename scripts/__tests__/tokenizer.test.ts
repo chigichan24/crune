@@ -91,6 +91,30 @@ describe("isNoiseToken", () => {
   it("returns false for short hex-like strings (<6 chars)", () => {
     expect(isNoiseToken("abc")).toBe(false);
   });
+
+  // Issue #30: HEX_PATTERN now requires at least one digit. Without that
+  // guard the regex matched plain English words built only from a-f.
+  it("returns false for English words built from a-f without digits", () => {
+    expect(isNoiseToken("decade")).toBe(false);
+    expect(isNoiseToken("facade")).toBe(false);
+    expect(isNoiseToken("effect")).toBe(false);
+    expect(isNoiseToken("defaced")).toBe(false);
+  });
+
+  it("returns false for 6+ char hex-only words with no digits (Issue #30)", () => {
+    // `cafebabe` is a famous magic number, but as a standalone token without
+    // a digit there is no way to distinguish it from a regular English word.
+    // We err on the side of keeping it; sessions almost never refer to it
+    // anyway. The previous `^[0-9a-f]{6,}$` would have flagged this; the
+    // updated pattern does not.
+    expect(isNoiseToken("cafebabe")).toBe(false);
+  });
+
+  it("returns true for hex strings that contain a digit (Issue #30)", () => {
+    expect(isNoiseToken("abc123def")).toBe(true);
+    expect(isNoiseToken("0xabc123")).toBe(false); // contains 'x', not pure hex
+    expect(isNoiseToken("deadbeef0")).toBe(true);
+  });
 });
 
 describe("tokenize", () => {
@@ -128,10 +152,12 @@ describe("tokenize", () => {
 
   it("handles kebab-case and snake_case", () => {
     const tokens = tokenize("my-component some_variable");
-    expect(tokens).toContain("component");
+    // After Issue #30 the non-CJK pipeline stems the surviving tokens with
+    // Porter, so `component`/`variable` collapse to their stems.
+    expect(tokens).toContain("compon");
+    expect(tokens).toContain("variabl");
     // "some" is a stop word, so it's excluded
     expect(tokens).not.toContain("some");
-    expect(tokens).toContain("variable");
   });
 
   it("segments Japanese text into meaningful word-ish units (Issue #29)", () => {
@@ -188,6 +214,63 @@ describe("tokenize", () => {
     expect(tokens).not.toContain("ok");
     expect(tokens).not.toContain("to");
     expect(tokens).not.toContain("go");
+  });
+
+  // Issue #30: stemming collapses inflected forms.
+  it("stems inflected forms to a shared stem", () => {
+    const tokens = tokenize("running runs ran");
+    // `running` and `runs` both reduce to `run` under Porter step1a/1b.
+    // `ran` is irregular and Porter does not handle it; we accept that
+    // limitation (Porter is rule-based, not lexicon-based).
+    expect(tokens).toContain("run");
+    expect(tokens.filter((t) => t === "run").length).toBeGreaterThanOrEqual(2);
+    // The unstemmed surface forms must NOT be in the output.
+    expect(tokens).not.toContain("running");
+    expect(tokens).not.toContain("runs");
+  });
+
+  it("collapses other inflected pairs (test/tested/testing, fix/fixed/fixing)", () => {
+    const tested = tokenize("tested testing");
+    expect(tested.every((t) => t === "test")).toBe(true);
+    const fixed = tokenize("fixed fixing");
+    expect(fixed.every((t) => t === "fix")).toBe(true);
+  });
+
+  // Issue #30: words built only from a-f used to be filtered as hex noise.
+  it("keeps English words built from a-f as real tokens", () => {
+    const tokens = tokenize("decade facade effect");
+    // After Porter stemming `decade` -> `decad`, `facade` -> `facad`,
+    // `effect` -> `effect`. The point of this test is that NONE of them
+    // disappear into the noise filter.
+    expect(tokens).toContain("decad");
+    expect(tokens).toContain("facad");
+    expect(tokens).toContain("effect");
+  });
+
+  // Issue #30: the expanded NLTK-parity stop-word list drops several common
+  // filler words that the old hand-rolled list let through.
+  it("drops newly added NLTK-parity stop words", () => {
+    const tokens = tokenize(
+      "actually really back even ever say seem tell yeah right thing the test"
+    );
+    // Sanity: substantive vocab survives.
+    expect(tokens).toContain("test");
+    // The new entries must be filtered.
+    for (const w of [
+      "actually",
+      "really",
+      "back",
+      "even",
+      "ever",
+      "say",
+      "seem",
+      "tell",
+      "yeah",
+      "right",
+      "thing",
+    ]) {
+      expect(tokens).not.toContain(w);
+    }
   });
 });
 

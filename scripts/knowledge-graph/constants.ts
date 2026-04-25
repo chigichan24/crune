@@ -5,24 +5,36 @@
 // ─── Stop words ─────────────────────────────────────────────────────────────
 
 export const STOP_WORDS = new Set([
-  // English
-  "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-  "have", "has", "had", "do", "does", "did", "will", "would", "could",
-  "should", "may", "might", "shall", "can", "need", "must", "ought",
-  "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
-  "us", "them", "my", "your", "his", "its", "our", "their", "mine",
-  "yours", "hers", "ours", "theirs", "this", "that", "these", "those",
-  "what", "which", "who", "whom", "whose", "when", "where", "why", "how",
-  "all", "each", "every", "both", "few", "more", "most", "other", "some",
-  "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too",
-  "very", "just", "because", "as", "until", "while", "of", "at", "by",
-  "for", "with", "about", "against", "between", "through", "during",
-  "before", "after", "above", "below", "to", "from", "up", "down", "in",
-  "out", "on", "off", "over", "under", "again", "further", "then", "once",
-  "here", "there", "and", "but", "or", "if", "else", "also", "like",
-  "please", "thanks", "thank", "yes", "no", "ok", "okay", "sure", "let",
-  "make", "use", "using", "used", "want", "see", "look", "try", "get",
-  "got", "think", "know", "now", "new", "way", "well", "back", "still",
+  // English — roughly NLTK English stop word parity (~180 entries) plus a
+  // small project-specific filler set ("file", "code", "change") that NLTK
+  // does not include but which carry no signal in this corpus.
+  // Issue #30: expanded from ~100 entries to NLTK parity to keep IDF weights
+  // tight on substantive vocabulary.
+  "a", "about", "above", "after", "again", "against", "ain", "all", "also",
+  "am", "an", "and", "any", "are", "aren", "as", "at", "back", "be",
+  "because", "been", "before", "being", "below", "between", "both", "but",
+  "by", "can", "could", "couldn", "did", "didn", "do", "does", "doesn",
+  "doing", "don", "down", "during", "each", "else", "even", "ever", "every",
+  "few", "for", "from", "further", "get", "give", "go", "going", "got",
+  "had", "hadn", "has", "hasn", "have", "haven", "having", "he", "her",
+  "here", "hers", "herself", "him", "himself", "his", "how", "i", "if",
+  "in", "into", "is", "isn", "it", "its", "itself", "just", "know", "let",
+  "like", "look", "ma", "make", "many", "may", "me", "might", "mightn",
+  "mine", "more", "most", "much", "must", "mustn", "my", "myself", "need",
+  "needn", "new", "no", "nor", "not", "now", "of", "off", "ok", "okay",
+  "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves",
+  "out", "over", "own", "please", "really", "right", "s", "same", "say",
+  "see", "seem", "seen", "shall", "shan", "she", "should", "shouldn", "so",
+  "some", "still", "such", "sure", "t", "tell", "than", "thank", "thanks",
+  "that", "the", "their", "theirs", "them", "themselves", "then", "there",
+  "these", "they", "thing", "think", "this", "those", "through", "to",
+  "too", "try", "under", "until", "up", "us", "use", "used", "using",
+  "very", "want", "was", "wasn", "way", "we", "well", "were", "weren",
+  "what", "when", "where", "which", "while", "who", "whom", "whose", "why",
+  "will", "with", "won", "would", "wouldn", "y", "yeah", "yes", "you",
+  "your", "yours", "yourself", "yourselves",
+  // Project-specific filler tokens (not part of NLTK). They appear in nearly
+  // every Claude Code session and dilute the TF-IDF signal.
   "file", "code", "change", "changes", "add", "update", "fix", "set",
   // Japanese particles and common words
   "の", "に", "は", "を", "が", "で", "と", "も", "か", "な", "だ",
@@ -42,7 +54,11 @@ export const STOP_WORDS = new Set([
 // ─── Noise token patterns ───────────────────────────────────────────────────
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const HEX_PATTERN = /^[0-9a-f]{6,}$/i;
+// Hex literal must contain at least one digit. Without the lookahead this
+// regex would also match plain English words built only from a-f (e.g.
+// "decade", "facade", "effect", "defaced") and incorrectly drop them as
+// noise. See https://github.com/chigichan24/crune/issues/30.
+export const HEX_PATTERN = /^(?=[0-9a-f]*[0-9])[0-9a-f]{6,}$/i;
 export const NUM_PATTERN = /^\d+$/;
 
 // ─── Structural features ────────────────────────────────────────────────────
