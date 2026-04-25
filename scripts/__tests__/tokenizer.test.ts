@@ -155,3 +155,28 @@ describe("tokenize", () => {
     expect(tokens).not.toContain("go");
   });
 });
+
+describe("tokenize - large input regression (Issue #18)", () => {
+  // Real Claude Code sessions can contain `ls -R` / `find` / `tree` dumps
+  // with hundreds of thousands of path segments. `tokens.push(...arr)` on
+  // such an array hits V8's argument count limit and throws
+  // `RangeError: Maximum call stack size exceeded` even though it is not
+  // recursion. See https://github.com/chigichan24/crune/issues/18.
+  it("extractPathTokens does not throw on a huge corpus of file paths", () => {
+    const pathSegments = Array.from(
+      { length: 100_000 },
+      (_, i) => `/dir${i}/file${i}.ts`
+    );
+    const text = pathSegments.join(" ");
+    expect(() => extractPathTokens(text)).not.toThrow();
+  });
+
+  it("tokenize does not throw on a huge corpus of file paths", () => {
+    const pathSegments = Array.from(
+      { length: 100_000 },
+      (_, i) => `/dir${i}/file${i}.ts`
+    );
+    const text = pathSegments.join(" ");
+    expect(() => tokenize(text)).not.toThrow();
+  });
+});
