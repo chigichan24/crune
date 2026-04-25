@@ -15,10 +15,16 @@ import {
 
 type Input = Record<string, unknown>
 
+/**
+ * Coerce a value to a string for display, but only for scalars. Objects and
+ * arrays return null so callers can fall back to a structured renderer instead
+ * of rendering "[object Object]" or "1,2,3" garbage.
+ */
 function asString(value: unknown): string | null {
   if (value == null) return null
   if (typeof value === 'string') return value
-  return String(value)
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return null
 }
 
 // ─── Existing tools ─────────────────────────────────────────────────────────
@@ -370,19 +376,12 @@ export function EnterPlanModeRenderer({ input }: { input: Input }) {
 
 // ─── Monitor / ScheduleWakeup ───────────────────────────────────────────────
 
-function asScalarString(value: unknown): string | null {
-  if (value == null) return null
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return null
-}
-
 export function MonitorRenderer({ input }: { input: Input }) {
   // Monitor typically takes a command-like spec; fall back to scalar args.
   // Avoid stringifying nested objects to "[object Object]"; let the generic
   // renderer handle structured payloads instead.
-  const command = asScalarString(input.command ?? input.spec)
-  const description = asScalarString(input.description ?? input.until)
+  const command = asString(input.command ?? input.spec)
+  const description = asString(input.description ?? input.until)
   if (!command && !description) {
     return <GenericInputRenderer input={input} />
   }
