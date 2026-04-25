@@ -4,6 +4,8 @@ import {
   extractFrontmatter,
   extractFirstJsonObject,
   buildRubricPrompt,
+  evaluateSkill,
+  smokeFireTest,
 } from "../skill-evaluator.js";
 
 const goodSkill = `---
@@ -255,5 +257,34 @@ echo "hello"
     expect(prompt).toMatch(/\n````+\n[\s\S]*?\n````+\n?/);
     // The inner ``` must still be present verbatim.
     expect(prompt).toContain("```bash");
+  });
+});
+
+describe("smokeFireTest", () => {
+  it("returns skipped: true with a follow-up message (stub)", async () => {
+    const result = await smokeFireTest(goodSkill);
+    expect(result.skipped).toBe(true);
+    expect(typeof result.message).toBe("string");
+  });
+});
+
+describe("evaluateSkill (orchestrator)", () => {
+  it("scores 0 when structural validation fails and does not call the LLM", async () => {
+    const broken = `# no frontmatter at all`;
+    const result = await evaluateSkill(broken, { skipRubric: true });
+    expect(result.structural.valid).toBe(false);
+    expect(result.overallScore).toBe(0);
+    // smoke firing is always present (stub)
+    expect(result.smokeFiring.skipped).toBe(true);
+    // rubric is marked skipped, never invoked
+    expect(result.rubric?.skipped).toBe(true);
+    expect(result.rubric?.ok).toBe(false);
+  });
+
+  it("scores 50 when structural passes but rubric is skipped", async () => {
+    const result = await evaluateSkill(goodSkill, { skipRubric: true });
+    expect(result.structural.valid).toBe(true);
+    expect(result.overallScore).toBe(50);
+    expect(result.rubric?.skipped).toBe(true);
   });
 });
