@@ -22,7 +22,8 @@ export function extractPathTokens(text: string): string[] {
       const name = seg.replace(/\.[^.]+$/, ""); // remove extension
       if (name.length > 2) {
         // Avoid `tokens.push(...arr)` — large arrays exceed V8's argument
-        // count limit and throw RangeError. See Issue #18.
+        // count limit and throw RangeError.
+        // See https://github.com/chigichan24/crune/issues/18
         for (const t of splitCamelCase(name)) tokens.push(t);
       }
     }
@@ -44,7 +45,8 @@ export function tokenize(text: string): string[] {
 
   // Extract file path tokens first.
   // Avoid `tokens.push(...arr)` — large arrays exceed V8's argument
-  // count limit and throw RangeError. See Issue #18.
+  // count limit and throw RangeError.
+  // See https://github.com/chigichan24/crune/issues/18
   for (const t of extractPathTokens(text)) tokens.push(t);
 
   // Split on whitespace, punctuation, CJK boundaries
