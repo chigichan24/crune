@@ -180,27 +180,40 @@ export function AskUserQuestionRenderer({ input }: { input: Input }) {
           {q.question && (
             <div className="tool-question-text">{truncate(q.question, 280)}</div>
           )}
-          {Array.isArray(q.options) && q.options.length > 0 && (
-            <ul className="tool-question-options">
-              {q.options.slice(0, 6).map((opt, j) => (
-                <li key={j} className="tool-question-option">
-                  <span className="tool-question-option-label">
-                    {opt.label ?? `選択肢 ${j + 1}`}
-                  </span>
-                  {opt.description && (
-                    <span className="tool-question-option-desc">
-                      {' — '}{truncate(opt.description, 160)}
-                    </span>
-                  )}
-                </li>
-              ))}
-              {q.options.length > 6 && (
-                <li className="tool-question-option tool-question-option--more">
-                  …他 {q.options.length - 6} 件
-                </li>
-              )}
-            </ul>
-          )}
+          {Array.isArray(q.options) && q.options.length > 0 && (() => {
+            const safeOptions = q.options.filter(
+              (opt): opt is { label?: string; description?: string } =>
+                typeof opt === 'object' && opt !== null,
+            )
+            if (safeOptions.length === 0) return null
+            return (
+              <ul className="tool-question-options">
+                {safeOptions.slice(0, 6).map((opt, j) => {
+                  const label =
+                    typeof opt.label === 'string' && opt.label.length > 0
+                      ? opt.label
+                      : `選択肢 ${j + 1}`
+                  const description =
+                    typeof opt.description === 'string' ? opt.description : null
+                  return (
+                    <li key={j} className="tool-question-option">
+                      <span className="tool-question-option-label">{label}</span>
+                      {description && (
+                        <span className="tool-question-option-desc">
+                          {' — '}{truncate(description, 160)}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+                {safeOptions.length > 6 && (
+                  <li className="tool-question-option tool-question-option--more">
+                    …他 {safeOptions.length - 6} 件
+                  </li>
+                )}
+              </ul>
+            )
+          })()}
         </div>
       ))}
     </div>
