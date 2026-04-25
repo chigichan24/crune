@@ -55,6 +55,41 @@
   color: #78716c;
 }
 
+.tool-name-badge--task {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.tool-name-badge--question {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.tool-name-badge--skill {
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.tool-name-badge--web {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.tool-name-badge--plan {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.tool-name-badge--notebook {
+  background: #fdf2f8;
+  color: #9d174d;
+}
+
+.tool-name-badge--mcp {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
 /* Input section */
 .tool-input {
   padding: 8px 10px;
@@ -186,4 +221,263 @@
 
 .tool-result--error .tool-result-content {
   color: var(--danger);
+}
+
+/* ─── Task tracking (TaskCreate / TaskUpdate) ──────────────────────────── */
+.tool-task-subject {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.tool-task-activeform {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.tool-task-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tool-task-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 3px;
+}
+
+.tool-task-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tool-task-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.tool-task-status--pending {
+  background: #f5f5f4;
+  color: #78716c;
+}
+
+.tool-task-status--in_progress {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.tool-task-status--completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tool-task-status--failed,
+.tool-task-status--cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* ─── AskUserQuestion ──────────────────────────────────────────────────── */
+.tool-question {
+  margin-bottom: 8px;
+}
+
+.tool-question:last-child {
+  margin-bottom: 0;
+}
+
+.tool-question-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.tool-question-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.tool-question-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tool-question-option {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 2px 0;
+}
+
+.tool-question-option-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tool-question-option-desc {
+  color: var(--text-secondary);
+}
+
+.tool-question-option--more {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* ─── Skill ────────────────────────────────────────────────────────────── */
+.tool-skill-name {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+/* ─── Web (WebFetch / WebSearch) ───────────────────────────────────────── */
+.tool-url {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+
+.tool-query {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.tool-web-domains {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  margin-top: 2px;
+}
+
+.tool-web-domain-label {
+  color: var(--text-tertiary);
+}
+
+/* ─── Notebook ─────────────────────────────────────────────────────────── */
+.tool-notebook-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #fdf2f8;
+  color: #9d174d;
+}
+
+.tool-notebook-tag--type {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+/* ─── Plan mode ────────────────────────────────────────────────────────── */
+.tool-plan-block {
+  max-height: 200px;
+}
+
+.tool-plan-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.tool-plan-allowed {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tool-plan-allowed-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+.tool-plan-allowed-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ─── MCP ──────────────────────────────────────────────────────────────── */
+.tool-mcp-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.tool-mcp-server {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tool-mcp-sep {
+  color: var(--text-tertiary);
+}
+
+.tool-mcp-method {
+  color: var(--accent);
+}
+
+/* ─── Generic key/value list (fallback) ─────────────────────────────────── */
+.tool-kv-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tool-kv {
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.tool-kv-key {
+  font-family: monospace;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.tool-kv-value {
+  color: var(--text-primary);
+  font-family: monospace;
+  word-break: break-word;
+}
+
+.tool-subtitle--muted {
+  color: var(--text-tertiary);
+  font-style: italic;
 }
