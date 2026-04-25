@@ -229,11 +229,16 @@ describe("tokenize", () => {
     expect(tokens).not.toContain("runs");
   });
 
-  it("collapses other inflected pairs (test/tested/testing, fix/fixed/fixing)", () => {
+  it("collapses other inflected pairs (test/tested/testing, walk/walked/walking)", () => {
     const tested = tokenize("tested testing");
+    expect(tested.length).toBe(2);
     expect(tested.every((t) => t === "test")).toBe(true);
-    const fixed = tokenize("fixed fixing");
-    expect(fixed.every((t) => t === "fix")).toBe(true);
+    // Use `walk` rather than `fix` — `fix` is a project-specific stop word
+    // (constants.ts), so `tokenize("fixed fixing")` would return [] and the
+    // `.every()` assertion would pass vacuously, hiding any real regression.
+    const walked = tokenize("walked walking");
+    expect(walked.length).toBe(2);
+    expect(walked.every((t) => t === "walk")).toBe(true);
   });
 
   // Issue #30: words built only from a-f used to be filtered as hex noise.
