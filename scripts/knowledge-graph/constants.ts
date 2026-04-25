@@ -35,8 +35,12 @@ export const STOP_WORDS = new Set([
   // `Intl.Segmenter('ja')` emits as standalone segments. These carry no
   // standalone signal for TF-IDF / clustering. Content-bearing stems such
   // as 行う / 書く / 修正 are intentionally NOT listed here.
+  //
+  // Note: `ている` is intentionally NOT in this list because the Segmenter
+  // does not emit it as one segment — it is split as て + いる. The
+  // standalone fragment we actually need to filter is `いる`.
   // See https://github.com/chigichan24/crune/issues/29
-  "ている", "てい", "しない", "次に", "に従って",
+  "いる", "てい", "しない", "したら", "次に", "に従って",
 ]);
 
 // ─── Noise token patterns ───────────────────────────────────────────────────
