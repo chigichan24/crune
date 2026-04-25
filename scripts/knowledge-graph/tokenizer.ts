@@ -104,16 +104,19 @@ export function tokenize(text: string): string[] {
       // the case where a Japanese paragraph collapses into a single token.
       // See https://github.com/chigichan24/crune/issues/29
       if (CJK_CHAR_RE.test(part)) {
+        // Use `String.prototype.matchAll` rather than mutating the
+        // module-scoped `CJK_RUN_RE.lastIndex`. `matchAll` returns a
+        // fresh iterator each call, so the cursor is local to this
+        // invocation and cannot be corrupted by re-entry.
         let cursor = 0;
-        CJK_RUN_RE.lastIndex = 0;
-        let m: RegExpExecArray | null;
-        while ((m = CJK_RUN_RE.exec(part)) !== null) {
-          if (m.index > cursor) {
-            const nonCjk = part.slice(cursor, m.index);
+        for (const m of part.matchAll(CJK_RUN_RE)) {
+          const idx = m.index ?? 0;
+          if (idx > cursor) {
+            const nonCjk = part.slice(cursor, idx);
             for (const sub of splitCamelCase(nonCjk)) pushClean(sub, tokens);
           }
           for (const seg of segmentJapanese(m[0])) pushClean(seg, tokens);
-          cursor = m.index + m[0].length;
+          cursor = idx + m[0].length;
         }
         if (cursor < part.length) {
           const tail = part.slice(cursor);
