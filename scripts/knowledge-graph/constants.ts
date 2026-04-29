@@ -40,7 +40,7 @@ export const STOP_WORDS = new Set([
   // does not emit it as one segment — it is split as て + いる. The
   // standalone fragment we actually need to filter is `いる`.
   // See https://github.com/chigichan24/crune/issues/29
-  "いる", "てい", "しない", "したら", "次に", "に従って",
+  "てい", "しない", "したら", "次に", "に従って",
 ]);
 
 // ─── Noise token patterns ───────────────────────────────────────────────────
