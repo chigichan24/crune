@@ -28,7 +28,7 @@ function getJaSegmenter(): Intl.Segmenter | null {
  * Falls back to returning the original run as a single token when
  * `Intl.Segmenter` is unavailable.
  */
-export function segmentJapanese(run: string): string[] {
+function segmentJapanese(run: string): string[] {
   const seg = getJaSegmenter();
   if (!seg) return [run];
   const out: string[] = [];
