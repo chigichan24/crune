@@ -7,9 +7,10 @@ import { STOP_WORDS, UUID_PATTERN, HEX_PATTERN, NUM_PATTERN } from "./constants.
 // CJK character ranges:
 //   U+3040–U+309F  Hiragana
 //   U+30A0–U+30FF  Katakana
+//   U+3005, U+3007  Japanese ideographic iteration mark / ideographic number zero
 //   U+4E00–U+9FFF  CJK Unified Ideographs
-const CJK_CHAR_RE = /[぀-ゟ゠-ヿ一-鿿]/;
-const CJK_RUN_RE = /[぀-ゟ゠-ヿ一-鿿]+/g;
+const CJK_CHAR_RE = /[々〇぀-ゟ゠-ヿ一-鿿]/;
+const CJK_RUN_RE = /[々〇぀-ゟ゠-ヿ一-鿿]+/g;
 
 // Lazily construct the segmenter once. `Intl.Segmenter` is built into Node 22+
 // (the project's CI target) and is CLDR-backed; no extra dependency is needed.
