@@ -146,9 +146,10 @@ export function tokenize(text: string): string[] {
  *    bunseki / jissou / shusei are 2-character kanji words and must survive).
  *
  * Stemming rule (Issue #30):
- *  - Apply Porter stemming AFTER CamelCase split, BEFORE stop-word filtering.
- *    This lets `running`/`runs` collapse into `run` and lets `using` reach
- *    the stop-word check as `use` (which is itself a stop word).
+ *  - Apply stop-word filtering on the cleaned surface form first, then apply
+ *    Porter stemming, then re-check stop words on the stemmed form.
+ *    This drops natural surface forms such as `using` before stemming while
+ *    still letting inflections like `running`/`runs` collapse into `run`.
  *  - Skip stemming for tokens containing CJK characters \u2014 those came from
  *    `Intl.Segmenter` and Porter would corrupt them.
  *  - Skip stemming for tokens containing digits (e.g. `abc123`, `v2`) since
