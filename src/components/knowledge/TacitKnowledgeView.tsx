@@ -1,8 +1,53 @@
 import { useState, useCallback } from 'react'
-import type { KnowledgeGraphMetrics, TopicNode, TopicEdge, KnowledgeCommunity, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
+import type { KnowledgeGraphMetrics, TopicNode, TopicEdge, KnowledgeCommunity, TacitKnowledge, SkillCandidate, EnrichedToolSequence, SkillEvaluation } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
 import './TacitKnowledgeView.css'
+
+/** Map an overall score (0-100) to a pass/borderline/fail status tone. */
+function tkEvalStatus(evaluation: SkillEvaluation): 'pass' | 'borderline' | 'fail' {
+  if (!evaluation.structural.valid) return 'fail'
+  const score = evaluation.overallScore ?? 0
+  if (score >= 70) return 'pass'
+  if (score >= 50) return 'borderline'
+  return 'fail'
+}
+
+/** Compact評価バッジ: 構造の合否、総合スコア、rubric内訳、改善ヒントを表示する。 */
+function SkillEvaluationBadge({ evaluation }: { evaluation: SkillEvaluation }) {
+  const status = tkEvalStatus(evaluation)
+  const score = evaluation.overallScore ?? 0
+  const rubric = evaluation.rubric
+  const hints = rubric?.hints ?? []
+
+  return (
+    <div className={`tk-eval tk-eval--${status}`}>
+      <div className="tk-eval-header">
+        <span className={`tk-eval-chip tk-eval-chip--${evaluation.structural.valid ? 'ok' : 'ng'}`}>
+          構造 {evaluation.structural.valid ? 'OK' : 'NG'}
+        </span>
+        <span className="tk-eval-score">スコア {score}/100</span>
+      </div>
+
+      {rubric?.ok && rubric.breakdown && (
+        <div className="tk-eval-breakdown">
+          <span>名前 {rubric.breakdown.nameQuality}/25</span>
+          <span>説明 {rubric.breakdown.descriptionTriggering}/25</span>
+          <span>手順 {rubric.breakdown.instructionsConcrete}/25</span>
+          <span>ノイズ {rubric.breakdown.noPreambleNoise}/25</span>
+        </div>
+      )}
+
+      {hints.length > 0 && (
+        <ul className="tk-eval-hints-list">
+          {hints.map((hint, i) => (
+            <li key={i} className="tk-eval-hint">{hint}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 interface Props {
   knowledge: TacitKnowledge | null
@@ -272,6 +317,9 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, com
                           <span className="tk-card-badge">Hook</span>
                         )}
                       </div>
+                      {candidate.evaluation && (
+                        <SkillEvaluationBadge evaluation={candidate.evaluation} />
+                      )}
                       <DistillButton
                         candidate={candidate}
                         topic={topic}
