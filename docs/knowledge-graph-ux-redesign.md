@@ -75,6 +75,7 @@ dominantRole, reusabilityScore
 - `grep -rn "GraphMetricsPanel" src/` の結果、参照は **自分自身(import 文と export 宣言)のみ**。どのコンポーネントからも import されていない。
 - 表示内容(Topics/Edges/Communities/Density/Modularity/Isolated/Bridge Topics)は `KnowledgeGraphView` の metrics bar と実質重複。
 - **推奨: follow-up issue で `GraphMetricsPanel.tsx` と co-located の `.css` を削除する。** 本提案では削除しない(設計のみ)。
+- **注意(将来の読者へ)**: 上記の "dead code" 判定はこのドキュメントの執筆時点(authoring time)のスナップショットである。誰かが後で `GraphMetricsPanel` を import するコードを追加した場合、この前提は無効になる。削除前は必ず `grep -rn "GraphMetricsPanel" src/` で未参照であることを再確認すること。
 
 ### 2.4 `TacitKnowledgeView.tsx`
 **伝えていること**
@@ -203,6 +204,7 @@ dominantRole, reusabilityScore
 
 ### 6.3 team scope は **per-user attribution 欠如でブロック**(重大ギャップ)
 - 現行データモデルに **「誰が」** の次元が一切ない。`SessionSummary` / `TopicNode` ともに user / author フィールドを持たない(`session.ts` 全体に user 識別子なし)。`~/.claude/projects/` は単一ユーザ前提のローカルログ。
+  - 補足: `ConversationTurn.userPrompt`(session.ts L63)はユーザが入力したテキスト(会話の発話内容)を保持するフィールドであり、「誰が」に相当するユーザ識別子ではない。したがって `userPrompt` が存在していても "per-user attribution なし" の結論は変わらない。
 - したがって JTBD-B1〜B3(per-user の Skill 共有 / サイロ特定 / 横断共有)は **現状では実装不能**。team scope は:
   1. 複数ユーザのログを集約する仕組み、
   2. セッション/トピックへの per-user attribution フィールド、
