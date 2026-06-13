@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseCliArgs, renderCandidateDetail } from "../cli.js";
+import {
+  parseCliArgs,
+  renderCandidateDetail,
+  serializeCandidate,
+  SCHEMA_VERSION,
+} from "../cli.js";
 import type { TopicNode, SkillCandidate } from "../knowledge-graph/types.js";
 
 function makeCandidate(overrides: Partial<SkillCandidate> = {}): SkillCandidate {
@@ -61,6 +66,7 @@ describe("parseCliArgs", () => {
     expect(result.skipEval).toBe(false);
     expect(result.evalModel).toBeUndefined();
     expect(result.preview).toBe(false);
+    expect(result.json).toBe(false);
   });
 
   it("sets preview with --preview", () => {
@@ -196,5 +202,59 @@ describe("renderCandidateDetail", () => {
 
   it("does not contain console output side effects (returns array)", () => {
     expect(Array.isArray(renderCandidateDetail(makeCandidate(), makeTopic()))).toBe(true);
+  });
+});
+
+describe("--json flag", () => {
+  it("defaults json to false", () => {
+    expect(parseCliArgs(["node", "cli.ts"]).json).toBe(false);
+  });
+
+  it("sets json with --json", () => {
+    expect(parseCliArgs(["node", "cli.ts", "--json"]).json).toBe(true);
+  });
+});
+
+describe("SCHEMA_VERSION", () => {
+  it("is the exported version constant 1", () => {
+    expect(SCHEMA_VERSION).toBe(1);
+  });
+});
+
+describe("serializeCandidate", () => {
+  it("serializes core fields and breakdown from the topic", () => {
+    const obj = serializeCandidate(makeCandidate(), makeTopic());
+    expect(obj.topicId).toBe("topic-001");
+    expect(obj.label).toBe("my label");
+    expect(obj.keywords).toEqual(["alpha", "beta"]);
+    expect(obj.sessionCount).toBe(3);
+    expect(obj.reusabilityScore).toBe(0.75);
+    expect(obj.reusabilityScoreBreakdown).toEqual([
+      { signal: "frequency", value: 1, weight: 0.35, contribution: 0.35 },
+      { signal: "timeCost", value: 1, weight: 0.25, contribution: 0.25 },
+      { signal: "crossProjectScore", value: 0, weight: 0.25, contribution: 0 },
+      { signal: "recency", value: 1, weight: 0.15, contribution: 0.15 },
+    ]);
+  });
+
+  it("omits synthesizedMarkdown when absent", () => {
+    const obj = serializeCandidate(makeCandidate(), makeTopic());
+    expect("synthesizedMarkdown" in obj).toBe(false);
+  });
+
+  it("includes synthesizedMarkdown when present", () => {
+    const obj = serializeCandidate(
+      makeCandidate({ synthesizedMarkdown: "# synthesized" }),
+      makeTopic()
+    );
+    expect(obj.synthesizedMarkdown).toBe("# synthesized");
+  });
+
+  it("falls back to topicId/placeholders when topic missing", () => {
+    const obj = serializeCandidate(makeCandidate(), undefined);
+    expect(obj.label).toBe("topic-001");
+    expect(obj.keywords).toEqual([]);
+    expect(obj.sessionCount).toBe(0);
+    expect(obj.reusabilityScoreBreakdown).toBeUndefined();
   });
 });

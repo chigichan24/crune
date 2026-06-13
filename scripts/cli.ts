@@ -37,6 +37,7 @@ interface CliArgs {
   skipSynthesis: boolean;
   dryRun: boolean;
   preview: boolean;
+  json: boolean;
   skipEval: boolean;
   evalModel?: string;
 }
@@ -50,6 +51,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let skipSynthesis = false;
   let dryRun = false;
   let preview = false;
+  let json = false;
   let skipEval = false;
   let evalModel: string | undefined;
 
@@ -69,6 +71,8 @@ export function parseCliArgs(argv: string[]): CliArgs {
       dryRun = true;
     } else if (args[i] === "--preview") {
       preview = true;
+    } else if (args[i] === "--json") {
+      json = true;
     } else if (args[i] === "--skip-eval") {
       skipEval = true;
     } else if (args[i] === "--eval-model" && args[i + 1]) {
@@ -79,7 +83,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     }
   }
 
-  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, preview, skipEval, evalModel };
+  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, preview, json, skipEval, evalModel };
 }
 
 function printUsage(): void {
@@ -95,12 +99,57 @@ Options:
   --skip-synthesis       Skip LLM synthesis, output heuristic skills only
   --dry-run              Show candidates without writing files (skips synthesis)
   --preview              Synthesize and print SKILL.md to stdout without writing
+  --json                 With --dry-run/--preview, emit candidates as JSON to
+                         stdout (see README "JSON output schema")
   --skip-eval            Skip skill evaluation pipeline (structural + rubric)
   --eval-model <model>   Claude model for rubric scoring (defaults to --model)
   -h, --help             Show this help message`);
 }
 
-// ─── Candidate rendering (pure) ────────────────────────────────────
+// ─── Candidate serialization / rendering (pure) ────────────────────
+
+/** JSON output schema version for --json. Bump on breaking shape changes. */
+export const SCHEMA_VERSION = 1;
+
+type ReusabilityBreakdown = NonNullable<
+  TopicNode["reusabilityScore"]["breakdown"]
+>;
+
+interface SerializedCandidate {
+  topicId: string;
+  label: string;
+  keywords: string[];
+  sessionCount: number;
+  reusabilityScore: number;
+  reusabilityScoreBreakdown?: ReusabilityBreakdown;
+  synthesizedMarkdown?: string;
+}
+
+/**
+ * Serialize a skill candidate into a plain object — the single source of truth
+ * shared by the text renderer and the --json output. synthesizedMarkdown is
+ * included only when present on the candidate.
+ */
+export function serializeCandidate(
+  candidate: SkillCandidate,
+  topic: TopicNode | undefined
+): SerializedCandidate {
+  const obj: SerializedCandidate = {
+    topicId: candidate.topicId,
+    label: topic?.label ?? candidate.topicId,
+    keywords: topic?.keywords ?? [],
+    sessionCount: topic?.sessionCount ?? 0,
+    reusabilityScore: candidate.reusabilityScore,
+  };
+  const breakdown = topic?.reusabilityScore?.breakdown;
+  if (breakdown) {
+    obj.reusabilityScoreBreakdown = breakdown;
+  }
+  if (candidate.synthesizedMarkdown) {
+    obj.synthesizedMarkdown = candidate.synthesizedMarkdown;
+  }
+  return obj;
+}
 
 /**
  * Render a human-readable detail view for a skill candidate as an array of
@@ -111,11 +160,13 @@ export function renderCandidateDetail(
   candidate: SkillCandidate,
   topic: TopicNode | undefined
 ): string[] {
-  const label = topic?.label ?? candidate.topicId;
+  const data = serializeCandidate(candidate, topic);
   const lines: string[] = [];
-  lines.push(`  [${candidate.reusabilityScore}] ${label}`);
-  lines.push(`    Keywords: ${topic?.keywords.join(", ") ?? "—"}`);
-  lines.push(`    Sessions: ${topic?.sessionCount ?? "?"}`);
+  lines.push(`  [${data.reusabilityScore}] ${data.label}`);
+  lines.push(
+    `    Keywords: ${data.keywords.length > 0 ? data.keywords.join(", ") : "—"}`
+  );
+  lines.push(`    Sessions: ${topic ? data.sessionCount : "?"}`);
 
   const breakdown = topic?.reusabilityScore?.breakdown;
   if (breakdown && breakdown.length > 0) {
@@ -219,8 +270,23 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Dry run — just list candidates
+  // Dry run — list candidates (text) or emit JSON. All logs stay on stderr so
+  // JSON on stdout is machine-parseable.
   if (config.dryRun) {
+    if (config.json) {
+      const obj = {
+        schemaVersion: SCHEMA_VERSION,
+        generatedAt: new Date().toISOString(),
+        candidates: topCandidates.map((c) =>
+          serializeCandidate(
+            c,
+            knowledgeGraph.nodes.find((n) => n.id === c.topicId)
+          )
+        ),
+      };
+      process.stdout.write(JSON.stringify(obj, null, 2) + "\n");
+      process.exit(0);
+    }
     console.error("\nSkill candidates (dry run):\n");
     for (const c of topCandidates) {
       const topic = knowledgeGraph.nodes.find((n) => n.id === c.topicId);
@@ -235,6 +301,10 @@ async function main(): Promise<void> {
   // Synthesize skills. In preview mode we emit markdown to stdout instead of
   // writing files, but evaluation still runs by default.
   const writeToDisk = !config.preview;
+  // In preview + --json we collect serialized candidates and emit JSON once at
+  // the end (synthesizedMarkdown included since synthesis ran).
+  const previewJson = config.preview && config.json;
+  const previewedCandidates: SkillCandidate[] = [];
   console.error(`\nGenerating ${topCandidates.length} skills...`);
 
   for (const candidate of topCandidates) {
@@ -264,6 +334,7 @@ async function main(): Promise<void> {
 
       if (result.success) {
         markdown = stripSynthesisPreamble(result.stdout);
+        candidate.synthesizedMarkdown = markdown;
         synthesisHappened = true;
         console.error(`    Synthesized`);
       } else {
@@ -326,13 +397,29 @@ async function main(): Promise<void> {
       fs.mkdirSync(skillDir, { recursive: true });
       fs.writeFileSync(outputPath, markdown, "utf-8");
       console.error(`    ${outputPath}`);
+    } else if (previewJson) {
+      // Defer output — collected and emitted as JSON once below.
+      previewedCandidates.push(candidate);
     } else {
       console.error(`--- ${skillName} ---`);
       console.log(markdown);
     }
   }
 
-  if (writeToDisk) {
+  if (previewJson) {
+    const obj = {
+      schemaVersion: SCHEMA_VERSION,
+      generatedAt: new Date().toISOString(),
+      candidates: previewedCandidates.map((c) =>
+        serializeCandidate(
+          c,
+          knowledgeGraph.nodes.find((n) => n.id === c.topicId)
+        )
+      ),
+    };
+    process.stdout.write(JSON.stringify(obj, null, 2) + "\n");
+    console.error(`\nDone! ${topCandidates.length} skills previewed (JSON)`);
+  } else if (writeToDisk) {
     console.error(
       `\nDone! ${topCandidates.length} skills written to ${config.outputDir}`
     );

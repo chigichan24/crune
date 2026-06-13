@@ -38,6 +38,8 @@ Generate reusable Claude Code skill definitions directly from your session logs.
 
 ```bash
 npx @chigichan24/crune --dry-run                    # Preview skill candidates
+npx @chigichan24/crune --preview                     # Synthesize and print SKILL.md to stdout (no files)
+npx @chigichan24/crune --dry-run --json              # Emit candidates as JSON to stdout
 npx @chigichan24/crune --skip-synthesis              # Generate heuristic skills (no LLM)
 npx @chigichan24/crune --count 3 --model haiku       # LLM-synthesized skills (requires claude CLI)
 npx @chigichan24/crune --output-dir ~/.claude/skills  # Install skills directly
@@ -52,7 +54,38 @@ Output follows the [Claude Code skill format](https://docs.anthropic.com/en/docs
 | `--count <n>` | Number of skills to generate (default: 5) |
 | `--model <model>` | Claude model for synthesis (e.g. `haiku`, `sonnet`) |
 | `--skip-synthesis` | Skip LLM synthesis, output heuristic skills only |
-| `--dry-run` | Show candidates without writing files |
+| `--dry-run` | Show candidates without writing files (skips synthesis) |
+| `--preview` | Synthesize and print `SKILL.md` to stdout without writing files |
+| `--json` | With `--dry-run`/`--preview`, emit candidates as JSON to stdout |
+
+### JSON output schema
+
+With `--json` (scoped to `--dry-run` or `--preview`), candidate data is written
+once to **stdout** as a single JSON document; all other logs go to **stderr**,
+so the stdout stream is safe to pipe into `jq`. Shape:
+
+```jsonc
+{
+  "schemaVersion": 1,                  // bumped on breaking shape changes
+  "generatedAt": "2026-06-14T00:00:00.000Z",
+  "candidates": [
+    {
+      "topicId": "topic-001",
+      "label": "...",                  // topic label (falls back to topicId)
+      "keywords": ["..."],
+      "sessionCount": 3,
+      "reusabilityScore": 0.75,        // flat overall score
+      "reusabilityScoreBreakdown": [   // per-signal contributions (omitted if absent)
+        { "signal": "frequency", "value": 1, "weight": 0.35, "contribution": 0.35 }
+      ],
+      "synthesizedMarkdown": "..."     // only present with --preview (synthesis ran)
+    }
+  ]
+}
+```
+
+With `--dry-run --json` synthesis does not run, so `synthesizedMarkdown` is
+omitted. With `--preview --json` it is included.
 
 ## Web Dashboard
 
