@@ -184,7 +184,7 @@ describe("renderCandidateDetail", () => {
       },
     });
     const lines = renderCandidateDetail(makeCandidate({ reusabilityScore: 0.8 }), topic);
-    expect(lines[0]).toBe("  [0.8] my label");
+    expect(lines[0]).toBe("  [0.80] my label");
     expect(lines.some((l) => l.includes("Breakdown (facets)"))).toBe(true);
     expect(
       lines.some((l) => l.trim() === "successRate: 1 x 0.1 = 0.1")

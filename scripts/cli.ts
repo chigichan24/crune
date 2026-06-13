@@ -163,7 +163,8 @@ export function renderCandidateDetail(
 ): string[] {
   const data = serializeCandidate(candidate, topic);
   const lines: string[] = [];
-  lines.push(`  [${data.reusabilityScore}] ${data.label}`);
+  // Text view formats the score to 2 decimals; JSON keeps the raw number.
+  lines.push(`  [${data.reusabilityScore.toFixed(2)}] ${data.label}`);
   lines.push(
     `    Keywords: ${data.keywords.length > 0 ? data.keywords.join(", ") : "—"}`
   );
