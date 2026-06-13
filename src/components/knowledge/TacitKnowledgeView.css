@@ -192,3 +192,108 @@
   line-height: 1.5;
 }
 
+
+/* ── Skill Evaluation Badge ─────────────────────────────────────── */
+.tk-eval {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 6px 0;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tk-eval--pass {
+  border-left-color: var(--success);
+}
+
+.tk-eval--borderline {
+  border-left-color: var(--warning);
+}
+
+.tk-eval--fail {
+  border-left-color: var(--danger);
+}
+
+.tk-eval-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tk-eval-chip {
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 2px 5px;
+}
+
+.tk-eval-chip--ok {
+  color: var(--success);
+  background-color: rgba(22, 163, 74, 0.1);
+}
+
+.tk-eval-chip--ng {
+  color: var(--danger);
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+.tk-eval-score {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tk-eval-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tk-eval-issue {
+  font-size: 10px;
+  color: var(--danger);
+}
+
+.tk-eval-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.tk-eval-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tk-eval-hints-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tk-eval-hints-list {
+  list-style: disc;
+  margin: 0;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tk-eval-hint {
+  font-size: 10px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}

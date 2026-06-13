@@ -49,6 +49,13 @@ export interface ReusabilityScore {
   recency: number;
   successRate?: number;
   helpfulness?: number;
+  breakdown?: {
+    signal: string;
+    value: number;
+    weight: number;
+    contribution: number;
+  }[];
+  weightProfile?: "base" | "facets";
 }
 
 export interface TopicNode {

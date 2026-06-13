@@ -6,6 +6,9 @@ import {
   buildRubricPrompt,
   evaluateSkill,
   smokeFireTest,
+  toSkillEvaluation,
+  shouldRetrySynthesis,
+  type EvaluationResult,
 } from "../skill-evaluator.js";
 
 const goodSkill = `---
@@ -268,6 +271,95 @@ describe("smokeFireTest", () => {
   });
 });
 
+describe("toSkillEvaluation (persistence mapper)", () => {
+  const baseResult: EvaluationResult = {
+    structural: {
+      valid: true,
+      issues: [{ field: "body", message: "example" }],
+      parsed: { name: "x", description: "y" },
+    },
+    rubric: {
+      ok: true,
+      score: 80,
+      breakdown: {
+        nameQuality: 20,
+        descriptionTriggering: 20,
+        instructionsConcrete: 20,
+        noPreambleNoise: 20,
+      },
+      hints: ["tighten description"],
+      rawResponse: "SECRET RAW LLM OUTPUT",
+    },
+    smokeFiring: { skipped: true, message: "stub" },
+    overallScore: 90,
+  };
+
+  it("strips rawResponse from the rubric", () => {
+    const out = toSkillEvaluation(baseResult);
+    expect(out.rubric).toBeDefined();
+    expect("rawResponse" in (out.rubric as object)).toBe(false);
+  });
+
+  it("preserves structural, rubric scores, smokeFiring, and overallScore", () => {
+    const out = toSkillEvaluation(baseResult);
+    expect(out.structural.valid).toBe(true);
+    expect(out.structural.issues).toEqual([{ field: "body", message: "example" }]);
+    expect(out.rubric?.score).toBe(80);
+    expect(out.rubric?.breakdown?.nameQuality).toBe(20);
+    expect(out.rubric?.hints).toEqual(["tighten description"]);
+    expect(out.smokeFiring?.skipped).toBe(true);
+    expect(out.overallScore).toBe(90);
+  });
+
+  it("does not leak the structural parsed field (not part of the persistable shape)", () => {
+    const out = toSkillEvaluation(baseResult);
+    expect("parsed" in (out.structural as object)).toBe(false);
+  });
+
+  it("omits rubric when absent", () => {
+    const out = toSkillEvaluation({
+      structural: { valid: false, issues: [] },
+      smokeFiring: { skipped: true },
+      overallScore: 0,
+    });
+    expect(out.rubric).toBeUndefined();
+  });
+
+  it("carries rubric error/skipped flags without rawResponse", () => {
+    const out = toSkillEvaluation({
+      structural: { valid: true, issues: [] },
+      rubric: { ok: false, skipped: true, error: "boom", rawResponse: "noise" },
+      smokeFiring: { skipped: true },
+      overallScore: 50,
+    });
+    expect(out.rubric?.ok).toBe(false);
+    expect(out.rubric?.skipped).toBe(true);
+    expect(out.rubric?.error).toBe("boom");
+    expect("rawResponse" in (out.rubric as object)).toBe(false);
+  });
+});
+
+describe("shouldRetrySynthesis (soft threshold)", () => {
+  it("retries when score is strictly below threshold", () => {
+    expect(shouldRetrySynthesis(59, 60)).toBe(true);
+    expect(shouldRetrySynthesis(0, 60)).toBe(true);
+  });
+
+  it("does not retry when score meets or exceeds threshold", () => {
+    expect(shouldRetrySynthesis(60, 60)).toBe(false);
+    expect(shouldRetrySynthesis(90, 60)).toBe(false);
+  });
+
+  it("treats undefined score as 0 (retry)", () => {
+    expect(shouldRetrySynthesis(undefined, 60)).toBe(true);
+  });
+
+  it("never retries when threshold is 0 (feature off)", () => {
+    expect(shouldRetrySynthesis(0, 0)).toBe(false);
+    expect(shouldRetrySynthesis(undefined, 0)).toBe(false);
+  });
+});
+
 describe("evaluateSkill (orchestrator)", () => {
   it("scores 0 when structural validation fails and does not call the LLM", async () => {
     const broken = `# no frontmatter at all`;
@@ -286,5 +378,16 @@ describe("evaluateSkill (orchestrator)", () => {
     expect(result.structural.valid).toBe(true);
     expect(result.overallScore).toBe(50);
     expect(result.rubric?.skipped).toBe(true);
+  });
+
+  it("does not invoke the rubric LLM when structural validation fails (even without skipRubric)", async () => {
+    const broken = `# no frontmatter at all`;
+    // No skipRubric: structural failure alone must short-circuit the claude -p
+    // call. If the LLM were invoked this would spawn a process / hang in CI.
+    const result = await evaluateSkill(broken);
+    expect(result.structural.valid).toBe(false);
+    expect(result.overallScore).toBe(0);
+    expect(result.rubric?.skipped).toBe(true);
+    expect(result.rubric?.ok).toBe(false);
   });
 });

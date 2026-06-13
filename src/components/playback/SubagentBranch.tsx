@@ -4,12 +4,19 @@ import { PlaybackStep } from './PlaybackStep'
 import { usePlanMode } from './PlanModeContext'
 import './SubagentBranch.css'
 
+/** Max nesting depth rendered before collapsing further recursion. */
+const MAX_DEPTH = 6
+
 interface Props {
   agentId: string
   session: SubagentSession
+  /** Full subagent map, threaded through so nested agents render recursively. */
+  subagents: Record<string, SubagentSession>
+  /** Nesting depth (0 = top-level subagent). Drives indentation/border. */
+  depth?: number
 }
 
-export function SubagentBranch({ agentId, session }: Props) {
+export function SubagentBranch({ agentId, session, subagents, depth = 0 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const isPlanMode = usePlanMode()
 
@@ -32,8 +39,12 @@ export function SubagentBranch({ agentId, session }: Props) {
     .map(([name, count]) => `${name}: ${count}`)
     .join(', ')
 
+  const depthClass = `subagent-branch--depth-${Math.min(depth, MAX_DEPTH)}`
+
   return (
-    <div className={`subagent-branch${isPlanMode ? ' subagent-branch--plan' : ''}`}>
+    <div
+      className={`subagent-branch ${depthClass}${isPlanMode ? ' subagent-branch--plan' : ''}`}
+    >
       <button
         className="subagent-toggle"
         onClick={() => setExpanded(prev => !prev)}
@@ -58,7 +69,8 @@ export function SubagentBranch({ agentId, session }: Props) {
               key={turn.turnIndex}
               turn={turn}
               isActive={false}
-              subagents={{}}
+              subagents={depth < MAX_DEPTH ? subagents : {}}
+              depth={depth + 1}
             />
           ))}
         </div>

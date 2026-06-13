@@ -4,6 +4,10 @@ import {
   type TopicNode,
   type FacetsData,
 } from "../knowledge-graph-builder.js";
+import {
+  BASE_WEIGHTS,
+  FACETS_WEIGHTS,
+} from "../knowledge-graph/reusability.js";
 
 function makeTopic(overrides: Partial<TopicNode> = {}): TopicNode {
   return {
@@ -207,5 +211,124 @@ describe("ReusabilityScore fields without facets", () => {
 
     expect(topic.reusabilityScore.successRate).toBeUndefined();
     expect(topic.reusabilityScore.helpfulness).toBeUndefined();
+  });
+});
+
+// ─── Breakdown: weight constants ────────────────────────────────────────────
+
+describe("reusability weight constants", () => {
+  it("BASE_WEIGHTS matches the inline base profile", () => {
+    expect(BASE_WEIGHTS).toEqual({
+      frequency: 0.35,
+      timeCost: 0.25,
+      crossProjectScore: 0.25,
+      recency: 0.15,
+    });
+  });
+
+  it("FACETS_WEIGHTS matches the inline facets profile", () => {
+    expect(FACETS_WEIGHTS).toEqual({
+      frequency: 0.3,
+      timeCost: 0.2,
+      crossProjectScore: 0.2,
+      recency: 0.1,
+      successRate: 0.1,
+      helpfulness: 0.1,
+    });
+  });
+});
+
+// ─── Breakdown: without facets ──────────────────────────────────────────────
+
+describe("computeReusabilityScores breakdown without facets", () => {
+  it("populates breakdown over the base signals with weightProfile=base", () => {
+    const topic = makeTopic({
+      sessionCount: 1,
+      totalDurationMinutes: 60,
+      projects: ["proj"],
+      lastSeen: "2026-03-17T00:00:00Z",
+    });
+    const now = new Date("2026-03-17T00:00:00Z");
+    computeReusabilityScores([topic], now);
+
+    const s = topic.reusabilityScore;
+    expect(s.weightProfile).toBe("base");
+    expect(s.breakdown).toBeDefined();
+    const signals = s.breakdown!.map((b) => b.signal);
+    expect(signals).toEqual([
+      "frequency",
+      "timeCost",
+      "crossProjectScore",
+      "recency",
+    ]);
+    expect(signals).not.toContain("successRate");
+    expect(signals).not.toContain("helpfulness");
+
+    for (const b of s.breakdown!) {
+      expect(b.contribution).toBe(Math.round(b.value * b.weight * 1000) / 1000);
+    }
+    const sum = s.breakdown!.reduce((acc, b) => acc + b.contribution, 0);
+    expect(Math.round(sum * 1000) / 1000).toBe(s.overall);
+  });
+
+  it("uses the real signal values in breakdown", () => {
+    const topic = makeTopic({
+      sessionCount: 1,
+      totalDurationMinutes: 60,
+      projects: ["proj"],
+      lastSeen: "2026-03-17T00:00:00Z",
+    });
+    const now = new Date("2026-03-17T00:00:00Z");
+    computeReusabilityScores([topic], now);
+
+    const map = Object.fromEntries(
+      topic.reusabilityScore.breakdown!.map((b) => [b.signal, b])
+    );
+    expect(map.frequency.value).toBe(topic.reusabilityScore.frequency);
+    expect(map.frequency.weight).toBe(BASE_WEIGHTS.frequency);
+    expect(map.recency.value).toBe(topic.reusabilityScore.recency);
+  });
+});
+
+// ─── Breakdown: with facets ─────────────────────────────────────────────────
+
+describe("computeReusabilityScores breakdown with facets", () => {
+  it("populates breakdown including successRate/helpfulness with weightProfile=facets", () => {
+    const topic = makeTopic({
+      sessionIds: ["s1", "s2"],
+      sessionCount: 2,
+      totalDurationMinutes: 120,
+      projects: ["proj"],
+      lastSeen: "2026-03-17T00:00:00Z",
+    });
+    const now = new Date("2026-03-17T00:00:00Z");
+
+    const facetsMap = new Map<string, FacetsData>();
+    facetsMap.set("s1", makeFacets("s1", "fully_achieved", "essential"));
+    facetsMap.set("s2", makeFacets("s2", "mostly_achieved", "essential"));
+
+    computeReusabilityScores([topic], now, facetsMap);
+
+    const s = topic.reusabilityScore;
+    expect(s.weightProfile).toBe("facets");
+    const signals = s.breakdown!.map((b) => b.signal);
+    expect(signals).toEqual([
+      "frequency",
+      "timeCost",
+      "crossProjectScore",
+      "recency",
+      "successRate",
+      "helpfulness",
+    ]);
+    for (const b of s.breakdown!) {
+      expect(b.contribution).toBe(Math.round(b.value * b.weight * 1000) / 1000);
+    }
+    const sum = s.breakdown!.reduce((acc, b) => acc + b.contribution, 0);
+    expect(Math.round(sum * 1000) / 1000).toBe(s.overall);
+
+    const map = Object.fromEntries(s.breakdown!.map((b) => [b.signal, b]));
+    expect(map.successRate.value).toBe(s.successRate);
+    expect(map.successRate.weight).toBe(FACETS_WEIGHTS.successRate);
+    expect(map.helpfulness.value).toBe(s.helpfulness);
   });
 });

@@ -141,6 +141,13 @@ export interface ReusabilityScore {
   recency: number
   successRate?: number
   helpfulness?: number
+  breakdown?: {
+    signal: string
+    value: number
+    weight: number
+    contribution: number
+  }[]
+  weightProfile?: 'base' | 'facets'
 }
 
 export interface TopicNode {
@@ -301,6 +308,18 @@ export interface HotFile {
   file: string
   editCount: number
   sessionId: string
+}
+
+// === Playback Feedback (Bookmark / Tag / Annotate, issue #23) ===
+export interface FeedbackEntry {
+  sessionId: string
+  /** Numeric ConversationTurn.turnIndex (there is no string turn id). */
+  turnId: number
+  /** Tool-call block id (toolUseId) for block-level feedback; absent = turn-level. */
+  blockId?: string
+  bookmarked: boolean
+  tags: string[]
+  note: string
 }
 
 // === Graph Context for Skill Synthesis ===

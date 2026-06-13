@@ -1,0 +1,133 @@
+.feedback-cluster {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.feedback-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.feedback-btn:hover {
+  opacity: 1;
+  background-color: var(--bg-tertiary);
+}
+
+.feedback-btn--has,
+.feedback-btn--open {
+  opacity: 1;
+}
+
+.feedback-btn--open {
+  border-color: var(--border);
+  background-color: var(--bg-tertiary);
+}
+
+/* Active bookmark uses the interactive accent color */
+.feedback-btn--bookmark.feedback-btn--active {
+  opacity: 1;
+  border-color: var(--accent);
+  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.feedback-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.feedback-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  margin-top: 4px;
+  min-width: 220px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+.feedback-note {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.feedback-note:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ─── TagInput ─────────────────────────────────────────────────────────── */
+.tag-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tag-input-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 4px 1px 7px;
+  border-radius: 999px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.tag-chip-remove {
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.tag-chip-remove:hover {
+  color: var(--danger);
+}
+
+.tag-input-field {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.tag-input-field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
