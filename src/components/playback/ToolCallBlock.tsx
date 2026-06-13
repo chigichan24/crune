@@ -29,6 +29,8 @@ import './ToolCallBlock.css'
 interface Props {
   toolCall: ToolCall
   subagents: Record<string, SubagentSession>
+  /** Nesting depth, forwarded to recursively-rendered subagent branches. */
+  depth?: number
 }
 
 /**
@@ -50,7 +52,7 @@ function extractInputBody(name: string, input: Record<string, unknown>): string 
   }
 }
 
-export function ToolCallBlock({ toolCall, subagents }: Props) {
+export function ToolCallBlock({ toolCall, subagents, depth = 0 }: Props) {
   const name = toolCall.toolName ?? ''
   const input = toolCall.input ?? {}
   const result = toolCall.result ?? null
@@ -115,6 +117,8 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
         <SubagentBranch
           agentId={subagentId!}
           session={matchingSubagent}
+          subagents={subagents}
+          depth={depth}
         />
       )}
     </div>

@@ -7,6 +7,8 @@ interface Props {
   turn: ConversationTurn
   isActive: boolean
   subagents: Record<string, SubagentSession>
+  /** Nesting depth for recursively-rendered subagent steps (0 = top level). */
+  depth?: number
 }
 
 function formatTimestamp(iso: string): string {
@@ -14,7 +16,7 @@ function formatTimestamp(iso: string): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-export function PlaybackStep({ turn, isActive, subagents }: Props) {
+export function PlaybackStep({ turn, isActive, subagents, depth = 0 }: Props) {
   const [thinkingOpen, setThinkingOpen] = useState(false)
 
   const toolCalls = turn.toolCalls ?? []
@@ -58,6 +60,7 @@ export function PlaybackStep({ turn, isActive, subagents }: Props) {
           key={tc.toolUseId}
           toolCall={tc}
           subagents={subagents}
+          depth={depth}
         />
       ))}
     </div>

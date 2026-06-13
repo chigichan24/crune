@@ -4,6 +4,33 @@
   padding-left: 12px;
 }
 
+/* Depth-based indentation + border so nested agents read as a tree.
+   Deeper levels indent further and shift border color. */
+.subagent-branch--depth-0 {
+  border-left-width: 3px;
+}
+
+.subagent-branch--depth-1 {
+  margin-left: 16px;
+  border-left-width: 2px;
+  border-left-color: var(--chart-4);
+}
+
+.subagent-branch--depth-2 {
+  margin-left: 24px;
+  border-left-width: 2px;
+  border-left-color: var(--chart-5);
+}
+
+.subagent-branch--depth-3,
+.subagent-branch--depth-4,
+.subagent-branch--depth-5,
+.subagent-branch--depth-6 {
+  margin-left: 32px;
+  border-left-width: 2px;
+  border-left-color: var(--chart-6);
+}
+
 .subagent-toggle {
   display: flex;
   align-items: center;
