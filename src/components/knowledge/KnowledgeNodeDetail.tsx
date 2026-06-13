@@ -1,68 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity, SkillEvaluation } from '../../types'
+import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
+import { SkillEvaluationBadge } from './SkillEvaluationBadge'
 import './KnowledgeNodeDetail.css'
-
-/** Map an overall score (0-100) to a pass/borderline/fail status tone. */
-function evalStatus(evaluation: SkillEvaluation): 'pass' | 'borderline' | 'fail' {
-  if (!evaluation.structural.valid) return 'fail'
-  const score = evaluation.overallScore ?? 0
-  if (score >= 70) return 'pass'
-  if (score >= 50) return 'borderline'
-  return 'fail'
-}
-
-/**
- * Compact評価バッジ: 構造の合否、総合スコア、rubric内訳、改善ヒントを表示する。
- */
-function SkillEvaluationBadge({ evaluation }: { evaluation: SkillEvaluation }) {
-  const status = evalStatus(evaluation)
-  const score = evaluation.overallScore ?? 0
-  const rubric = evaluation.rubric
-  const hints = rubric?.hints ?? []
-
-  return (
-    <div className={`knd-eval knd-eval--${status}`}>
-      <div className="knd-eval-header">
-        <span className={`knd-eval-chip knd-eval-chip--${evaluation.structural.valid ? 'ok' : 'ng'}`}>
-          構造 {evaluation.structural.valid ? 'OK' : 'NG'}
-        </span>
-        <span className="knd-eval-score">スコア {score}/100</span>
-      </div>
-
-      {!evaluation.structural.valid && evaluation.structural.issues.length > 0 && (
-        <ul className="knd-eval-issues">
-          {evaluation.structural.issues.map((issue, i) => (
-            <li key={i} className="knd-eval-issue">
-              <strong>{issue.field}</strong>: {issue.message}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {rubric?.ok && rubric.breakdown && (
-        <div className="knd-eval-breakdown">
-          <span>名前 {rubric.breakdown.nameQuality}/25</span>
-          <span>説明 {rubric.breakdown.descriptionTriggering}/25</span>
-          <span>手順 {rubric.breakdown.instructionsConcrete}/25</span>
-          <span>ノイズ {rubric.breakdown.noPreambleNoise}/25</span>
-        </div>
-      )}
-
-      {hints.length > 0 && (
-        <div className="knd-eval-hints">
-          <span className="knd-eval-hints-label">改善ヒント</span>
-          <ul className="knd-eval-hints-list">
-            {hints.map((hint, i) => (
-              <li key={i} className="knd-eval-hint">{hint}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
 
 interface Props {
   node: TopicNode | null
@@ -249,7 +190,7 @@ export function KnowledgeNodeDetail({
           <div className="knd-export">
             {/* Skill evaluation badge (from analyze-sessions eval pipeline) */}
             {skillCandidate.evaluation && (
-              <SkillEvaluationBadge evaluation={skillCandidate.evaluation} />
+              <SkillEvaluationBadge evaluation={skillCandidate.evaluation} prefix="knd" />
             )}
             {/* Pre-synthesized result (from analyze-sessions) */}
             {skillCandidate.synthesizedMarkdown && !synthResult && (

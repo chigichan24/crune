@@ -247,12 +247,40 @@
   color: var(--text-primary);
 }
 
+.tk-eval-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tk-eval-issue {
+  font-size: 10px;
+  color: var(--danger);
+}
+
 .tk-eval-breakdown {
   display: flex;
   flex-wrap: wrap;
   gap: 3px 8px;
   font-size: 10px;
   color: var(--text-secondary);
+}
+
+.tk-eval-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tk-eval-hints-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .tk-eval-hints-list {
