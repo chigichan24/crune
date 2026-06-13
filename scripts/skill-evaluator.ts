@@ -11,6 +11,7 @@
  */
 import { spawn } from "node:child_process";
 import { z } from "zod";
+import type { SkillEvaluation } from "../src/types/session.js";
 
 // ---------- Types ----------
 
@@ -531,4 +532,49 @@ export async function evaluateSkill(
   }
 
   return { structural, rubric, smokeFiring, overallScore };
+}
+
+// ---------- Persistence mapper ----------
+
+/**
+ * Convert an internal {@link EvaluationResult} into the persistable
+ * {@link SkillEvaluation} shape from src/types/session.ts.
+ *
+ * Drops fields that are not safe / useful to serialize into overview.json:
+ *   - `rubric.rawResponse` (raw LLM text, potentially large/noisy)
+ *   - `structural.parsed` (intermediate parse, not part of the UI shape)
+ *
+ * Everything else (structural validity + issues, rubric score/breakdown/hints/
+ * error/skipped, smoke firing, overall score) is preserved verbatim.
+ */
+export function toSkillEvaluation(result: EvaluationResult): SkillEvaluation {
+  const out: SkillEvaluation = {
+    structural: {
+      valid: result.structural.valid,
+      issues: result.structural.issues.map((i) => ({
+        field: i.field,
+        message: i.message,
+      })),
+    },
+    smokeFiring: {
+      skipped: result.smokeFiring.skipped,
+      message: result.smokeFiring.message,
+    },
+    overallScore: result.overallScore,
+  };
+
+  if (result.rubric) {
+    out.rubric = {
+      ok: result.rubric.ok,
+      score: result.rubric.score,
+      breakdown: result.rubric.breakdown
+        ? { ...result.rubric.breakdown }
+        : undefined,
+      hints: result.rubric.hints ? [...result.rubric.hints] : undefined,
+      error: result.rubric.error,
+      skipped: result.rubric.skipped,
+    };
+  }
+
+  return out;
 }
