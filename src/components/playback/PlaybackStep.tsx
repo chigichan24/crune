@@ -55,11 +55,12 @@ export function PlaybackStep({ turn, isActive, subagents, depth = 0 }: Props) {
       ))}
 
       {/* Tool calls */}
-      {toolCalls.map((tc) => (
+      {toolCalls.map((tc, i) => (
         <ToolCallBlock
-          key={tc.toolUseId}
+          key={tc.toolUseId || `idx-${i}`}
           toolCall={tc}
           turnId={turn.turnIndex}
+          index={i}
           subagents={subagents}
           depth={depth}
         />

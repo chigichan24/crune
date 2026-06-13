@@ -8,7 +8,11 @@
  *
  * Entry identity within a session:
  *   - turn-level:  `${turnId}`
- *   - block-level: `${turnId}:${blockId}`
+ *   - block-level: `${turnId}:b:${blockId}`
+ *
+ * The `:b:` marker keeps block-level keys distinct from the turn-level key even
+ * when `blockId` is an empty string, so a tool_use block with a missing id can
+ * never collide with (and overwrite) its turn-level feedback.
  */
 import type { FeedbackEntry } from '../../../types'
 
@@ -22,7 +26,7 @@ function defaultStorage(): Storage | null {
 
 /** Compute the within-session identity key for an entry. */
 export function entryKey(turnId: number, blockId?: string): string {
-  return blockId != null && blockId !== '' ? `${turnId}:${blockId}` : `${turnId}`
+  return blockId != null ? `${turnId}:b:${blockId}` : `${turnId}`
 }
 
 function entryKeyOf(entry: FeedbackEntry): string {
@@ -92,7 +96,7 @@ export function upsertEntry(
       : {
           sessionId,
           turnId,
-          ...(blockId != null && blockId !== '' ? { blockId } : {}),
+          ...(blockId != null ? { blockId } : {}),
           bookmarked: false,
           tags: [],
           note: '',
@@ -105,7 +109,7 @@ export function upsertEntry(
     sessionId,
     turnId,
   }
-  if (blockId != null && blockId !== '') {
+  if (blockId != null) {
     next.blockId = blockId
   } else {
     delete next.blockId

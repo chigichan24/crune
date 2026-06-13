@@ -39,7 +39,14 @@ describe('entryKey', () => {
   })
 
   it('combines turnId and blockId for block-level feedback', () => {
-    expect(entryKey(3, 'tool-abc')).toBe('3:tool-abc')
+    expect(entryKey(3, 'tool-abc')).toBe('3:b:tool-abc')
+  })
+
+  it('keeps an empty-string blockId distinct from the turn-level key', () => {
+    // A tool_use block with a missing id yields blockId='' but must NOT collapse
+    // onto the turn-level key, otherwise it would overwrite turn feedback.
+    expect(entryKey(3, '')).toBe('3:b:')
+    expect(entryKey(3, '')).not.toBe(entryKey(3))
   })
 })
 
@@ -66,6 +73,22 @@ describe('feedbackStore', () => {
     upsertEntry('s1', 2, 'blk', { note: 'block' }, storage)
     expect(getEntry('s1', 2, undefined, storage)?.note).toBe('turn')
     expect(getEntry('s1', 2, 'blk', storage)?.note).toBe('block')
+    expect(loadSessionFeedback('s1', storage)).toHaveLength(2)
+  })
+
+  it('does not let an empty-blockId block overwrite turn-level feedback', () => {
+    upsertEntry('s1', 2, undefined, { note: 'turn' }, storage)
+    upsertEntry('s1', 2, '', { note: 'block-empty-id' }, storage)
+    expect(getEntry('s1', 2, undefined, storage)?.note).toBe('turn')
+    expect(getEntry('s1', 2, '', storage)?.note).toBe('block-empty-id')
+    expect(loadSessionFeedback('s1', storage)).toHaveLength(2)
+  })
+
+  it('keeps distinct surrogate blockIds from colliding', () => {
+    upsertEntry('s1', 2, 'idx-0', { note: 'first' }, storage)
+    upsertEntry('s1', 2, 'idx-1', { note: 'second' }, storage)
+    expect(getEntry('s1', 2, 'idx-0', storage)?.note).toBe('first')
+    expect(getEntry('s1', 2, 'idx-1', storage)?.note).toBe('second')
     expect(loadSessionFeedback('s1', storage)).toHaveLength(2)
   })
 

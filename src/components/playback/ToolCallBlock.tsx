@@ -31,6 +31,8 @@ interface Props {
   toolCall: ToolCall
   /** Owning turn's numeric turnIndex, for block-level feedback keys. */
   turnId: number
+  /** Index of this tool call within its turn; used as a stable fallback id. */
+  index: number
   subagents: Record<string, SubagentSession>
   /** Nesting depth, forwarded to recursively-rendered subagent branches. */
   depth?: number
@@ -55,9 +57,12 @@ function extractInputBody(name: string, input: Record<string, unknown>): string 
   }
 }
 
-export function ToolCallBlock({ toolCall, turnId, subagents, depth = 0 }: Props) {
+export function ToolCallBlock({ toolCall, turnId, index, subagents, depth = 0 }: Props) {
   const name = toolCall.toolName ?? ''
   const input = toolCall.input ?? {}
+  // toolUseId can be empty when the source block lacks an id; fall back to a
+  // per-turn-stable surrogate so distinct blocks get distinct feedback keys.
+  const blockId = toolCall.toolUseId || `idx-${index}`
   const result = toolCall.result ?? null
   const category = getToolCategory(name)
   const resultStr =
@@ -114,7 +119,7 @@ export function ToolCallBlock({ toolCall, turnId, subagents, depth = 0 }: Props)
           {name}
         </span>
         <div className="tool-call-feedback">
-          <FeedbackCluster turnId={turnId} blockId={toolCall.toolUseId} />
+          <FeedbackCluster turnId={turnId} blockId={blockId} />
         </div>
       </div>
       {renderInput()}
