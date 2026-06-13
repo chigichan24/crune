@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { buildTfidf } from "../knowledge-graph-builder.js";
+import { buildBm25 } from "../knowledge-graph-builder.js";
 
-describe("buildTfidf", () => {
+describe("buildBm25", () => {
   it("excludes terms that appear in only 1 document", () => {
     const documents = new Map<string, string[]>();
     documents.set("doc1", ["alpha", "beta", "gamma"]);
     documents.set("doc2", ["alpha", "beta", "delta"]);
     documents.set("doc3", ["alpha", "gamma", "epsilon"]);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
 
     // n=3, maxDf = max(2, floor(3*0.8)) = max(2,2) = 2
     // "alpha" df=3 > maxDf(2) => excluded
@@ -30,7 +30,7 @@ describe("buildTfidf", () => {
       documents.set(`doc${i}`, tokens);
     }
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
 
     // "ubiquitous" in 10 docs > maxDf(8) => excluded
     expect(result.vocabulary).not.toContain("ubiquitous");
@@ -46,7 +46,7 @@ describe("buildTfidf", () => {
     documents.set("doc2", ["foo", "bar", "qux"]);
     documents.set("doc3", ["foo", "baz", "qux"]);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
 
     for (const [, vec] of result.vectors) {
       let dotProduct = 0;
@@ -69,7 +69,7 @@ describe("buildTfidf", () => {
     documents.set("doc4", ["common", "filler"]);
     documents.set("doc5", ["filler", "filler"]);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
 
     // Both "common" (df=4) and "rare" (df=2) should be in vocabulary
     // maxDf = max(2, floor(5*0.8)) = max(2,4) = 4, so common (df=4) is kept
@@ -93,7 +93,7 @@ describe("buildTfidf", () => {
     documents.set("doc2", ["foo", "bar"]);
     documents.set("doc3", []);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
 
     const vec = result.vectors.get("doc3")!;
     for (let i = 0; i < vec.length; i++) {
@@ -111,7 +111,7 @@ describe("buildTfidf", () => {
     documents.set("doc4", ["common", "filler"]);
     documents.set("doc5", ["filler", "filler"]);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
 
     // maxDf = min(max(2, floor(5*0.8)), 4) = 4, so "common" (df=4) is admitted.
     expect(result.vocabulary).toContain("common");
@@ -129,7 +129,7 @@ describe("buildTfidf", () => {
     documents.set("doc1", ["shared", "unique1"]);
     documents.set("doc2", ["shared", "unique2"]);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
 
     expect(result.vocabulary).not.toContain("shared");
   });
@@ -157,7 +157,7 @@ describe("buildTfidf", () => {
     documents.set("doc3", ["anchor", "extra"]);
     documents.set("doc4", ["extra", "filler"]);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
     expect(result.vocabulary).toContain("term");
     expect(result.vocabulary).toContain("anchor");
 
@@ -206,7 +206,7 @@ describe("buildTfidf", () => {
     documents.set("padref1", ["pad", "tag"]);
     documents.set("padref2", ["shared", "pad"]);
 
-    const result = buildTfidf(documents);
+    const result = buildBm25(documents);
     expect(result.vocabulary).toContain("shared");
 
     const idx = result.vocabIndex.get("shared")!;

@@ -9,7 +9,7 @@
  * consumers are unaffected.
  */
 
-import type { TfidfResult } from "./types.js";
+import type { Bm25Result } from "./types.js";
 
 // BM25 hyperparameters (Okapi defaults). Exported so tests can reference the
 // single source of truth instead of re-declaring magic numbers.
@@ -17,15 +17,14 @@ export const BM25_K1 = 1.2; // term-frequency saturation
 export const BM25_B = 0.75; // document-length normalization strength
 
 /**
- * Build BM25 (Okapi) document vectors.
- *
- * NOTE: The exported name `buildTfidf` (and the `TfidfResult` type / `tfidf.ts`
- * file name) is retained for downstream compatibility — many consumers import
- * these symbols. The actual algorithm is Okapi BM25, not classic TF-IDF.
+ * Build Okapi BM25 document vectors: smoothed non-negative IDF, saturated
+ * term frequency (k1), and document-length normalization (b). The result is a
+ * per-document L2-normalized Float64Array so downstream cosine similarity is
+ * unchanged.
  */
-export function buildTfidf(
+export function buildBm25(
   documents: Map<string, string[]>
-): TfidfResult {
+): Bm25Result {
   // Build vocabulary
   const df = new Map<string, number>(); // document frequency
   for (const [, tokens] of documents) {

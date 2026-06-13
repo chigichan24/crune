@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type {
   TopicNode,
-  TfidfResult,
+  Bm25Result,
   SemanticEdgeType,
 } from "../knowledge-graph-builder.js";
 import {
@@ -35,7 +35,7 @@ function makeTopicNode(overrides: Partial<TopicNode> = {}): TopicNode {
   };
 }
 
-function makeTfidf(vocabulary: string[], vectors: Map<string, Float64Array>): TfidfResult {
+function makeBm25(vocabulary: string[], vectors: Map<string, Float64Array>): Bm25Result {
   const vocabIndex = new Map<string, number>();
   vocabulary.forEach((v, i) => vocabIndex.set(v, i));
   return { vocabulary, vocabIndex, vectors };
@@ -62,9 +62,9 @@ describe("findSharedKeywords", () => {
       ["t1", new Float64Array([0.5, 0.8, 0.02, 0.001])],
       ["t2", new Float64Array([0.3, 0.6, 0.9, 0.005])],
     ]);
-    const tfidf = makeTfidf(vocabulary, new Map());
+    const bm25 = makeBm25(vocabulary, new Map());
 
-    const shared = findSharedKeywords("t1", "t2", tfidf, centroids, 3);
+    const shared = findSharedKeywords("t1", "t2", bm25, centroids, 3);
     // "react" (0.5 > 0.01 & 0.3 > 0.01) and "typescript" (0.8 > 0.01 & 0.6 > 0.01)
     // "testing" only in t1 is 0.02 and t2 is 0.9, both > 0.01 → included
     // "css" is below 0.01 in both → excluded
@@ -75,11 +75,11 @@ describe("findSharedKeywords", () => {
   });
 
   it("returns empty array when one centroid is missing", () => {
-    const tfidf = makeTfidf(["a"], new Map());
+    const bm25 = makeBm25(["a"], new Map());
     const centroids = new Map<string, Float64Array>([
       ["t1", new Float64Array([0.5])],
     ]);
-    expect(findSharedKeywords("t1", "t_missing", tfidf, centroids, 3)).toEqual([]);
+    expect(findSharedKeywords("t1", "t_missing", bm25, centroids, 3)).toEqual([]);
   });
 });
 
@@ -96,13 +96,13 @@ describe("classifyEdge", () => {
       projects: ["projectB"],
     });
     const signals = { semanticSimilarity: 0.5, fileOverlap: 0.1, sessionOverlap: 0.1 };
-    const tfidf = makeTfidf(["shared"], new Map());
+    const bm25 = makeBm25(["shared"], new Map());
     const centroids = new Map<string, Float64Array>([
       ["t1", new Float64Array([0.5])],
       ["t2", new Float64Array([0.5])],
     ]);
 
-    const result = classifyEdge(ti, tj, signals, [], tfidf, centroids);
+    const result = classifyEdge(ti, tj, signals, [], bm25, centroids);
     expect(result.type).toBe("cross-project-bridge" as SemanticEdgeType);
     expect(result.label).toContain("cross-project");
   });
@@ -122,10 +122,10 @@ describe("classifyEdge", () => {
     // semanticSimilarity * 0.4 < fileOverlap * 0.3 → need fileOverlap high, semantic low
     const signals = { semanticSimilarity: 0.1, fileOverlap: 0.9, sessionOverlap: 0.0 };
     const sharedFiles = ["/src/components/Button.tsx", "/src/components/Card.tsx"];
-    const tfidf = makeTfidf([], new Map());
+    const bm25 = makeBm25([], new Map());
     const centroids = new Map<string, Float64Array>();
 
-    const result = classifyEdge(ti, tj, signals, sharedFiles, tfidf, centroids);
+    const result = classifyEdge(ti, tj, signals, sharedFiles, bm25, centroids);
     expect(result.type).toBe("shared-module" as SemanticEdgeType);
     expect(result.label).toContain("shared");
   });
@@ -143,10 +143,10 @@ describe("classifyEdge", () => {
     });
     // sessionOverlap * 0.3 must be the max, fileOverlap * 0.3 must be less or no shared files
     const signals = { semanticSimilarity: 0.1, fileOverlap: 0.0, sessionOverlap: 0.9 };
-    const tfidf = makeTfidf([], new Map());
+    const bm25 = makeBm25([], new Map());
     const centroids = new Map<string, Float64Array>();
 
-    const result = classifyEdge(ti, tj, signals, [], tfidf, centroids);
+    const result = classifyEdge(ti, tj, signals, [], bm25, centroids);
     expect(result.type).toBe("workflow-continuation" as SemanticEdgeType);
     expect(result.label).toBe("workflow continuation");
   });

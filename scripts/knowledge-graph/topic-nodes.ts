@@ -2,7 +2,7 @@
  * Topic node construction from session clusters.
  */
 
-import type { SessionInput, TopicNode, ToolIdfResult, TfidfResult, FacetsData } from "./types.js";
+import type { SessionInput, TopicNode, ToolIdfResult, Bm25Result, FacetsData } from "./types.js";
 import { ACTION_VERBS_EN, ACTION_VERBS_JA } from "./constants.js";
 import { cosineSimilarity } from "./similarity.js";
 
@@ -34,13 +34,13 @@ export function extractDominantAction(prompts: string[]): string {
 export function selectRepresentativePrompts(
   memberSessions: SessionInput[],
   clusterCentroid: Float64Array,
-  tfidfResult: TfidfResult,
+  bm25Result: Bm25Result,
   maxCount: number = 3
 ): string[] {
   const scored: { prompt: string; score: number }[] = [];
 
   for (const s of memberSessions) {
-    const sessionVec = tfidfResult.vectors.get(s.sessionId);
+    const sessionVec = bm25Result.vectors.get(s.sessionId);
     if (!sessionVec) continue;
 
     const sim = cosineSimilarity(sessionVec, clusterCentroid);
@@ -168,7 +168,7 @@ function buildFacetsLabel(
 export function buildTopicNodes(
   clusterMembers: number[][],
   sessions: SessionInput[],
-  tfidf: TfidfResult,
+  bm25: Bm25Result,
   toolIdf: ToolIdfResult,
   facetsMap?: Map<string, FacetsData>
 ): TopicNode[] {
@@ -179,9 +179,9 @@ export function buildTopicNodes(
     const memberSessions = members.map((idx) => sessions[idx]);
 
     // Compute cluster centroid (TF-IDF text only, for keyword extraction)
-    const centroid = new Float64Array(tfidf.vocabulary.length);
+    const centroid = new Float64Array(bm25.vocabulary.length);
     for (const idx of members) {
-      const vec = tfidf.vectors.get(sessions[idx].sessionId);
+      const vec = bm25.vectors.get(sessions[idx].sessionId);
       if (vec) {
         for (let k = 0; k < centroid.length; k++) centroid[k] += vec[k];
       }
@@ -189,7 +189,7 @@ export function buildTopicNodes(
     for (let k = 0; k < centroid.length; k++) centroid[k] /= members.length;
 
     // Top-5 keywords from centroid
-    const scored = tfidf.vocabulary.map((term, idx) => ({
+    const scored = bm25.vocabulary.map((term, idx) => ({
       term,
       score: centroid[idx],
     }));
@@ -251,7 +251,7 @@ export function buildTopicNodes(
     }
 
     const representativePrompts = selectRepresentativePrompts(
-      memberSessions, normalizedCentroid, tfidf
+      memberSessions, normalizedCentroid, bm25
     );
     const suggestedPrompt = generateSuggestedPrompt(
       memberSessions, keywords, toolIdf
