@@ -10,6 +10,8 @@ describe("parseCliArgs", () => {
     expect(result.model).toBeUndefined();
     expect(result.skipSynthesis).toBe(false);
     expect(result.dryRun).toBe(false);
+    expect(result.skipEval).toBe(false);
+    expect(result.evalModel).toBeUndefined();
   });
 
   it("sets sessionsDir with --sessions-dir", () => {
@@ -45,6 +47,16 @@ describe("parseCliArgs", () => {
   it("sets dryRun with --dry-run", () => {
     const result = parseCliArgs(["node", "cli.ts", "--dry-run"]);
     expect(result.dryRun).toBe(true);
+  });
+
+  it("sets skipEval with --skip-eval", () => {
+    const result = parseCliArgs(["node", "cli.ts", "--skip-eval"]);
+    expect(result.skipEval).toBe(true);
+  });
+
+  it("sets evalModel with --eval-model", () => {
+    const result = parseCliArgs(["node", "cli.ts", "--eval-model", "haiku"]);
+    expect(result.evalModel).toBe("haiku");
   });
 
   it("handles multiple flags combined", () => {
