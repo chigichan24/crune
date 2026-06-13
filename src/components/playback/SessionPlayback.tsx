@@ -4,6 +4,7 @@ import type { ConversationTurn, ToolCall } from '../../types'
 import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
 import { PlanModeContext } from './PlanModeContext.ts'
+import { selectKeyMoments } from './toolCallHelpers.ts'
 import './SessionPlayback.css'
 
 interface Props {
@@ -153,6 +154,15 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  // Jump to a turn from the key-moments rail: activate it and scroll into view.
+  const jumpToTurn = useCallback((index: number) => {
+    setActiveTurnIndex(index)
+    const el = turnRefs.current.get(index)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [])
+
   const setTurnRef = useCallback((index: number, el: HTMLDivElement | null) => {
     if (el) {
       turnRefs.current.set(index, el)
@@ -213,6 +223,12 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
       index: i,
     }))
   }, [turnMeasurements, scrollInfo.height, data])
+
+  // Semantic key-moments for the jump-link rail
+  const keyMoments = useMemo(
+    () => (data ? selectKeyMoments(data.turns) : []),
+    [data],
+  )
 
   // Viewport indicator position
   const viewportTopPct = (scrollInfo.top / scrollInfo.height) * 100
@@ -290,6 +306,26 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
           </div>
         ))}
       </div>
+
+      {/* Key-moments rail: labeled jump links to semantically important turns */}
+      {keyMoments.length > 0 && (
+        <div className="playback-keymoments" role="navigation" aria-label="重要な瞬間">
+          <span className="keymoments-label">重要な瞬間</span>
+          <div className="keymoments-links">
+            {keyMoments.map((moment) => (
+              <button
+                key={moment.index}
+                className={`keymoment-link keymoment-link--${moment.kind} ${moment.index === activeTurnIndex ? 'keymoment-link--active' : ''}`}
+                title={summarizeTurn(turns[moment.index])}
+                onClick={() => jumpToTurn(moment.index)}
+              >
+                <span className="keymoment-kind">{moment.label}</span>
+                <span className="keymoment-index">#{moment.index + 1}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="playback-body">
         {/* Minimap */}

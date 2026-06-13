@@ -1,13 +1,26 @@
 import { describe, it, expect } from 'vitest'
+import type { ConversationTurn } from '../../../types'
 import {
   countLines,
   getToolCategory,
   parseMcpToolName,
   pickKeyInputArgs,
+  selectKeyMoments,
   shouldCollapse,
   summarizeValue,
   truncate,
 } from '../toolCallHelpers'
+
+function makeTurn(partial: Partial<ConversationTurn> & { turnIndex: number }): ConversationTurn {
+  return {
+    timestamp: '2026-01-01T00:00:00Z',
+    userPrompt: '',
+    assistantThinking: [],
+    assistantTexts: [],
+    toolCalls: [],
+    ...partial,
+  }
+}
 
 describe('countLines', () => {
   it('returns 0 for an empty string', () => {
@@ -56,6 +69,66 @@ describe('shouldCollapse', () => {
 
   it('does not collapse content of exactly 500 chars on few lines', () => {
     expect(shouldCollapse('a'.repeat(500))).toBe(false)
+  })
+})
+
+describe('selectKeyMoments', () => {
+  it('returns empty for no turns', () => {
+    expect(selectKeyMoments([])).toEqual([])
+  })
+
+  it('always includes the final turn', () => {
+    const turns = [
+      makeTurn({ turnIndex: 0, userPrompt: 'hi' }),
+      makeTurn({ turnIndex: 1, userPrompt: 'bye' }),
+    ]
+    const moments = selectKeyMoments(turns)
+    expect(moments.some(m => m.index === 1)).toBe(true)
+    expect(moments[moments.length - 1].kind).toBe('final')
+  })
+
+  it('flags agent turns', () => {
+    const turns = [
+      makeTurn({ turnIndex: 0, toolCalls: [{ toolUseId: 't', toolName: 'Agent', input: {} }] }),
+      makeTurn({ turnIndex: 1 }),
+    ]
+    const moments = selectKeyMoments(turns)
+    const m = moments.find(x => x.index === 0)
+    expect(m?.kind).toBe('agent')
+  })
+
+  it('flags plan/task turns', () => {
+    const turns = [
+      makeTurn({ turnIndex: 0, toolCalls: [{ toolUseId: 't', toolName: 'EnterPlanMode', input: {} }] }),
+      makeTurn({ turnIndex: 1, toolCalls: [{ toolUseId: 't', toolName: 'TaskCreate', input: {} }] }),
+      makeTurn({ turnIndex: 2 }),
+    ]
+    const moments = selectKeyMoments(turns)
+    expect(moments.find(x => x.index === 0)?.kind).toBe('plan')
+    expect(moments.find(x => x.index === 1)?.kind).toBe('plan')
+  })
+
+  it('includes long/substantive user prompts but not short ones', () => {
+    const longPrompt = 'a'.repeat(100)
+    const turns = [
+      makeTurn({ turnIndex: 0, userPrompt: 'short' }),
+      makeTurn({ turnIndex: 1, userPrompt: longPrompt }),
+      makeTurn({ turnIndex: 2 }),
+    ]
+    const moments = selectKeyMoments(turns)
+    expect(moments.some(m => m.index === 0)).toBe(false)
+    expect(moments.find(m => m.index === 1)?.kind).toBe('prompt')
+  })
+
+  it('returns moments sorted by index without duplicates', () => {
+    const turns = [
+      makeTurn({ turnIndex: 0, toolCalls: [{ toolUseId: 't', toolName: 'Agent', input: {} }], userPrompt: 'x'.repeat(100) }),
+      makeTurn({ turnIndex: 1 }),
+    ]
+    const moments = selectKeyMoments(turns)
+    const indices = moments.map(m => m.index)
+    expect(indices).toEqual([...indices].sort((a, b) => a - b))
+    expect(new Set(indices).size).toBe(indices.length)
   })
 })
 

@@ -5,6 +5,8 @@
  * without a DOM/JSX runtime.
  */
 
+import type { ConversationTurn } from '../../types'
+
 export type ToolCategory =
   | 'shell'
   | 'edit'
@@ -212,4 +214,89 @@ export function pickKeyInputArgs(
   }
 
   return result
+}
+
+/**
+ * Kind of a semantic "key moment" in a session, used to label jump links.
+ */
+export type KeyMomentKind = 'plan' | 'agent' | 'prompt' | 'final'
+
+export interface KeyMoment {
+  /** Index into the turns array (matches ConversationTurn position). */
+  index: number
+  kind: KeyMomentKind
+  /** Short Japanese label for the jump link. */
+  label: string
+}
+
+/** A user prompt this long (chars) counts as substantive. */
+export const KEY_MOMENT_PROMPT_MIN_CHARS = 80
+
+const PLAN_TASK_TOOLS = new Set([
+  'EnterPlanMode',
+  'ExitPlanMode',
+  'TaskCreate',
+  'TaskUpdate',
+])
+
+const KEY_MOMENT_LABELS: Record<KeyMomentKind, string> = {
+  plan: '計画',
+  agent: 'エージェント',
+  prompt: 'プロンプト',
+  final: '最終',
+}
+
+/**
+ * Select the semantic "key moments" of a session for the jump-link rail.
+ *
+ * Key moments are:
+ *  - plan/task turns (Enter/ExitPlanMode, TaskCreate/Update)
+ *  - agent turns (spawning subagents)
+ *  - the final turn
+ *  - user prompts only when long/substantive (>= KEY_MOMENT_PROMPT_MIN_CHARS)
+ *
+ * Each turn yields at most one moment; when several signals apply, the
+ * highest-priority kind wins (agent > plan > prompt > final). The result is
+ * sorted ascending by index with no duplicate indices.
+ */
+export function selectKeyMoments(turns: ConversationTurn[]): KeyMoment[] {
+  if (turns.length === 0) return []
+  const lastIndex = turns.length - 1
+  const byIndex = new Map<number, KeyMomentKind>()
+
+  const setKind = (index: number, kind: KeyMomentKind, priority: number) => {
+    const existing = byIndex.get(index)
+    if (existing == null || priority > KIND_PRIORITY[existing]) {
+      byIndex.set(index, kind)
+    }
+  }
+
+  turns.forEach((turn, index) => {
+    const toolCalls = turn.toolCalls ?? []
+    const hasAgent = toolCalls.some(
+      tc => tc.toolName === 'Agent' || tc.toolName === 'Task',
+    )
+    const hasPlan = toolCalls.some(tc => PLAN_TASK_TOOLS.has(tc.toolName ?? ''))
+    const promptLen = (turn.userPrompt ?? '').trim().length
+
+    if (hasAgent) setKind(index, 'agent', KIND_PRIORITY.agent)
+    if (hasPlan) setKind(index, 'plan', KIND_PRIORITY.plan)
+    if (promptLen >= KEY_MOMENT_PROMPT_MIN_CHARS) {
+      setKind(index, 'prompt', KIND_PRIORITY.prompt)
+    }
+  })
+
+  // Final turn is always a key moment (lowest priority, won't override others).
+  setKind(lastIndex, 'final', KIND_PRIORITY.final)
+
+  return [...byIndex.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([index, kind]) => ({ index, kind, label: KEY_MOMENT_LABELS[kind] }))
+}
+
+const KIND_PRIORITY: Record<KeyMomentKind, number> = {
+  agent: 3,
+  plan: 2,
+  prompt: 1,
+  final: 0,
 }

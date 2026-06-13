@@ -125,6 +125,80 @@
   color: var(--text-secondary);
 }
 
+/* Key-moments rail: labeled jump links */
+.playback-keymoments {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 6px 4px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.keymoments-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.keymoments-links {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.keymoment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.keymoment-link:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.keymoment-link--active {
+  border-color: var(--accent);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.keymoment-kind {
+  font-weight: 600;
+}
+
+.keymoment-index {
+  font-family: monospace;
+  color: var(--text-tertiary);
+}
+
+.keymoment-link--agent .keymoment-kind {
+  color: var(--chart-2);
+}
+
+.keymoment-link--plan .keymoment-kind {
+  color: var(--chart-3);
+}
+
+.keymoment-link--prompt .keymoment-kind {
+  color: var(--chart-1);
+}
+
 /* Body layout: minimap + content + side panel */
 .playback-body {
   display: grid;
