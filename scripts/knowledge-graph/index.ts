@@ -92,12 +92,12 @@ export function buildSemanticKnowledgeGraph(
 ): SemanticKnowledgeGraph {
   const { enableLouvain = true, enableBrandes = true, facetsDir } = options;
 
-  console.log(`  [Knowledge Graph] Processing ${sessions.length} sessions...`);
+  console.error(`  [Knowledge Graph] Processing ${sessions.length} sessions...`);
 
   // Read facets data if directory is provided
   const facetsMap = facetsDir ? readFacetsDir(facetsDir) : new Map();
   if (facetsDir) {
-    console.log(`  [Knowledge Graph] Facets: ${facetsMap.size} sessions with /insights data`);
+    console.error(`  [Knowledge Graph] Facets: ${facetsMap.size} sessions with /insights data`);
   }
 
   // Edge case: too few sessions
@@ -146,7 +146,7 @@ export function buildSemanticKnowledgeGraph(
     }
   }
 
-  console.log(
+  console.error(
     `  [Knowledge Graph] Tokenized ${documents.size} sessions (${sessions.length - documents.size} excluded: empty)`
   );
 
@@ -156,18 +156,18 @@ export function buildSemanticKnowledgeGraph(
 
   // Step 1b: Build Tool-IDF and Structural vectors (always needed, even for single topic)
   const toolIdf = buildToolIdf(activeSessions);
-  console.log(
+  console.error(
     `  [Knowledge Graph] Tool-IDF: ${toolIdf.toolVocabulary.length} tool types`
   );
 
   const structVectors = buildStructuralVectors(activeSessions);
-  console.log(
+  console.error(
     `  [Knowledge Graph] Structural features: ${STRUCTURAL_DIM} dimensions`
   );
 
   // Extract enriched tool sequences from all sessions
   const enrichedSequences = extractEnrichedSequences(activeSessions);
-  console.log(
+  console.error(
     `  [Knowledge Graph] Enriched sequences: ${enrichedSequences.length} patterns detected`
   );
 
@@ -209,7 +209,7 @@ export function buildSemanticKnowledgeGraph(
 
   // Step 2: TF-IDF (text features)
   const tfidf = buildTfidf(documents);
-  console.log(
+  console.error(
     `  [Knowledge Graph] TF-IDF: ${tfidf.vocabulary.length} terms in vocabulary`
   );
 
@@ -230,7 +230,7 @@ export function buildSemanticKnowledgeGraph(
   // Use m/4 clamped to [20, 80] — higher than sqrt(m) to preserve more signal.
   const targetK = Math.min(80, Math.max(20, Math.round(activeSessions.length / 4)));
   const svd = truncatedSvd(sessionIds, matrix, totalDim, targetK);
-  console.log(
+  console.error(
     `  [Knowledge Graph] SVD: ${totalDim}d → ${svd.k}d latent space (top-3 σ: ${[...svd.sigma.slice(0, 3)].map(s => s.toFixed(2)).join(', ')})`
   );
 
@@ -242,7 +242,7 @@ export function buildSemanticKnowledgeGraph(
   for (const dim of latentDims.slice(0, 3)) {
     const terms = dim.topTerms.slice(0, 3).map(t => t.term).join(', ');
     const tools = dim.topTools.slice(0, 2).map(t => t.tool).join(', ');
-    console.log(
+    console.error(
       `    dim-${dim.index}: var=${(dim.varianceRatio * 100).toFixed(1)}% terms=[${terms}] tools=[${tools}]`
     );
   }
@@ -285,14 +285,14 @@ export function buildSemanticKnowledgeGraph(
         svdDist
       );
       if (clusterMembers.length < beforeCount) {
-        console.log(
+        console.error(
           `  [Knowledge Graph] Merged narrow clusters: ${beforeCount} → ${clusterMembers.length} topics`
         );
       }
     }
   }
 
-  console.log(
+  console.error(
     `  [Knowledge Graph] Clustering: ${clusterMembers.length} topics from ${activeSessions.length} sessions`
   );
 
@@ -301,13 +301,13 @@ export function buildSemanticKnowledgeGraph(
 
   // Step 5b: Compute reusability scores
   computeReusabilityScores(topics, new Date(), facetsMap);
-  console.log(
+  console.error(
     `  [Knowledge Graph] Reusability scores computed for ${topics.length} topics`
   );
 
   // Step 6: Build topic edges (using SVD vectors for semantic similarity)
   const edges = buildTopicEdges(topics, activeSessions, tfidf, svd);
-  console.log(`  [Knowledge Graph] Edges: ${edges.length} topic connections`);
+  console.error(`  [Knowledge Graph] Edges: ${edges.length} topic connections`);
 
   // Step 7: Louvain community detection (optional)
   let communities;
@@ -316,7 +316,7 @@ export function buildSemanticKnowledgeGraph(
     const louvainResult = louvainDetection(topics, edges);
     communities = louvainResult.communities;
     modularity = louvainResult.modularity;
-    console.log(
+    console.error(
       `  [Knowledge Graph] Communities: ${communities.length} (modularity: ${modularity.toFixed(3)})`
     );
   } else {
@@ -332,7 +332,7 @@ export function buildSemanticKnowledgeGraph(
       topics[i].communityId = i;
     }
     modularity = 0;
-    console.log(
+    console.error(
       `  [Knowledge Graph] Communities: ${communities.length} (Louvain disabled, using cluster-based)`
     );
   }
@@ -353,7 +353,7 @@ export function buildSemanticKnowledgeGraph(
         ? (degreeMap.get(t.id) || 0) / (nTopics - 1)
         : 0;
     }
-    console.log(`  [Knowledge Graph] Brandes disabled, degree centrality only`);
+    console.error(`  [Knowledge Graph] Brandes disabled, degree centrality only`);
   }
 
   const isolatedCount = topics.filter((t) => t.degreeCentrality === 0).length;
@@ -381,11 +381,11 @@ export function buildSemanticKnowledgeGraph(
 
   // Step 9: Generate skill candidates
   const skillCandidates = generateSkillCandidates(topics, enrichedSequences);
-  console.log(
+  console.error(
     `  [Knowledge Graph] Skill candidates: ${skillCandidates.length} generated`
   );
 
-  console.log(
+  console.error(
     `  [Knowledge Graph] Done. ${nTopics} topics, ${edges.length} edges, ${communities.length} communities, ${isolatedCount} isolated`
   );
 
