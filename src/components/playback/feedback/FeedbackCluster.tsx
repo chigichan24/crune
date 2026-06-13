@@ -96,10 +96,14 @@ function NoteEditor({ value, onCommit }: NoteEditorProps) {
   const [draft, setDraft] = useState(value)
 
   // Re-seed when the committed value changes externally (e.g. a different
-  // entry is selected while the editor stays mounted).
-  useEffect(() => {
+  // entry is selected while the editor stays mounted). Done during render via
+  // a previous-value tracker rather than an effect, per React's "adjusting
+  // state on prop change" guidance — this avoids a setState-in-effect.
+  const [seededValue, setSeededValue] = useState(value)
+  if (value !== seededValue) {
+    setSeededValue(value)
     setDraft(value)
-  }, [value])
+  }
 
   // Keep the latest draft/value in a ref so the unmount-commit effect can read
   // them without re-running (and thus committing) on every keystroke. The ref
