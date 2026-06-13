@@ -1,6 +1,6 @@
 /**
  * Semantic knowledge graph construction from Claude Code session data.
- * Pipeline: TF-IDF + Tool-IDF + Structure → SVD (Latent Semantic) → Clustering → Louvain → Brandes
+ * Pipeline: BM25 + Tool-IDF + Structure → SVD (Latent Semantic) → Clustering → Louvain → Brandes
  */
 
 import type {
@@ -119,7 +119,7 @@ export function buildSemanticKnowledgeGraph(
     };
   }
 
-  // Step 1: Extract session text documents (for TF-IDF)
+  // Step 1: Extract session text documents (for BM25)
   const documents = new Map<string, string[]>();
   for (const session of sessions) {
     const textParts: string[] = [];
@@ -207,10 +207,10 @@ export function buildSemanticKnowledgeGraph(
     };
   }
 
-  // Step 2: TF-IDF (text features)
+  // Step 2: BM25 (text features)
   const tfidf = buildTfidf(documents);
   console.log(
-    `  [Knowledge Graph] TF-IDF: ${tfidf.vocabulary.length} terms in vocabulary`
+    `  [Knowledge Graph] BM25: ${tfidf.vocabulary.length} terms in vocabulary`
   );
 
   // Step 3: Build combined matrix and apply Truncated SVD
