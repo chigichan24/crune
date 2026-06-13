@@ -26,15 +26,21 @@ dominantRole, reusabilityScore
 ```
 
 #### force graph が無視しているフィールド(重要)
-`KnowledgeGraphView.tsx` の `filteredData`(L156-174)で `GraphNode` に投影されるのは
+`KnowledgeGraphView.tsx` の `filteredData`(L140-175)で `GraphNode` に投影されるのは
 `id / label / keywords / project / sessionCount / communityId / betweennessCentrality / val(=sessionCount*2)` のみ。
-以下は **グラフ本体では一切使われていない**(node のサイズ・色・ラベルにも反映されない):
+
+以下のフィールドは **`GraphNode` に投影すらされない**(force graph からは完全に不可視):
 
 - `firstSeen` / `lastSeen` — 時間軸情報。グラフは時間を表現しない。
 - `reusabilityScore`(overall とその内訳)— "どれを Skill 化すべきか" の最重要シグナルがノードに表れない。
 - `projects`(複数プロジェクト所属)— 横断知識のシグナルが落ちる(`project` 単数のみ参照)。
 - `dominantRole`(user-driven / tool-heavy / subagent-delegated)— 作業の性質が見えない。
-- `totalDurationMinutes` / `totalToolCalls` / `degreeCentrality` / `representativePrompts` / `suggestedPrompt` / `toolSignature` — すべて detail パネルに入るまで不可視。
+- `totalDurationMinutes` / `totalToolCalls` / `representativePrompts` / `suggestedPrompt` / `toolSignature` — すべて detail パネルに入るまで不可視。
+- `degreeCentrality` — GraphNode に投影されない。
+
+以下のフィールドは **`GraphNode` には投影されているが、ノードのサイズ・色・ラベルには一切反映されない**:
+
+- `betweennessCentrality` — GraphNode の `betweennessCentrality` プロパティとして渡されるが、`nodeColor` / `nodeVal` / `nodeLabel` のいずれにも使われておらず、視覚出力には現れない。
 
 これらは Detail パネル(`KnowledgeNodeDetail.tsx`)を開いて初めて表示される。つまり **意思決定に必要な情報がすべて 1 ノード 1 クリックの奥に隠れている**。これが #19 の "bird's-eye view と detail panel の insight がつながらない" の根本原因。
 
