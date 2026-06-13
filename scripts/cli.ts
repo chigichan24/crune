@@ -185,6 +185,13 @@ export function renderCandidateDetail(
 async function main(): Promise<void> {
   const config = parseCliArgs(process.argv);
 
+  // --json only produces output in dry-run/preview mode. In a normal run files
+  // are written and JSON would be silently ignored — fail fast at the boundary.
+  if (config.json && !config.dryRun && !config.preview) {
+    console.error("--json requires --dry-run or --preview");
+    process.exit(1);
+  }
+
   console.error("Discovering sessions...");
   const sessionFiles = discoverSessions(config.sessionsDir);
   if (sessionFiles.length === 0) {
