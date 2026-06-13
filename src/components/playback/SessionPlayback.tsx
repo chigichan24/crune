@@ -4,7 +4,8 @@ import type { ConversationTurn, ToolCall } from '../../types'
 import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
 import { PlanModeContext } from './PlanModeContext.ts'
-import { selectKeyMoments } from './toolCallHelpers.ts'
+import { selectKeyMoments, turnMatchesFilter } from './toolCallHelpers.ts'
+import type { PlaybackFilter } from './toolCallHelpers.ts'
 import './SessionPlayback.css'
 
 interface Props {
@@ -65,6 +66,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
   const minimapRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const [hoveredBar, setHoveredBar] = useState<{ index: number; x: number; y: number } | null>(null)
+  const [filter, setFilter] = useState<PlaybackFilter>({ text: '', toolName: '', keyTurnsOnly: false })
 
   // Turn measurements for minimap
   const [turnMeasurements, setTurnMeasurements] = useState<Array<{ top: number; height: number }>>([])
@@ -74,6 +76,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on prop change is intentional
     setActiveTurnIndex(0)
+    setFilter({ text: '', toolName: '', keyTurnsOnly: false })
   }, [sessionId])
 
   // Measure turn positions after render
@@ -229,6 +232,34 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
     () => (data ? selectKeyMoments(data.turns) : []),
     [data],
   )
+  const keyIndices = useMemo(
+    () => new Set(keyMoments.map(m => m.index)),
+    [keyMoments],
+  )
+
+  // Distinct tool names present in the session, for the tool-name filter dropdown
+  const availableToolNames = useMemo(() => {
+    if (!data) return []
+    const names = new Set<string>()
+    for (const turn of data.turns) {
+      for (const tc of turn.toolCalls ?? []) {
+        if (tc.toolName) names.add(tc.toolName)
+      }
+    }
+    return [...names].sort()
+  }, [data])
+
+  // Set of turn indices that pass the active filter
+  const isFilterActive =
+    filter.text.trim() !== '' || filter.toolName !== '' || filter.keyTurnsOnly
+  const matchedIndices = useMemo(() => {
+    if (!data) return new Set<number>()
+    const matched = new Set<number>()
+    data.turns.forEach((turn, i) => {
+      if (turnMatchesFilter(turn, i, filter, keyIndices)) matched.add(i)
+    })
+    return matched
+  }, [data, filter, keyIndices])
 
   // Viewport indicator position
   const viewportTopPct = (scrollInfo.top / scrollInfo.height) * 100
@@ -327,6 +358,46 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
         </div>
       )}
 
+      {/* Search / filter bar */}
+      <div className="playback-filter">
+        <input
+          type="text"
+          className="filter-text"
+          placeholder="ターンを検索（プロンプト・応答・ツール名）"
+          value={filter.text}
+          onChange={e => setFilter(f => ({ ...f, text: e.target.value }))}
+        />
+        <select
+          className="filter-tool"
+          value={filter.toolName}
+          onChange={e => setFilter(f => ({ ...f, toolName: e.target.value }))}
+        >
+          <option value="">すべてのツール</option>
+          {availableToolNames.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
+        <label className="filter-keyturns">
+          <input
+            type="checkbox"
+            checked={filter.keyTurnsOnly}
+            onChange={e => setFilter(f => ({ ...f, keyTurnsOnly: e.target.checked }))}
+          />
+          重要なターンのみ
+        </label>
+        {isFilterActive && (
+          <span className="filter-count">一致: {matchedIndices.size}</span>
+        )}
+        {isFilterActive && (
+          <button
+            className="filter-clear"
+            onClick={() => setFilter({ text: '', toolName: '', keyTurnsOnly: false })}
+          >
+            クリア
+          </button>
+        )}
+      </div>
+
       <div className="playback-body">
         {/* Minimap */}
         <div
@@ -378,20 +449,34 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
 
         {/* Turn content */}
         <div ref={contentRef} className="playback-content">
-          {turns.map((turn, i) => (
-            <div
-              key={turn.turnIndex}
-              className={`playback-turn ${i === activeTurnIndex ? 'playback-turn--active' : ''}`}
-              ref={el => setTurnRef(i, el)}
-              onClick={() => setActiveTurnIndex(i)}
-            >
-              <PlaybackStep
-                turn={turn}
-                isActive={i === activeTurnIndex}
-                subagents={subagents}
-              />
-            </div>
-          ))}
+          {turns.map((turn, i) => {
+            // Non-matching turns are dimmed + collapsed in place but kept in the
+            // DOM so minimap/keyboard-nav indices stay valid.
+            const dimmed = isFilterActive && !matchedIndices.has(i)
+            return (
+              <div
+                key={turn.turnIndex}
+                className={`playback-turn ${i === activeTurnIndex ? 'playback-turn--active' : ''}${dimmed ? ' playback-turn--filtered' : ''}`}
+                ref={el => setTurnRef(i, el)}
+                onClick={() => setActiveTurnIndex(i)}
+              >
+                {dimmed ? (
+                  <div className="playback-turn-collapsed">
+                    <span className="collapsed-index">#{i + 1}</span>
+                    <span className="collapsed-prompt">
+                      {(turn.userPrompt ?? '').slice(0, 80) || '（プロンプトなし）'}
+                    </span>
+                  </div>
+                ) : (
+                  <PlaybackStep
+                    turn={turn}
+                    isActive={i === activeTurnIndex}
+                    subagents={subagents}
+                  />
+                )}
+              </div>
+            )
+          })}
         </div>
 
         <PlaybackSidePanel detail={data} />

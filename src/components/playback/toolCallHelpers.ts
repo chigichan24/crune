@@ -300,3 +300,50 @@ const KIND_PRIORITY: Record<KeyMomentKind, number> = {
   prompt: 1,
   final: 0,
 }
+
+/**
+ * Active filter state for the playback search/filter bar.
+ */
+export interface PlaybackFilter {
+  /** Free-text query (matched against prompt, assistant texts, tool names). */
+  text: string
+  /** Exact tool-name filter ('' = any). */
+  toolName: string
+  /** When true, only key-moment turns match. */
+  keyTurnsOnly: boolean
+}
+
+/**
+ * Pure predicate: does a turn satisfy the active filter?
+ *
+ * AND semantics across the active conditions. Free-text matches the user
+ * prompt, assistant texts, and tool names (case-insensitive). The tool-name
+ * filter requires an exact tool match. `keyTurnsOnly` restricts to indices in
+ * `keyIndices`. An empty/whitespace-only condition is treated as inactive.
+ */
+export function turnMatchesFilter(
+  turn: ConversationTurn,
+  index: number,
+  filter: PlaybackFilter,
+  keyIndices: Set<number>,
+): boolean {
+  if (filter.keyTurnsOnly && !keyIndices.has(index)) return false
+
+  const toolNames = (turn.toolCalls ?? []).map(tc => tc.toolName ?? '')
+
+  if (filter.toolName && !toolNames.includes(filter.toolName)) return false
+
+  const query = filter.text.trim().toLowerCase()
+  if (query) {
+    const haystack = [
+      turn.userPrompt ?? '',
+      ...(turn.assistantTexts ?? []),
+      ...toolNames,
+    ]
+      .join('\n')
+      .toLowerCase()
+    if (!haystack.includes(query)) return false
+  }
+
+  return true
+}

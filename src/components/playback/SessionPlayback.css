@@ -199,6 +199,105 @@
   color: var(--chart-1);
 }
 
+/* Search / filter bar */
+.playback-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 8px 4px;
+  flex-wrap: wrap;
+}
+
+.filter-text {
+  flex: 1;
+  min-width: 200px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.filter-text:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filter-tool {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.filter-keyturns {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.filter-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.filter-clear {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.filter-clear:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+/* Dimmed + collapsed (filtered-out) turn */
+.playback-turn--filtered {
+  opacity: 0.4;
+}
+
+.playback-turn--filtered:hover {
+  opacity: 0.7;
+}
+
+.playback-turn-collapsed {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.collapsed-index {
+  font-family: monospace;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.collapsed-prompt {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* Body layout: minimap + content + side panel */
 .playback-body {
   display: grid;

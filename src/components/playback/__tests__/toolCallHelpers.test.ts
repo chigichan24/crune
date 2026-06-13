@@ -9,7 +9,9 @@ import {
   shouldCollapse,
   summarizeValue,
   truncate,
+  turnMatchesFilter,
 } from '../toolCallHelpers'
+import type { PlaybackFilter } from '../toolCallHelpers'
 
 function makeTurn(partial: Partial<ConversationTurn> & { turnIndex: number }): ConversationTurn {
   return {
@@ -129,6 +131,69 @@ describe('selectKeyMoments', () => {
     const indices = moments.map(m => m.index)
     expect(indices).toEqual([...indices].sort((a, b) => a - b))
     expect(new Set(indices).size).toBe(indices.length)
+  })
+})
+
+describe('turnMatchesFilter', () => {
+  const empty: PlaybackFilter = { text: '', toolName: '', keyTurnsOnly: false }
+  const keyIndices = new Set([2])
+
+  it('matches everything when the filter is empty', () => {
+    const turn = makeTurn({ turnIndex: 0, userPrompt: 'anything' })
+    expect(turnMatchesFilter(turn, 0, empty, keyIndices)).toBe(true)
+  })
+
+  it('matches free text against the user prompt (case-insensitive)', () => {
+    const turn = makeTurn({ turnIndex: 0, userPrompt: 'Fix the BUG in parser' })
+    expect(turnMatchesFilter(turn, 0, { ...empty, text: 'bug' }, keyIndices)).toBe(true)
+    expect(turnMatchesFilter(turn, 0, { ...empty, text: 'feature' }, keyIndices)).toBe(false)
+  })
+
+  it('matches free text against assistant texts', () => {
+    const turn = makeTurn({ turnIndex: 0, assistantTexts: ['Here is the diff'] })
+    expect(turnMatchesFilter(turn, 0, { ...empty, text: 'diff' }, keyIndices)).toBe(true)
+  })
+
+  it('matches free text against tool names', () => {
+    const turn = makeTurn({
+      turnIndex: 0,
+      toolCalls: [{ toolUseId: 't', toolName: 'Bash', input: {} }],
+    })
+    expect(turnMatchesFilter(turn, 0, { ...empty, text: 'bash' }, keyIndices)).toBe(true)
+  })
+
+  it('filters by exact tool name', () => {
+    const turn = makeTurn({
+      turnIndex: 0,
+      toolCalls: [{ toolUseId: 't', toolName: 'Edit', input: {} }],
+    })
+    expect(turnMatchesFilter(turn, 0, { ...empty, toolName: 'Edit' }, keyIndices)).toBe(true)
+    expect(turnMatchesFilter(turn, 0, { ...empty, toolName: 'Bash' }, keyIndices)).toBe(false)
+  })
+
+  it('restricts to key turns when keyTurnsOnly is set', () => {
+    const turn = makeTurn({ turnIndex: 2 })
+    expect(turnMatchesFilter(turn, 2, { ...empty, keyTurnsOnly: true }, keyIndices)).toBe(true)
+    expect(turnMatchesFilter(turn, 1, { ...empty, keyTurnsOnly: true }, keyIndices)).toBe(false)
+  })
+
+  it('requires all active conditions (AND semantics)', () => {
+    const turn = makeTurn({
+      turnIndex: 2,
+      userPrompt: 'fix bug',
+      toolCalls: [{ toolUseId: 't', toolName: 'Edit', input: {} }],
+    })
+    const filter: PlaybackFilter = { text: 'bug', toolName: 'Edit', keyTurnsOnly: true }
+    expect(turnMatchesFilter(turn, 2, filter, keyIndices)).toBe(true)
+    // text fails
+    expect(turnMatchesFilter(turn, 2, { ...filter, text: 'nope' }, keyIndices)).toBe(false)
+    // tool fails
+    expect(turnMatchesFilter(turn, 2, { ...filter, toolName: 'Bash' }, keyIndices)).toBe(false)
+  })
+
+  it('ignores whitespace-only text filters', () => {
+    const turn = makeTurn({ turnIndex: 0, userPrompt: 'hi' })
+    expect(turnMatchesFilter(turn, 0, { ...empty, text: '   ' }, keyIndices)).toBe(true)
   })
 })
 
