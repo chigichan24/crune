@@ -4,6 +4,8 @@ import type { ConversationTurn, ToolCall } from '../../types'
 import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
 import { PlanModeContext } from './PlanModeContext.ts'
+import { FeedbackContext } from './feedback/FeedbackContext.ts'
+import { useSessionFeedback } from '../../hooks/useSessionFeedback.ts'
 import { selectKeyMoments, turnMatchesFilter } from './toolCallHelpers.ts'
 import type { PlaybackFilter } from './toolCallHelpers.ts'
 import './SessionPlayback.css'
@@ -60,6 +62,7 @@ function summarizeTurn(turn: ConversationTurn): string {
 
 export function SessionPlayback({ sessionId, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
+  const feedback = useSessionFeedback(sessionId)
   const [activeTurnIndex, setActiveTurnIndex] = useState(0)
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const contentRef = useRef<HTMLDivElement>(null)
@@ -293,6 +296,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
 
   return (
     <PlanModeContext.Provider value={isPlanMode}>
+      <FeedbackContext.Provider value={feedback}>
       <div className="session-playback">
       <div className="playback-header">
         <div className="playback-header-info">
@@ -482,6 +486,7 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
         <PlaybackSidePanel detail={data} />
       </div>
       </div>
+      </FeedbackContext.Provider>
     </PlanModeContext.Provider>
   )
 }
