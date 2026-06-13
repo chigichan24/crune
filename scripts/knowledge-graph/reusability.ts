@@ -6,6 +6,48 @@
 import type { TopicNode, ReusabilityScore, FacetsData } from "./types.js";
 import { helpfulnessToScore } from "./facets-reader.js";
 
+/** Weight profile used when no facets data is available. */
+export const BASE_WEIGHTS = {
+  frequency: 0.35,
+  timeCost: 0.25,
+  crossProjectScore: 0.25,
+  recency: 0.15,
+} as const;
+
+/** Weight profile used when facets data enriches the signals. */
+export const FACETS_WEIGHTS = {
+  frequency: 0.3,
+  timeCost: 0.2,
+  crossProjectScore: 0.2,
+  recency: 0.1,
+  successRate: 0.1,
+  helpfulness: 0.1,
+} as const;
+
+type BreakdownEntry = NonNullable<ReusabilityScore["breakdown"]>[number];
+
+/**
+ * Build the per-signal breakdown by iterating the active weight set over the
+ * real reusability signal values. contribution = round(weight * value, 3).
+ */
+function buildBreakdown(
+  weights: Record<string, number>,
+  values: Record<string, number>
+): BreakdownEntry[] {
+  const breakdown: BreakdownEntry[] = [];
+  for (const signal of Object.keys(weights)) {
+    const weight = weights[signal];
+    const value = values[signal] ?? 0;
+    breakdown.push({
+      signal,
+      value: Math.round(value * 1000) / 1000,
+      weight,
+      contribution: Math.round(weight * value * 1000) / 1000,
+    });
+  }
+  return breakdown;
+}
+
 export function computeReusabilityScores(
   topics: TopicNode[],
   now: Date = new Date(),
@@ -84,21 +126,39 @@ export function computeReusabilityScores(
       const helpfulness = helpfulnessSum / sessionCount;
 
       overall =
-        0.30 * frequency +
-        0.20 * timeCost +
-        0.20 * crossProjectScore +
-        0.10 * recency +
-        0.10 * successRate +
-        0.10 * helpfulness;
+        FACETS_WEIGHTS.frequency * frequency +
+        FACETS_WEIGHTS.timeCost * timeCost +
+        FACETS_WEIGHTS.crossProjectScore * crossProjectScore +
+        FACETS_WEIGHTS.recency * recency +
+        FACETS_WEIGHTS.successRate * successRate +
+        FACETS_WEIGHTS.helpfulness * helpfulness;
 
       score.successRate = Math.round(successRate * 1000) / 1000;
       score.helpfulness = Math.round(helpfulness * 1000) / 1000;
+
+      score.weightProfile = "facets";
+      score.breakdown = buildBreakdown(FACETS_WEIGHTS, {
+        frequency,
+        timeCost,
+        crossProjectScore,
+        recency,
+        successRate,
+        helpfulness,
+      });
     } else {
       overall =
-        0.35 * frequency +
-        0.25 * timeCost +
-        0.25 * crossProjectScore +
-        0.15 * recency;
+        BASE_WEIGHTS.frequency * frequency +
+        BASE_WEIGHTS.timeCost * timeCost +
+        BASE_WEIGHTS.crossProjectScore * crossProjectScore +
+        BASE_WEIGHTS.recency * recency;
+
+      score.weightProfile = "base";
+      score.breakdown = buildBreakdown(BASE_WEIGHTS, {
+        frequency,
+        timeCost,
+        crossProjectScore,
+        recency,
+      });
     }
 
     score.overall = Math.round(overall * 1000) / 1000;
