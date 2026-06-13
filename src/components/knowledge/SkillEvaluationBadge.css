@@ -1,0 +1,10 @@
+/*
+ * SkillEvaluationBadge is intentionally prefix-driven: each host view (Knowledge
+ * Node Detail `knd`, Tacit Knowledge `tk`) supplies its own `prefix` prop and
+ * owns the concrete `.{prefix}-eval*` rules in its co-located stylesheet so the
+ * badge inherits the surrounding view's sizing/spacing. The markup and the
+ * pass/borderline/fail thresholds live once in SkillEvaluationBadge.tsx.
+ *
+ * This file is the badge's co-located stylesheet entrypoint; host-specific
+ * visual rules remain in KnowledgeNodeDetail.css / TacitKnowledgeView.css.
+ */

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import type { KnowledgeGraphMetrics, TopicNode, TopicEdge, KnowledgeCommunity, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
+import { SkillEvaluationBadge } from './SkillEvaluationBadge'
 import './TacitKnowledgeView.css'
 
 interface Props {
@@ -272,6 +273,9 @@ export function TacitKnowledgeView({ knowledge, graphMetrics, topics, edges, com
                           <span className="tk-card-badge">Hook</span>
                         )}
                       </div>
+                      {candidate.evaluation && (
+                        <SkillEvaluationBadge evaluation={candidate.evaluation} prefix="tk" />
+                      )}
                       <DistillButton
                         candidate={candidate}
                         topic={topic}

@@ -101,6 +101,24 @@ npm run dev:full    # Runs skill-server + Vite dev server
 
 The skill server (`scripts/skill-server.ts`) accepts POST requests at `/api/synthesize` and calls `claude -p` with the enriched prompt including graph context.
 
+### Skill Evaluation (issue #20)
+
+After a candidate is synthesized, `analyze-sessions` evaluates the generated SKILL.md via `scripts/skill-evaluator.ts` and persists the result onto `SkillCandidate.evaluation` (serialized into `overview.json`). Evaluation is gated behind synthesis **success** so heuristic `skillMarkdown` is never scored.
+
+Three layers (`evaluateSkill`):
+1. **Structural validation** --- deterministic zod-backed YAML frontmatter checks (name kebab-case, description length, body present). Always runs locally.
+2. **LLM rubric** --- `claude -p` scores the skill 0-100 across nameQuality / descriptionTriggering / instructionsConcrete / noPreambleNoise (25 each). Runs unless `--skip-eval`.
+3. **Smoke firing** --- stubbed (deferred to a follow-up issue); always reports `skipped: true`.
+
+`overallScore` = 50 for structural pass + scaled rubric (0-50). `toSkillEvaluation()` strips the raw LLM response and intermediate parse before persistence.
+
+Flags (next to the `--synthesize-*` flags, eval defaults **ON**):
+- `--skip-eval` --- Skip the LLM rubric (structural-only).
+- `--eval-model <model>` --- Claude model for rubric scoring (e.g. `haiku`).
+- `--eval-threshold <n>` --- Soft threshold (default 60). When `overallScore < n`, the pipeline runs **exactly one** bounded re-synthesis retry and keeps the higher-scoring attempt. The candidate is never dropped; low scores are flagged in the UI. `--eval-threshold 0` disables retries. The retry decision is the pure function `shouldRetrySynthesis(score, threshold)`.
+
+**UI badge**: When `candidate.evaluation` exists, `KnowledgeNodeDetail` and `TacitKnowledgeView` render a compact評価バッジ --- 構造 OK/NG, スコア NN/100, optional rubric内訳, and 改善ヒント list. Pass/borderline/fail tone uses `--success`/`--warning`/`--danger` (pass ≥70, borderline ≥50, fail otherwise or structural NG).
+
 ## Session Summarization
 
 セッション一覧の `firstUserPrompt` フィールドは、facetsデータが利用可能な場合は `/insights` の `brief_summary`（LLM生成の要約）で置き換えられる。facetsがないセッションは従来通り最初のユーザープロンプトを表示する。
@@ -127,7 +145,8 @@ All domain types are in `src/types/session.ts`. Key types:
 - `SessionDetail`, `ConversationTurn`, `AssistantBlock` --- playback data
 - `KnowledgeGraph`, `TopicNode`, `TopicEdge` --- graph data
 - `ReusabilityScore` --- includes `successRate?` and `helpfulness?` (facets-derived, optional)
-- `SkillCandidate` --- includes `skillMarkdown` (heuristic) and `synthesizedMarkdown` (LLM-synthesized)
+- `SkillCandidate` --- includes `skillMarkdown` (heuristic), `synthesizedMarkdown` (LLM-synthesized), and `evaluation` (`SkillEvaluation`, issue #20)
+- `SkillEvaluation` --- persisted evaluation: `structural`, optional `rubric`, optional `smokeFiring` (stub), `overallScore`
 - `GraphContext`, `ConnectedTopicInfo` --- graph context for synthesis
 - `TacitKnowledge`, `WorkflowPattern` --- extracted insights
 

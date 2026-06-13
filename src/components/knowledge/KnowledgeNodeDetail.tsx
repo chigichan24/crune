@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
+import { SkillEvaluationBadge } from './SkillEvaluationBadge'
 import './KnowledgeNodeDetail.css'
 
 interface Props {
@@ -187,6 +188,10 @@ export function KnowledgeNodeDetail({
         {/* Distill Skill */}
         {skillCandidate && (
           <div className="knd-export">
+            {/* Skill evaluation badge (from analyze-sessions eval pipeline) */}
+            {skillCandidate.evaluation && (
+              <SkillEvaluationBadge evaluation={skillCandidate.evaluation} prefix="knd" />
+            )}
             {/* Pre-synthesized result (from analyze-sessions) */}
             {skillCandidate.synthesizedMarkdown && !synthResult && (
               <div className="knd-synth-result">

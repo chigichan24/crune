@@ -11,6 +11,7 @@
  */
 import { spawn } from "node:child_process";
 import { z } from "zod";
+import type { SkillEvaluation } from "../src/types/session.js";
 
 // ---------- Types ----------
 
@@ -511,10 +512,14 @@ export async function evaluateSkill(
   const structural = validateStructure(markdown);
 
   let rubric: RubricResult | undefined;
-  if (!options.skipRubric) {
-    rubric = await scoreWithRubric(markdown, options);
-  } else {
+  if (options.skipRubric) {
     rubric = { ok: false, skipped: true };
+  } else if (!structural.valid) {
+    // Structural validation failed -> overallScore is forced to 0 regardless of
+    // the rubric, so the (expensive) claude -p rubric call would be wasted.
+    rubric = { ok: false, skipped: true };
+  } else {
+    rubric = await scoreWithRubric(markdown, options);
   }
 
   const smokeFiring = await smokeFireTest(markdown);
@@ -531,4 +536,67 @@ export async function evaluateSkill(
   }
 
   return { structural, rubric, smokeFiring, overallScore };
+}
+
+// ---------- Soft threshold ----------
+
+/**
+ * Decide whether to trigger a (single, bounded) re-synthesis retry for a
+ * skill whose evaluation scored below the soft threshold.
+ *
+ * Pure decision function — the caller owns the actual retry budget (exactly
+ * one extra `claude -p` call). A missing score is treated as 0. A threshold
+ * of 0 disables retries entirely.
+ */
+export function shouldRetrySynthesis(
+  overallScore: number | undefined,
+  threshold: number
+): boolean {
+  if (threshold <= 0) return false;
+  return (overallScore ?? 0) < threshold;
+}
+
+// ---------- Persistence mapper ----------
+
+/**
+ * Convert an internal {@link EvaluationResult} into the persistable
+ * {@link SkillEvaluation} shape from src/types/session.ts.
+ *
+ * Drops fields that are not safe / useful to serialize into overview.json:
+ *   - `rubric.rawResponse` (raw LLM text, potentially large/noisy)
+ *   - `structural.parsed` (intermediate parse, not part of the UI shape)
+ *
+ * Everything else (structural validity + issues, rubric score/breakdown/hints/
+ * error/skipped, smoke firing, overall score) is preserved verbatim.
+ */
+export function toSkillEvaluation(result: EvaluationResult): SkillEvaluation {
+  const out: SkillEvaluation = {
+    structural: {
+      valid: result.structural.valid,
+      issues: result.structural.issues.map((i) => ({
+        field: i.field,
+        message: i.message,
+      })),
+    },
+    smokeFiring: {
+      skipped: result.smokeFiring.skipped,
+      message: result.smokeFiring.message,
+    },
+    overallScore: result.overallScore,
+  };
+
+  if (result.rubric) {
+    out.rubric = {
+      ok: result.rubric.ok,
+      score: result.rubric.score,
+      breakdown: result.rubric.breakdown
+        ? { ...result.rubric.breakdown }
+        : undefined,
+      hints: result.rubric.hints ? [...result.rubric.hints] : undefined,
+      error: result.rubric.error,
+      skipped: result.rubric.skipped,
+    };
+  }
+
+  return out;
 }
