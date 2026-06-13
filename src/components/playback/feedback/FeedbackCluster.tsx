@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFeedback } from './FeedbackContext'
 import { TagInput } from './TagInput'
 import './FeedbackCluster.css'
@@ -70,15 +70,64 @@ export function FeedbackCluster({ turnId, blockId }: Props) {
 
       {noteOpen && (
         <div className="feedback-popover">
-          <textarea
-            className="feedback-note"
-            placeholder="メモを追加"
+          <NoteEditor
             value={note}
-            onChange={e => fb.setNote(turnId, blockId, e.target.value)}
-            rows={3}
+            onCommit={next => fb.setNote(turnId, blockId, next)}
           />
         </div>
       )}
     </div>
+  )
+}
+
+interface NoteEditorProps {
+  /** Committed note from the store. */
+  value: string
+  /** Persist the draft to the store. Called on blur and on unmount. */
+  onCommit: (note: string) => void
+}
+
+/**
+ * Note textarea that keeps edits in local state and only commits to the store
+ * on blur or unmount, instead of on every keystroke. This avoids a full
+ * localStorage write + version bump + tree re-render per character typed.
+ */
+function NoteEditor({ value, onCommit }: NoteEditorProps) {
+  const [draft, setDraft] = useState(value)
+
+  // Re-seed when the committed value changes externally (e.g. a different
+  // entry is selected while the editor stays mounted).
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  // Keep the latest draft/value in a ref so the unmount-commit effect can read
+  // them without re-running (and thus committing) on every keystroke. The ref
+  // is updated in an effect (never during render) per react-hooks/refs.
+  const latest = useRef({ draft, value, onCommit })
+  useEffect(() => {
+    latest.current = { draft, value, onCommit }
+  })
+
+  useEffect(() => {
+    return () => {
+      const { draft: d, value: v, onCommit: commit } = latest.current
+      if (d !== v) commit(d)
+    }
+  }, [])
+
+  const commit = () => {
+    if (draft !== value) onCommit(draft)
+  }
+
+  return (
+    <textarea
+      className="feedback-note"
+      placeholder="メモを追加"
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      rows={3}
+    />
   )
 }
