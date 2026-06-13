@@ -152,23 +152,39 @@ describe("buildTfidf", () => {
       "term",
       "anchor",
     ]);
-    documents.set("doc3", ["anchor", "filler"]);
-    documents.set("doc4", ["anchor", "filler"]);
+    // "anchor" needs df>=2 but must NOT be ubiquitous (else the maxDf cap
+    // excludes it); "extra" gives it a non-member doc and keeps df>=2.
+    documents.set("doc3", ["anchor", "extra"]);
+    documents.set("doc4", ["extra", "filler"]);
 
     const result = buildTfidf(documents);
     expect(result.vocabulary).toContain("term");
+    expect(result.vocabulary).toContain("anchor");
 
     const idx = result.vocabIndex.get("term")!;
-    // Compare pre-L2 BM25 saturated TF directly: tf = c*(k1+1)/(c + k1*...).
-    // With k1=1.2, tf(1)/... vs tf(10) ratio must be well under 10 (sub-linear).
-    const K1 = 1.2;
-    const tf1 = (1 * (K1 + 1)) / (1 + K1); // length-norm factor ~ irrelevant to ratio cap
-    const tf10 = (10 * (K1 + 1)) / (10 + K1);
-    expect(tf10 / tf1).toBeLessThan(3); // strongly sub-linear, nowhere near 10x
 
-    // Sanity: the term has a non-zero component in doc2.
+    // Assert on the ACTUAL produced vectors, not a re-implemented BM25 formula.
+    // doc1 and doc2 both contain "term" + "anchor"; doc2 repeats "term" 10x
+    // while doc1 has it once. "anchor" occurs once in both, so within each
+    // L2-normalized vector the term/anchor ratio reflects only BM25's TF
+    // saturation. A linear (non-saturating) scheme would make doc2's
+    // term/anchor ratio ~10x doc1's; saturation keeps it far below the 10x
+    // count ratio.
+    const anchorIdx = result.vocabIndex.get("anchor")!;
+    const vec1 = result.vectors.get("doc1")!;
     const vec2 = result.vectors.get("doc2")!;
+
+    const ratio1 = vec1[idx] / vec1[anchorIdx];
+    const ratio2 = vec2[idx] / vec2[anchorIdx];
+
+    // Both terms present in both docs.
+    expect(vec1[idx]).toBeGreaterThan(0);
     expect(vec2[idx]).toBeGreaterThan(0);
+
+    // More repetitions => larger relative weight, but strongly sub-linear:
+    // the produced ratio grows far less than the 10x count ratio.
+    expect(ratio2).toBeGreaterThan(ratio1);
+    expect(ratio2 / ratio1).toBeLessThan(3); // nowhere near 10x
   });
 
   it("down-weights a shared single-occurrence term in a longer document (length normalization)", () => {
@@ -195,24 +211,16 @@ describe("buildTfidf", () => {
 
     const idx = result.vocabIndex.get("shared")!;
 
-    // Recompute pre-L2 BM25 weight to assert length normalization independent
-    // of the subsequent L2 step. docLen counts only in-vocab tokens.
-    const K1 = 1.2;
-    const B = 0.75;
-    const inVocab = (toks: string[]) =>
-      toks.filter((t) => result.vocabIndex.has(t)).length;
-    const lens = [...documents.values()].map(inVocab);
-    const avgdl = lens.reduce((a, b) => a + b, 0) / lens.length;
+    // Assert directly on the ACTUAL produced vectors. "shared" occurs exactly
+    // once in both docs, so a length-insensitive scheme would weight it
+    // similarly; BM25's document-length normalization down-weights the term in
+    // the longer document. The doc set is constructed so this relationship
+    // survives the subsequent L2 normalization step (verified deterministic).
+    const shortShared = result.vectors.get("short")![idx];
+    const longShared = result.vectors.get("long")![idx];
 
-    const bm25 = (count: number, docLen: number) =>
-      (count * (K1 + 1)) / (count + K1 * (1 - B + B * (docLen / avgdl)));
-
-    const shortLen = inVocab(documents.get("short")!);
-    const longLen = inVocab(documents.get("long")!);
-    expect(bm25(1, longLen)).toBeLessThan(bm25(1, shortLen));
-
-    // Both vectors carry the term; non-emptiness sanity check.
-    expect(result.vectors.get("short")![idx]).toBeGreaterThan(0);
-    expect(result.vectors.get("long")![idx]).toBeGreaterThan(0);
+    expect(shortShared).toBeGreaterThan(0);
+    expect(longShared).toBeGreaterThan(0);
+    expect(longShared).toBeLessThan(shortShared);
   });
 });

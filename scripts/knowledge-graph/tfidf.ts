@@ -11,10 +11,18 @@
 
 import type { TfidfResult } from "./types.js";
 
-// BM25 hyperparameters (Okapi defaults).
-const K1 = 1.2; // term-frequency saturation
-const B = 0.75; // document-length normalization strength
+// BM25 hyperparameters (Okapi defaults). Exported so tests can reference the
+// single source of truth instead of re-declaring magic numbers.
+export const BM25_K1 = 1.2; // term-frequency saturation
+export const BM25_B = 0.75; // document-length normalization strength
 
+/**
+ * Build BM25 (Okapi) document vectors.
+ *
+ * NOTE: The exported name `buildTfidf` (and the `TfidfResult` type / `tfidf.ts`
+ * file name) is retained for downstream compatibility — many consumers import
+ * these symbols. The actual algorithm is Okapi BM25, not classic TF-IDF.
+ */
 export function buildTfidf(
   documents: Map<string, string[]>
 ): TfidfResult {
@@ -75,12 +83,12 @@ export function buildTfidf(
     }
 
     const docLen = docLens.get(docId) || 0;
-    const lenNorm = avgdl > 0 ? 1 - B + B * (docLen / avgdl) : 1;
+    const lenNorm = avgdl > 0 ? 1 - BM25_B + BM25_B * (docLen / avgdl) : 1;
 
     const vec = new Float64Array(vocabulary.length);
     for (const [term, count] of tf) {
       const idx = vocabIndex.get(term)!;
-      const saturatedTf = (count * (K1 + 1)) / (count + K1 * lenNorm);
+      const saturatedTf = (count * (BM25_K1 + 1)) / (count + BM25_K1 * lenNorm);
       vec[idx] = saturatedTf * (idf.get(term) || 0);
     }
 
