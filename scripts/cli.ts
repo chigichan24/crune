@@ -182,6 +182,29 @@ export function renderCandidateDetail(
   return lines;
 }
 
+/**
+ * Emit the `--json` envelope (schema version, timestamp, serialized candidates)
+ * to stdout. Shared by the dry-run+json and preview+json branches so the
+ * envelope shape stays in one place. Each candidate is paired with its topic
+ * node (looked up by id) before serialization.
+ */
+function emitCandidatesJson(
+  candidates: SkillCandidate[],
+  nodes: TopicNode[]
+): void {
+  const obj = {
+    schemaVersion: SCHEMA_VERSION,
+    generatedAt: new Date().toISOString(),
+    candidates: candidates.map((c) =>
+      serializeCandidate(
+        c,
+        nodes.find((n) => n.id === c.topicId)
+      )
+    ),
+  };
+  process.stdout.write(JSON.stringify(obj, null, 2) + "\n");
+}
+
 // ─── Main pipeline ─────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -283,17 +306,7 @@ async function main(): Promise<void> {
   // JSON on stdout is machine-parseable.
   if (config.dryRun) {
     if (config.json) {
-      const obj = {
-        schemaVersion: SCHEMA_VERSION,
-        generatedAt: new Date().toISOString(),
-        candidates: topCandidates.map((c) =>
-          serializeCandidate(
-            c,
-            knowledgeGraph.nodes.find((n) => n.id === c.topicId)
-          )
-        ),
-      };
-      process.stdout.write(JSON.stringify(obj, null, 2) + "\n");
+      emitCandidatesJson(topCandidates, knowledgeGraph.nodes);
       process.exit(0);
     }
     console.error("\nSkill candidates (dry run):\n");
@@ -416,17 +429,7 @@ async function main(): Promise<void> {
   }
 
   if (previewJson) {
-    const obj = {
-      schemaVersion: SCHEMA_VERSION,
-      generatedAt: new Date().toISOString(),
-      candidates: previewedCandidates.map((c) =>
-        serializeCandidate(
-          c,
-          knowledgeGraph.nodes.find((n) => n.id === c.topicId)
-        )
-      ),
-    };
-    process.stdout.write(JSON.stringify(obj, null, 2) + "\n");
+    emitCandidatesJson(previewedCandidates, knowledgeGraph.nodes);
     console.error(`\nDone! ${topCandidates.length} skills previewed (JSON)`);
   } else if (writeToDisk) {
     console.error(
