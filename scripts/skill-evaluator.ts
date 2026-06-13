@@ -512,10 +512,14 @@ export async function evaluateSkill(
   const structural = validateStructure(markdown);
 
   let rubric: RubricResult | undefined;
-  if (!options.skipRubric) {
-    rubric = await scoreWithRubric(markdown, options);
-  } else {
+  if (options.skipRubric) {
     rubric = { ok: false, skipped: true };
+  } else if (!structural.valid) {
+    // Structural validation failed -> overallScore is forced to 0 regardless of
+    // the rubric, so the (expensive) claude -p rubric call would be wasted.
+    rubric = { ok: false, skipped: true };
+  } else {
+    rubric = await scoreWithRubric(markdown, options);
   }
 
   const smokeFiring = await smokeFireTest(markdown);

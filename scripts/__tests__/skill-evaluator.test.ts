@@ -379,4 +379,15 @@ describe("evaluateSkill (orchestrator)", () => {
     expect(result.overallScore).toBe(50);
     expect(result.rubric?.skipped).toBe(true);
   });
+
+  it("does not invoke the rubric LLM when structural validation fails (even without skipRubric)", async () => {
+    const broken = `# no frontmatter at all`;
+    // No skipRubric: structural failure alone must short-circuit the claude -p
+    // call. If the LLM were invoked this would spawn a process / hang in CI.
+    const result = await evaluateSkill(broken);
+    expect(result.structural.valid).toBe(false);
+    expect(result.overallScore).toBe(0);
+    expect(result.rubric?.skipped).toBe(true);
+    expect(result.rubric?.ok).toBe(false);
+  });
 });
