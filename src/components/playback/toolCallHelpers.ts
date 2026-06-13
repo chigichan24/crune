@@ -246,6 +246,14 @@ const KEY_MOMENT_LABELS: Record<KeyMomentKind, string> = {
   final: '最終',
 }
 
+/** Resolution order when several key-moment kinds apply to the same turn. */
+const KIND_PRIORITY: Record<KeyMomentKind, number> = {
+  agent: 3,
+  plan: 2,
+  prompt: 1,
+  final: 0,
+}
+
 /**
  * Select the semantic "key moments" of a session for the jump-link rail.
  *
@@ -264,9 +272,9 @@ export function selectKeyMoments(turns: ConversationTurn[]): KeyMoment[] {
   const lastIndex = turns.length - 1
   const byIndex = new Map<number, KeyMomentKind>()
 
-  const setKind = (index: number, kind: KeyMomentKind, priority: number) => {
+  const setKind = (index: number, kind: KeyMomentKind) => {
     const existing = byIndex.get(index)
-    if (existing == null || priority > KIND_PRIORITY[existing]) {
+    if (existing == null || KIND_PRIORITY[kind] > KIND_PRIORITY[existing]) {
       byIndex.set(index, kind)
     }
   }
@@ -279,26 +287,19 @@ export function selectKeyMoments(turns: ConversationTurn[]): KeyMoment[] {
     const hasPlan = toolCalls.some(tc => PLAN_TASK_TOOLS.has(tc.toolName ?? ''))
     const promptLen = (turn.userPrompt ?? '').trim().length
 
-    if (hasAgent) setKind(index, 'agent', KIND_PRIORITY.agent)
-    if (hasPlan) setKind(index, 'plan', KIND_PRIORITY.plan)
+    if (hasAgent) setKind(index, 'agent')
+    if (hasPlan) setKind(index, 'plan')
     if (promptLen >= KEY_MOMENT_PROMPT_MIN_CHARS) {
-      setKind(index, 'prompt', KIND_PRIORITY.prompt)
+      setKind(index, 'prompt')
     }
   })
 
   // Final turn is always a key moment (lowest priority, won't override others).
-  setKind(lastIndex, 'final', KIND_PRIORITY.final)
+  setKind(lastIndex, 'final')
 
   return [...byIndex.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([index, kind]) => ({ index, kind, label: KEY_MOMENT_LABELS[kind] }))
-}
-
-const KIND_PRIORITY: Record<KeyMomentKind, number> = {
-  agent: 3,
-  plan: 2,
-  prompt: 1,
-  final: 0,
 }
 
 /**
