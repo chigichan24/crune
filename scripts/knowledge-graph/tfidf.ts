@@ -1,8 +1,19 @@
 /**
- * TF-IDF vectorization for session documents.
+ * BM25 vectorization for session documents.
+ *
+ * Replaces the previous log-TF / log-IDF scheme with Okapi BM25:
+ * - Smoothed, non-negative IDF.
+ * - Saturated term frequency with document-length normalization.
+ * The result shape (vocabulary / vocabIndex / L2-normalized vectors) is
+ * identical to the prior TF-IDF implementation so downstream cosine-similarity
+ * consumers are unaffected.
  */
 
 import type { TfidfResult } from "./types.js";
+
+// BM25 hyperparameters (Okapi defaults).
+const K1 = 1.2; // term-frequency saturation
+const B = 0.75; // document-length normalization strength
 
 export function buildTfidf(
   documents: Map<string, string[]>
@@ -16,9 +27,11 @@ export function buildTfidf(
     }
   }
 
-  // Filter vocabulary: appear in at least 2 docs, but not in > 80% of docs
+  // Filter vocabulary: appear in at least 2 docs, but not too broadly.
+  // The absolute cap (n - 1) guarantees a term present in EVERY doc (df == n)
+  // is always excluded, even for tiny corpora where floor(n*0.8) would admit it.
   const n = documents.size;
-  const maxDf = Math.max(2, Math.floor(n * 0.8));
+  const maxDf = Math.min(Math.max(2, Math.floor(n * 0.8)), n - 1);
   const vocabulary: string[] = [];
   const vocabIndex = new Map<string, number>();
 
@@ -29,7 +42,28 @@ export function buildTfidf(
     }
   }
 
-  // Build TF-IDF vectors
+  // First pass: per-document length = count of in-vocabulary tokens, and the
+  // corpus average document length (avgdl) used for BM25 length normalization.
+  const docLens = new Map<string, number>();
+  let totalLen = 0;
+  for (const [docId, tokens] of documents) {
+    let len = 0;
+    for (const t of tokens) {
+      if (vocabIndex.has(t)) len++;
+    }
+    docLens.set(docId, len);
+    totalLen += len;
+  }
+  const avgdl = n > 0 ? totalLen / n : 0;
+
+  // Precompute BM25 smoothed IDF per vocabulary term (non-negative by design).
+  const idf = new Map<string, number>();
+  for (const term of vocabulary) {
+    const d = df.get(term) || 0;
+    idf.set(term, Math.log((n - d + 0.5) / (d + 0.5) + 1));
+  }
+
+  // Build BM25 vectors
   const vectors = new Map<string, Float64Array>();
 
   for (const [docId, tokens] of documents) {
@@ -40,12 +74,14 @@ export function buildTfidf(
       }
     }
 
+    const docLen = docLens.get(docId) || 0;
+    const lenNorm = avgdl > 0 ? 1 - B + B * (docLen / avgdl) : 1;
+
     const vec = new Float64Array(vocabulary.length);
     for (const [term, count] of tf) {
       const idx = vocabIndex.get(term)!;
-      const termFreq = Math.log(1 + count);
-      const invDocFreq = Math.log(n / (df.get(term) || 1));
-      vec[idx] = termFreq * invDocFreq;
+      const saturatedTf = (count * (K1 + 1)) / (count + K1 * lenNorm);
+      vec[idx] = saturatedTf * (idf.get(term) || 0);
     }
 
     // L2 normalize

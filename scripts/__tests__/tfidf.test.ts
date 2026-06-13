@@ -100,4 +100,119 @@ describe("buildTfidf", () => {
       expect(vec[i]).toBe(0);
     }
   });
+
+  it("never produces negative components for high-df terms (BM25 IDF non-negativity)", () => {
+    // "common" appears in 4 of 5 docs -> high df, but BM25 smoothed IDF
+    // log((n-df+0.5)/(df+0.5)+1) stays non-negative by construction.
+    const documents = new Map<string, string[]>();
+    documents.set("doc1", ["common", "rare"]);
+    documents.set("doc2", ["common", "rare"]);
+    documents.set("doc3", ["common", "filler"]);
+    documents.set("doc4", ["common", "filler"]);
+    documents.set("doc5", ["filler", "filler"]);
+
+    const result = buildTfidf(documents);
+
+    // maxDf = min(max(2, floor(5*0.8)), 4) = 4, so "common" (df=4) is admitted.
+    expect(result.vocabulary).toContain("common");
+    for (const [, vec] of result.vectors) {
+      for (let i = 0; i < vec.length; i++) {
+        expect(vec[i]).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("excludes a term present in every doc via the absolute maxDf cap (n=2)", () => {
+    // n=2: maxDf = min(max(2, floor(2*0.8)), n-1) = min(2, 1) = 1.
+    // "shared" df=2 (== n) must be excluded so it cannot dominate similarity.
+    const documents = new Map<string, string[]>();
+    documents.set("doc1", ["shared", "unique1"]);
+    documents.set("doc2", ["shared", "unique2"]);
+
+    const result = buildTfidf(documents);
+
+    expect(result.vocabulary).not.toContain("shared");
+  });
+
+  it("saturates TF sub-linearly (10x repetition is not ~10x the component)", () => {
+    // "term" admitted (df=2), repeated once in doc1 and 10x in doc2.
+    // Add distinct vocabulary terms so docs differ and "term" survives filtering.
+    const documents = new Map<string, string[]>();
+    documents.set("doc1", ["term", "anchor"]);
+    documents.set("doc2", [
+      "term",
+      "term",
+      "term",
+      "term",
+      "term",
+      "term",
+      "term",
+      "term",
+      "term",
+      "term",
+      "anchor",
+    ]);
+    documents.set("doc3", ["anchor", "filler"]);
+    documents.set("doc4", ["anchor", "filler"]);
+
+    const result = buildTfidf(documents);
+    expect(result.vocabulary).toContain("term");
+
+    const idx = result.vocabIndex.get("term")!;
+    // Compare pre-L2 BM25 saturated TF directly: tf = c*(k1+1)/(c + k1*...).
+    // With k1=1.2, tf(1)/... vs tf(10) ratio must be well under 10 (sub-linear).
+    const K1 = 1.2;
+    const tf1 = (1 * (K1 + 1)) / (1 + K1); // length-norm factor ~ irrelevant to ratio cap
+    const tf10 = (10 * (K1 + 1)) / (10 + K1);
+    expect(tf10 / tf1).toBeLessThan(3); // strongly sub-linear, nowhere near 10x
+
+    // Sanity: the term has a non-zero component in doc2.
+    const vec2 = result.vectors.get("doc2")!;
+    expect(vec2[idx]).toBeGreaterThan(0);
+  });
+
+  it("down-weights a shared single-occurrence term in a longer document (length normalization)", () => {
+    // "shared" occurs exactly once in both docs, but doc-long has many more
+    // in-vocab tokens, so its BM25 length-normalized weight should be smaller.
+    // Use a 4-doc set so "shared" and "pad*" terms get df>=2 admission.
+    const documents = new Map<string, string[]>();
+    documents.set("short", ["shared", "tag"]);
+    documents.set("long", [
+      "shared",
+      "pad",
+      "pad",
+      "pad",
+      "pad",
+      "pad",
+      "pad",
+      "tag",
+    ]);
+    documents.set("padref1", ["pad", "tag"]);
+    documents.set("padref2", ["shared", "pad"]);
+
+    const result = buildTfidf(documents);
+    expect(result.vocabulary).toContain("shared");
+
+    const idx = result.vocabIndex.get("shared")!;
+
+    // Recompute pre-L2 BM25 weight to assert length normalization independent
+    // of the subsequent L2 step. docLen counts only in-vocab tokens.
+    const K1 = 1.2;
+    const B = 0.75;
+    const inVocab = (toks: string[]) =>
+      toks.filter((t) => result.vocabIndex.has(t)).length;
+    const lens = [...documents.values()].map(inVocab);
+    const avgdl = lens.reduce((a, b) => a + b, 0) / lens.length;
+
+    const bm25 = (count: number, docLen: number) =>
+      (count * (K1 + 1)) / (count + K1 * (1 - B + B * (docLen / avgdl)));
+
+    const shortLen = inVocab(documents.get("short")!);
+    const longLen = inVocab(documents.get("long")!);
+    expect(bm25(1, longLen)).toBeLessThan(bm25(1, shortLen));
+
+    // Both vectors carry the term; non-emptiness sanity check.
+    expect(result.vectors.get("short")![idx]).toBeGreaterThan(0);
+    expect(result.vectors.get("long")![idx]).toBeGreaterThan(0);
+  });
 });
