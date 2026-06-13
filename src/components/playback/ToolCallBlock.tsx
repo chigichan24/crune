@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ToolCall, SubagentSession } from '../../types'
 import { SubagentBranch } from './SubagentBranch'
+import { FeedbackCluster } from './feedback/FeedbackCluster'
 import { countLines, getToolCategory, shouldCollapse, truncate } from './toolCallHelpers'
 import {
   AgentRenderer,
@@ -28,6 +29,8 @@ import './ToolCallBlock.css'
 
 interface Props {
   toolCall: ToolCall
+  /** Owning turn's numeric turnIndex, for block-level feedback keys. */
+  turnId: number
   subagents: Record<string, SubagentSession>
   /** Nesting depth, forwarded to recursively-rendered subagent branches. */
   depth?: number
@@ -52,7 +55,7 @@ function extractInputBody(name: string, input: Record<string, unknown>): string 
   }
 }
 
-export function ToolCallBlock({ toolCall, subagents, depth = 0 }: Props) {
+export function ToolCallBlock({ toolCall, turnId, subagents, depth = 0 }: Props) {
   const name = toolCall.toolName ?? ''
   const input = toolCall.input ?? {}
   const result = toolCall.result ?? null
@@ -110,6 +113,9 @@ export function ToolCallBlock({ toolCall, subagents, depth = 0 }: Props) {
         <span className={`tool-name-badge tool-name-badge--${category}`}>
           {name}
         </span>
+        <div className="tool-call-feedback">
+          <FeedbackCluster turnId={turnId} blockId={toolCall.toolUseId} />
+        </div>
       </div>
       {renderInput()}
       {renderResult()}

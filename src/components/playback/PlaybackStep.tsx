@@ -59,6 +59,7 @@ export function PlaybackStep({ turn, isActive, subagents, depth = 0 }: Props) {
         <ToolCallBlock
           key={tc.toolUseId}
           toolCall={tc}
+          turnId={turn.turnIndex}
           subagents={subagents}
           depth={depth}
         />
