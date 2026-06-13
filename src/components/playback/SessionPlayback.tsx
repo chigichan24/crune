@@ -5,6 +5,7 @@ import { PlaybackStep } from './PlaybackStep.tsx'
 import { PlaybackSidePanel } from './PlaybackSidePanel.tsx'
 import { PlanModeContext } from './PlanModeContext.ts'
 import { FeedbackContext } from './feedback/FeedbackContext.ts'
+import { FeedbackCluster } from './feedback/FeedbackCluster.tsx'
 import { useSessionFeedback } from '../../hooks/useSessionFeedback.ts'
 import { selectKeyMoments, turnMatchesFilter } from './toolCallHelpers.ts'
 import type { PlaybackFilter } from './toolCallHelpers.ts'
@@ -472,11 +473,16 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
                     </span>
                   </div>
                 ) : (
-                  <PlaybackStep
-                    turn={turn}
-                    isActive={i === activeTurnIndex}
-                    subagents={subagents}
-                  />
+                  <>
+                    <div className="playback-turn-feedback">
+                      <FeedbackCluster turnId={turn.turnIndex} />
+                    </div>
+                    <PlaybackStep
+                      turn={turn}
+                      isActive={i === activeTurnIndex}
+                      subagents={subagents}
+                    />
+                  </>
                 )}
               </div>
             )

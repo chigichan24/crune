@@ -265,6 +265,14 @@
   border-color: var(--accent);
 }
 
+/* Turn-level feedback cluster (bookmark / tags / note) */
+.playback-turn-feedback {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 5;
+}
+
 /* Dimmed + collapsed (filtered-out) turn */
 .playback-turn--filtered {
   opacity: 0.4;
@@ -416,5 +424,6 @@
 
 /* Turn items */
 .playback-turn {
+  position: relative;
   cursor: pointer;
 }
