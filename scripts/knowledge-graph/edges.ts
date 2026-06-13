@@ -2,13 +2,13 @@
  * Topic edge construction and classification.
  */
 
-import type { SessionInput, TopicNode, TopicEdge, SemanticEdgeType, TfidfResult, SvdResult } from "./types.js";
+import type { SessionInput, TopicNode, TopicEdge, SemanticEdgeType, Bm25Result, SvdResult } from "./types.js";
 import { cosineSimilarity } from "./similarity.js";
 
 export function buildTopicEdges(
   topics: TopicNode[],
   sessions: SessionInput[],
-  tfidf: TfidfResult,
+  bm25: Bm25Result,
   svd?: SvdResult
 ): TopicEdge[] {
   const edges: TopicEdge[] = [];
@@ -39,9 +39,9 @@ export function buildTopicEdges(
       centroids.set(topic.id, centroid);
     } else {
       // Fallback: TF-IDF centroids
-      const centroid = new Float64Array(tfidf.vocabulary.length);
+      const centroid = new Float64Array(bm25.vocabulary.length);
       for (const sid of topic.sessionIds) {
-        const vec = tfidf.vectors.get(sid);
+        const vec = bm25.vectors.get(sid);
         if (vec) {
           for (let k = 0; k < centroid.length; k++) centroid[k] += vec[k];
         }
@@ -114,7 +114,7 @@ export function buildTopicEdges(
 
       // Determine dominant signal and generate label
       const signals = { semanticSimilarity: semanticSim, fileOverlap, sessionOverlap };
-      const { type, label } = classifyEdge(ti, tj, signals, intersection, tfidf, centroids);
+      const { type, label } = classifyEdge(ti, tj, signals, intersection, bm25, centroids);
 
       edges.push({
         source: ti.id,
@@ -135,7 +135,7 @@ export function classifyEdge(
   tj: TopicNode,
   signals: { semanticSimilarity: number; fileOverlap: number; sessionOverlap: number },
   sharedFiles: string[],
-  tfidf: TfidfResult,
+  bm25: Bm25Result,
   centroids: Map<string, Float64Array>
 ): { type: SemanticEdgeType; label: string } {
   const isCrossProject =
@@ -144,7 +144,7 @@ export function classifyEdge(
 
   if (isCrossProject) {
     // Find shared keywords between centroids
-    const sharedKw = findSharedKeywords(ti.id, tj.id, tfidf, centroids, 3);
+    const sharedKw = findSharedKeywords(ti.id, tj.id, bm25, centroids, 3);
     return {
       type: "cross-project-bridge",
       label: `cross-project: ${sharedKw.join(", ") || "related concepts"}`,
@@ -171,7 +171,7 @@ export function classifyEdge(
   }
 
   // Default: semantic similarity
-  const sharedKw = findSharedKeywords(ti.id, tj.id, tfidf, centroids, 3);
+  const sharedKw = findSharedKeywords(ti.id, tj.id, bm25, centroids, 3);
   return {
     type: "semantic-similarity",
     label: `related: ${sharedKw.join(", ") || "similar topics"}`,
@@ -181,7 +181,7 @@ export function classifyEdge(
 export function findSharedKeywords(
   topicIdA: string,
   topicIdB: string,
-  tfidf: TfidfResult,
+  bm25: Bm25Result,
   centroids: Map<string, Float64Array>,
   topK: number
 ): string[] {
@@ -191,9 +191,9 @@ export function findSharedKeywords(
 
   // Find terms with high weight in both centroids
   const shared: { term: string; score: number }[] = [];
-  for (let i = 0; i < tfidf.vocabulary.length; i++) {
+  for (let i = 0; i < bm25.vocabulary.length; i++) {
     if (ca[i] > 0.01 && cb[i] > 0.01) {
-      shared.push({ term: tfidf.vocabulary[i], score: ca[i] * cb[i] });
+      shared.push({ term: bm25.vocabulary[i], score: ca[i] * cb[i] });
     }
   }
   shared.sort((a, b) => b.score - a.score);

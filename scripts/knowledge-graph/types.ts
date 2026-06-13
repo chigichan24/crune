@@ -167,7 +167,7 @@ export interface ToolIdfResult {
   vectors: Map<string, Float64Array>;
 }
 
-export interface TfidfResult {
+export interface Bm25Result {
   vocabulary: string[];
   vocabIndex: Map<string, number>;
   vectors: Map<string, Float64Array>;

@@ -10,7 +10,7 @@
 
 ```
 Feature Extraction ─┐
-  1a. TF-IDF         │
+  1a. BM25           │
   1b. Tool-IDF       ├→ Combined Matrix → SVD → Clustering → Topic Nodes → Edges → Louvain → Brandes
   1c. Structural     │
 ────────────────────┘
@@ -24,7 +24,7 @@ Feature Extraction ─┐
 
 3種類の特徴量を各セッションから抽出し、それぞれ独立にL2正規化する。
 
-### 1a. TF-IDF (Text Features)
+### 1a. BM25 (Text Features)
 
 各セッションの user prompt、assistant 応答テキスト、編集ファイルパス、git branch を結合し、トークン化する。
 
@@ -35,11 +35,19 @@ Feature Extraction ─┐
 - 日英ストップワード除去
 - UUID、16進数文字列（6文字以上）、純数字、40文字超トークンをノイズとして除外
 
-**Vectorization**:
-- `tf(t, d) = log(1 + count(t, d))`
-- `idf(t) = log(N / df(t))`
-- Vocabulary filtering: 2文書以上に出現し、かつ全文書の80%以下に出現する語のみ採用
-- L2正規化
+**Vectorization** (Okapi BM25, `k1 = 1.2` / `b = 0.75`):
+
+従来の log-TF × log-IDF 方式を BM25 に置き換えた。返り値の形（`vocabulary` / `vocabIndex` / L2正規化済みベクトル）は不変で、下流の cosine 類似度計算には影響しない。
+
+- **Smoothed IDF（非負）**: `idf(t) = log((N - df(t) + 0.5) / (df(t) + 0.5) + 1)`
+  - `+ 1` により df が大きい語でも非負が保証され、高頻度語が負の寄与を持つことがない。
+- **Saturated TF with length normalization**: `tf(t, d) = count·(k1+1) / (count + k1·(1 - b + b·(docLen / avgdl)))`
+  - `docLen` は語彙内トークン数、`avgdl` は全文書の平均文書長（語彙内トークンのみで計算）。
+  - 出現回数に対して飽和（sub-linear）し、10回出現が1回出現の約10倍にはならない。長い文書の語ほど相対的に減衰する。
+- ベクトル成分: `tf(t, d) · idf(t)`
+- **Vocabulary filtering**: 2文書以上に出現する語を採用しつつ、`maxDf = min(max(2, floor(N·0.8)), N - 1)` を上限とする。
+  - 絶対上限 `N - 1` により、全文書に出現する語（`df == N`）は小規模コーパスでも常に除外され、類似度を支配しない。
+- L2正規化（下流の cosine 類似度のため不変）
 
 ### 1b. Tool-IDF (Tool Usage Features)
 

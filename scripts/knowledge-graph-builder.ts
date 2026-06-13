@@ -17,7 +17,7 @@ export {
   type KnowledgeCommunity,
   type KnowledgeGraphMetrics,
   type ToolIdfResult,
-  type TfidfResult,
+  type Bm25Result,
   type SvdResult,
   type LatentDimension,
   // Tokenizer
@@ -26,7 +26,7 @@ export {
   extractPathTokens,
   isNoiseToken,
   // TF-IDF
-  buildTfidf,
+  buildBm25,
   // Feature extraction
   buildToolIdf,
   buildStructuralVectors,

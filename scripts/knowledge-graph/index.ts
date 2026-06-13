@@ -1,6 +1,6 @@
 /**
  * Semantic knowledge graph construction from Claude Code session data.
- * Pipeline: TF-IDF + Tool-IDF + Structure → SVD (Latent Semantic) → Clustering → Louvain → Brandes
+ * Pipeline: BM25 + Tool-IDF + Structure → SVD (Latent Semantic) → Clustering → Louvain → Brandes
  */
 
 import type {
@@ -8,11 +8,11 @@ import type {
   SemanticKnowledgeGraph,
   KnowledgeGraphMetrics,
   KnowledgeGraphOptions,
-  TfidfResult,
+  Bm25Result,
 } from "./types.js";
 import { STRUCTURAL_DIM } from "./constants.js";
 import { tokenize } from "./tokenizer.js";
-import { buildTfidf } from "./tfidf.js";
+import { buildBm25 } from "./bm25.js";
 import { buildToolIdf, buildStructuralVectors } from "./feature-extraction.js";
 import { buildCombinedMatrix, truncatedSvd, interpretLatentDimensions } from "./svd.js";
 import { cosineDistance } from "./similarity.js";
@@ -40,7 +40,7 @@ export type {
   KnowledgeGraphMetrics,
   KnowledgeGraphOptions,
   ToolIdfResult,
-  TfidfResult,
+  Bm25Result,
   SvdResult,
   LatentDimension,
   ReusabilityScore,
@@ -53,7 +53,7 @@ export type {
 } from "./types.js";
 
 export { tokenize, splitCamelCase, extractPathTokens, isNoiseToken } from "./tokenizer.js";
-export { buildTfidf } from "./tfidf.js";
+export { buildBm25 } from "./bm25.js";
 export { buildToolIdf, buildStructuralVectors } from "./feature-extraction.js";
 export { buildCombinedMatrix, truncatedSvd, interpretLatentDimensions } from "./svd.js";
 export { cosineSimilarity, cosineDistance } from "./similarity.js";
@@ -119,7 +119,7 @@ export function buildSemanticKnowledgeGraph(
     };
   }
 
-  // Step 1: Extract session text documents (for TF-IDF)
+  // Step 1: Extract session text documents (for BM25)
   const documents = new Map<string, string[]>();
   for (const session of sessions) {
     const textParts: string[] = [];
@@ -173,11 +173,11 @@ export function buildSemanticKnowledgeGraph(
 
   if (activeSessions.length < 2) {
     // Single session: create one topic
-    const emptyTfidf: TfidfResult = { vocabulary: [], vocabIndex: new Map(), vectors: new Map() };
+    const emptyBm25: Bm25Result = { vocabulary: [], vocabIndex: new Map(), vectors: new Map() };
     const singleTopic = buildTopicNodes(
       [sessionIds.map((_, i) => i)],
       activeSessions,
-      emptyTfidf,
+      emptyBm25,
       toolIdf,
       facetsMap
     );
@@ -207,18 +207,18 @@ export function buildSemanticKnowledgeGraph(
     };
   }
 
-  // Step 2: TF-IDF (text features)
-  const tfidf = buildTfidf(documents);
+  // Step 2: BM25 (text features)
+  const bm25 = buildBm25(documents);
   console.error(
-    `  [Knowledge Graph] TF-IDF: ${tfidf.vocabulary.length} terms in vocabulary`
+    `  [Knowledge Graph] BM25: ${bm25.vocabulary.length} terms in vocabulary`
   );
 
   // Step 3: Build combined matrix and apply Truncated SVD
-  const textDim = tfidf.vocabulary.length;
+  const textDim = bm25.vocabulary.length;
   const toolDim = toolIdf.toolVocabulary.length;
   const { matrix, totalDim } = buildCombinedMatrix(
     sessionIds,
-    tfidf.vectors,
+    bm25.vectors,
     toolIdf.vectors,
     structVectors,
     textDim,
@@ -236,7 +236,7 @@ export function buildSemanticKnowledgeGraph(
 
   // Interpret latent dimensions (for logging and potential use in labeling)
   const latentDims = interpretLatentDimensions(
-    svd, tfidf.vocabulary, toolIdf.toolVocabulary, textDim, toolDim, 5
+    svd, bm25.vocabulary, toolIdf.toolVocabulary, textDim, toolDim, 5
   );
   // Log top 3 latent dimensions
   for (const dim of latentDims.slice(0, 3)) {
@@ -297,7 +297,7 @@ export function buildSemanticKnowledgeGraph(
   );
 
   // Step 5: Build topic nodes
-  const topics = buildTopicNodes(clusterMembers, activeSessions, tfidf, toolIdf, facetsMap);
+  const topics = buildTopicNodes(clusterMembers, activeSessions, bm25, toolIdf, facetsMap);
 
   // Step 5b: Compute reusability scores
   computeReusabilityScores(topics, new Date(), facetsMap);
@@ -306,7 +306,7 @@ export function buildSemanticKnowledgeGraph(
   );
 
   // Step 6: Build topic edges (using SVD vectors for semantic similarity)
-  const edges = buildTopicEdges(topics, activeSessions, tfidf, svd);
+  const edges = buildTopicEdges(topics, activeSessions, bm25, svd);
   console.error(`  [Knowledge Graph] Edges: ${edges.length} topic connections`);
 
   // Step 7: Louvain community detection (optional)
