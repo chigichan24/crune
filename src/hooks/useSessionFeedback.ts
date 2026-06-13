@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { FeedbackContextValue } from '../components/playback/feedback/FeedbackContext'
+import type { FeedbackEntry } from '../types'
 import {
   addTag as storeAddTag,
   collectAllTags,
-  getEntry as storeGetEntry,
+  entryKey,
+  loadSessionFeedback,
   removeTag as storeRemoveTag,
   setNote as storeSetNote,
   toggleBookmark as storeToggleBookmark,
@@ -20,13 +22,23 @@ export function useSessionFeedback(sessionId: string | null): FeedbackContextVal
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion(v => v + 1), [])
 
+  // Parse the current session's feedback blob exactly once per mutation and
+  // index it by entryKey, so per-block/per-turn lookups during a render are
+  // O(1) instead of a full getItem + JSON.parse of the whole blob each call.
+  const entryMap = useMemo(() => {
+    const map = new Map<string, FeedbackEntry>()
+    if (!sessionId) return map
+    for (const entry of loadSessionFeedback(sessionId)) {
+      map.set(entryKey(entry.turnId, entry.blockId), entry)
+    }
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload after every mutation
+  }, [sessionId, version])
+
   const getEntry = useCallback(
     (turnId: number, blockId?: string) =>
-      sessionId ? storeGetEntry(sessionId, turnId, blockId) : null,
-    // `version` is intentionally a dependency so this fn's identity changes
-    // after every mutation, forcing consumers to re-read the latest entry.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessionId, version],
+      entryMap.get(entryKey(turnId, blockId)) ?? null,
+    [entryMap],
   )
 
   const toggleBookmark = useCallback(
