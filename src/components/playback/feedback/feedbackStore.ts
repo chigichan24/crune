@@ -42,16 +42,43 @@ function isEmptyEntry(entry: FeedbackEntry): boolean {
   return !entry.bookmarked && (entry.tags?.length ?? 0) === 0 && (entry.note ?? '').trim() === ''
 }
 
+/**
+ * Coerce a raw stored value into a well-formed FeedbackEntry, or null if it
+ * fails the minimal shape check (must carry a string sessionId and numeric
+ * turnId). Tolerant of old/corrupted records missing `tags`/`note`/`bookmarked`
+ * so downstream code (removeTag, render) never throws on a malformed entry.
+ */
+function normalizeEntry(raw: unknown): FeedbackEntry | null {
+  if (!raw || typeof raw !== 'object') return null
+  const e = raw as Record<string, unknown>
+  if (typeof e.sessionId !== 'string' || typeof e.turnId !== 'number') return null
+  const entry: FeedbackEntry = {
+    sessionId: e.sessionId,
+    turnId: e.turnId,
+    bookmarked: !!e.bookmarked,
+    tags: Array.isArray(e.tags) ? e.tags.filter((t): t is string => typeof t === 'string') : [],
+    note: typeof e.note === 'string' ? e.note : '',
+  }
+  if (typeof e.blockId === 'string') entry.blockId = e.blockId
+  return entry
+}
+
 function readBlob(storage: Storage | null): FeedbackBlob {
   if (!storage) return {}
   const raw = storage.getItem(FEEDBACK_STORAGE_KEY)
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as FeedbackBlob
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const blob: FeedbackBlob = {}
+    for (const [sessionId, entries] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!Array.isArray(entries)) continue
+      const normalized = entries
+        .map(normalizeEntry)
+        .filter((e): e is FeedbackEntry => e !== null)
+      if (normalized.length > 0) blob[sessionId] = normalized
     }
-    return {}
+    return blob
   } catch {
     return {}
   }

@@ -196,6 +196,44 @@ describe('feedbackStore', () => {
     expect(loadSessionFeedback('s1', storage)).toEqual([])
   })
 
+  it('normalizes an entry missing tags/note/bookmarked on read', () => {
+    // Simulate an old/corrupted record lacking tags and note.
+    storage.setItem(
+      FEEDBACK_STORAGE_KEY,
+      JSON.stringify({ s1: [{ sessionId: 's1', turnId: 1 }] }),
+    )
+    const entry = getEntry('s1', 1, undefined, storage)
+    expect(entry).toMatchObject({ sessionId: 's1', turnId: 1, tags: [], note: '', bookmarked: false })
+    // removeTag must not throw on the (now normalized) entry.
+    expect(() => removeTag('s1', 1, undefined, 'whatever', storage)).not.toThrow()
+  })
+
+  it('drops entries failing the minimal shape check', () => {
+    storage.setItem(
+      FEEDBACK_STORAGE_KEY,
+      JSON.stringify({
+        s1: [
+          { sessionId: 's1', turnId: 1, note: 'good' },
+          { sessionId: 's1' }, // missing turnId
+          null,
+          'garbage',
+          { turnId: 2 }, // missing sessionId
+        ],
+      }),
+    )
+    const entries = loadSessionFeedback('s1', storage)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({ turnId: 1, note: 'good' })
+  })
+
+  it('coerces a non-array tags field to an empty array', () => {
+    storage.setItem(
+      FEEDBACK_STORAGE_KEY,
+      JSON.stringify({ s1: [{ sessionId: 's1', turnId: 1, tags: 'oops', note: 'x' }] }),
+    )
+    expect(getEntry('s1', 1, undefined, storage)?.tags).toEqual([])
+  })
+
   it('persists across independent reads (serialized in storage)', () => {
     upsertEntry('s1', 5, 'blk', { note: 'persisted', tags: ['x'] } as Partial<FeedbackEntry>, storage)
     const raw = storage.getItem(FEEDBACK_STORAGE_KEY)
