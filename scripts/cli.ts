@@ -36,6 +36,7 @@ interface CliArgs {
   model?: string;
   skipSynthesis: boolean;
   dryRun: boolean;
+  preview: boolean;
   skipEval: boolean;
   evalModel?: string;
 }
@@ -48,6 +49,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let model: string | undefined;
   let skipSynthesis = false;
   let dryRun = false;
+  let preview = false;
   let skipEval = false;
   let evalModel: string | undefined;
 
@@ -65,6 +67,8 @@ export function parseCliArgs(argv: string[]): CliArgs {
       skipSynthesis = true;
     } else if (args[i] === "--dry-run") {
       dryRun = true;
+    } else if (args[i] === "--preview") {
+      preview = true;
     } else if (args[i] === "--skip-eval") {
       skipEval = true;
     } else if (args[i] === "--eval-model" && args[i + 1]) {
@@ -75,7 +79,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     }
   }
 
-  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, skipEval, evalModel };
+  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, preview, skipEval, evalModel };
 }
 
 function printUsage(): void {
@@ -89,7 +93,8 @@ Options:
   --count <n>            Number of skills to generate (default: 5)
   --model <model>        Claude model for synthesis (e.g., haiku, sonnet)
   --skip-synthesis       Skip LLM synthesis, output heuristic skills only
-  --dry-run              Show candidates without writing files
+  --dry-run              Show candidates without writing files (skips synthesis)
+  --preview              Synthesize and print SKILL.md to stdout without writing
   --skip-eval            Skip skill evaluation pipeline (structural + rubric)
   --eval-model <model>   Claude model for rubric scoring (defaults to --model)
   -h, --help             Show this help message`);
@@ -227,7 +232,9 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Synthesize skills
+  // Synthesize skills. In preview mode we emit markdown to stdout instead of
+  // writing files, but evaluation still runs by default.
+  const writeToDisk = !config.preview;
   console.error(`\nGenerating ${topCandidates.length} skills...`);
 
   for (const candidate of topCandidates) {
@@ -310,19 +317,28 @@ async function main(): Promise<void> {
       }
     }
 
-    // Write skill file as <output-dir>/<skill-name>/SKILL.md
+    // Write skill file as <output-dir>/<skill-name>/SKILL.md, or print to
+    // stdout in preview mode.
     const skillName = extractSkillName(markdown, label);
-    const skillDir = path.join(config.outputDir, skillName);
-    const outputPath = path.join(skillDir, "SKILL.md");
-
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(outputPath, markdown, "utf-8");
-    console.error(`    ${outputPath}`);
+    if (writeToDisk) {
+      const skillDir = path.join(config.outputDir, skillName);
+      const outputPath = path.join(skillDir, "SKILL.md");
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(outputPath, markdown, "utf-8");
+      console.error(`    ${outputPath}`);
+    } else {
+      console.error(`--- ${skillName} ---`);
+      console.log(markdown);
+    }
   }
 
-  console.error(
-    `\nDone! ${topCandidates.length} skills written to ${config.outputDir}`
-  );
+  if (writeToDisk) {
+    console.error(
+      `\nDone! ${topCandidates.length} skills written to ${config.outputDir}`
+    );
+  } else {
+    console.error(`\nDone! ${topCandidates.length} skills previewed (no files written)`);
+  }
 }
 
 function extractSkillName(markdown: string, fallbackLabel: string): string {

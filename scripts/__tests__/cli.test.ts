@@ -60,6 +60,18 @@ describe("parseCliArgs", () => {
     expect(result.dryRun).toBe(false);
     expect(result.skipEval).toBe(false);
     expect(result.evalModel).toBeUndefined();
+    expect(result.preview).toBe(false);
+  });
+
+  it("sets preview with --preview", () => {
+    const result = parseCliArgs(["node", "cli.ts", "--preview"]);
+    expect(result.preview).toBe(true);
+  });
+
+  it("handles --preview combined with --dry-run", () => {
+    const result = parseCliArgs(["node", "cli.ts", "--dry-run", "--preview"]);
+    expect(result.dryRun).toBe(true);
+    expect(result.preview).toBe(true);
   });
 
   it("sets sessionsDir with --sessions-dir", () => {
