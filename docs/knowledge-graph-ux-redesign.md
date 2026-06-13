@@ -67,7 +67,7 @@ dominantRole, reusabilityScore
 - `centralityInterpretation()`(L57-63)で betweenness/degree を日本語の平易な解釈に変換している。**これは良い前例** で、本提案の「専門用語を平易な解釈に隠す」方針はこの関数の発想を全面展開したもの。
 
 **伝え損ねていること**
-- `Betweenness: 0.123 / Degree: 0.456` の **生数値が解釈文と並んで常時露出**(L300-307)。advanced 扱いではない。
+- `Betweenness: 0.123 / Degree: 0.456` の **生数値が解釈文と並んで常時露出**(L299-313: `knd-centrality` ブロック全体)。advanced 扱いではない。
 - 情報密度が高く、最重要の reusability と二次的な graph position が同一階層に並ぶ(優先度の差が UI に出ない)。
 - 単一ノードに閉じており、**横断比較**(他トピックと並べて見る)導線がない。
 
@@ -84,7 +84,7 @@ dominantRole, reusabilityScore
 **伝え損ねていること**
 - グラフの sidebar の中(`sidebarTab === 'insights'`)に押し込まれており、**グラフが主・リストが従** の情報設計になっている。実際の有用性は逆。
 - ソート/フィルタ/検索がなく、固定カテゴリの羅列。トピック数が増えるとスクロールが破綻する。
-- ここでも `BC: 0.123`(betweenness)が生で露出(L190-191)。
+- ここでも `BC: 0.123`(betweenness)が生で露出(L190)。
 
 **監査の結論**: 既に「リスト/カード」(`TacitKnowledgeView`)が質問への回答として機能している。force graph は探索的閲覧には向くが意思決定には弱い。よって **主従を反転** させるのが筋。
 
@@ -182,7 +182,7 @@ dominantRole, reusabilityScore
   - `degreeCentrality === 0` → 「孤立した知識(他とつながっていない)」
   - `community` → 「テーマ」/「作業の塊」
   - `modularity Q` → 既定では非表示
-- **生数値は "詳細(advanced)" トグルの奥に格納**。既定では平易な解釈ラベルのみ表示し、トグル展開時に raw number(`0.123` 等)を出す。`KnowledgeNodeDetail` L300-307 の常時露出を advanced 化する。
+- **生数値は "詳細(advanced)" トグルの奥に格納**。既定では平易な解釈ラベルのみ表示し、トグル展開時に raw number(`0.123` 等)を出す。`KnowledgeNodeDetail` L299-313 の `knd-centrality` ブロック(ラベル・生数値・解釈文)の常時露出を advanced 化する。
 
 ### 5.3 両ジョブに対する正当化
 - **solo(主)**: default の faceted list が A2 を直接満たし、timeline が A1/A3、list→playback リンクが A4 を満たす。force graph 降格で初見の認知コストが下がる(#19 の核心)。専門用語の平意化で「何の質問に答えているか」が明確になる。
