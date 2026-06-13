@@ -99,11 +99,13 @@ describe('feedbackStore', () => {
     expect(entry).toMatchObject({ note: 'first', bookmarked: true })
   })
 
-  it('toggles a bookmark on and off', () => {
+  it('toggles a bookmark on and off, pruning the empty entry when off', () => {
     expect(toggleBookmark('s1', 1, undefined, storage)).toBe(true)
     expect(getEntry('s1', 1, undefined, storage)?.bookmarked).toBe(true)
     expect(toggleBookmark('s1', 1, undefined, storage)).toBe(false)
-    expect(getEntry('s1', 1, undefined, storage)?.bookmarked).toBe(false)
+    // Un-bookmarking leaves no bookmark/tags/note, so the entry is pruned.
+    expect(getEntry('s1', 1, undefined, storage)).toBeNull()
+    expect(loadSessionFeedback('s1', storage)).toEqual([])
   })
 
   it('adds tags and dedupes them', () => {
@@ -128,6 +130,34 @@ describe('feedbackStore', () => {
   it('sets a note', () => {
     setNote('s1', 1, undefined, 'remember this', storage)
     expect(getEntry('s1', 1, undefined, storage)?.note).toBe('remember this')
+  })
+
+  it('prunes the entry when a note is cleared back to blank', () => {
+    setNote('s1', 1, undefined, 'remember this', storage)
+    setNote('s1', 1, undefined, '', storage)
+    expect(getEntry('s1', 1, undefined, storage)).toBeNull()
+    expect(loadSessionFeedback('s1', storage)).toEqual([])
+  })
+
+  it('treats a whitespace-only note as empty and prunes it', () => {
+    setNote('s1', 1, undefined, '   ', storage)
+    expect(getEntry('s1', 1, undefined, storage)).toBeNull()
+  })
+
+  it('prunes the entry and drops the session bucket when the last tag is removed', () => {
+    addTag('s1', 1, undefined, 'bug', storage)
+    removeTag('s1', 1, undefined, 'bug', storage)
+    expect(getEntry('s1', 1, undefined, storage)).toBeNull()
+    // Session bucket is dropped entirely, not left as an empty array.
+    const raw = storage.getItem(FEEDBACK_STORAGE_KEY)
+    expect(raw ? Object.keys(JSON.parse(raw)) : []).not.toContain('s1')
+  })
+
+  it('keeps an entry that still has a bookmark when its note is cleared', () => {
+    toggleBookmark('s1', 1, undefined, storage)
+    setNote('s1', 1, undefined, 'temp', storage)
+    setNote('s1', 1, undefined, '', storage)
+    expect(getEntry('s1', 1, undefined, storage)?.bookmarked).toBe(true)
   })
 
   it('removes an entry', () => {

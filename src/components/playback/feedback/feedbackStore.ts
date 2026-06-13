@@ -33,6 +33,15 @@ function entryKeyOf(entry: FeedbackEntry): string {
   return entryKey(entry.turnId, entry.blockId)
 }
 
+/**
+ * True when an entry carries no signal: not bookmarked, no tags, blank note.
+ * Such entries are pruned rather than persisted so clearing a note / removing
+ * the last tag / un-bookmarking does not leave dangling blank records behind.
+ */
+function isEmptyEntry(entry: FeedbackEntry): boolean {
+  return !entry.bookmarked && (entry.tags?.length ?? 0) === 0 && (entry.note ?? '').trim() === ''
+}
+
 function readBlob(storage: Storage | null): FeedbackBlob {
   if (!storage) return {}
   const raw = storage.getItem(FEEDBACK_STORAGE_KEY)
@@ -113,6 +122,21 @@ export function upsertEntry(
     next.blockId = blockId
   } else {
     delete next.blockId
+  }
+
+  // Prune rather than persist entries that carry no signal, and drop the
+  // session bucket entirely once it has no entries left.
+  if (isEmptyEntry(next)) {
+    if (idx >= 0) {
+      entries.splice(idx, 1)
+    }
+    if (entries.length === 0) {
+      delete blob[sessionId]
+    } else {
+      blob[sessionId] = entries
+    }
+    writeBlob(storage, blob)
+    return next
   }
 
   if (idx >= 0) {
