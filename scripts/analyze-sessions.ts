@@ -595,7 +595,8 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
 
             // Soft threshold: a SINGLE bounded re-synthesis retry when the
             // overall score is below threshold. The candidate is never dropped
-            // — we keep whichever attempt scored higher and let the UI flag
+            // — we keep the retry only when it strictly beats the original
+            // (a tie keeps the original, for determinism) and let the UI flag
             // low scores. The retry only makes sense when the rubric is available;
             // with --skip-eval the structural-only score can't improve, so skip it.
             const threshold = synthesisConfig.evalThreshold ?? 60;
@@ -607,7 +608,7 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
               if (retry.success) {
                 const retryMarkdown = stripSynthesisPreamble(retry.stdout);
                 const retryEval = await evaluateSkill(retryMarkdown, evalOpts);
-                if ((retryEval.overallScore ?? 0) >= (evalResult.overallScore ?? 0)) {
+                if ((retryEval.overallScore ?? 0) > (evalResult.overallScore ?? 0)) {
                   original.synthesizedMarkdown = retryMarkdown;
                   evalResult = retryEval;
                 }
