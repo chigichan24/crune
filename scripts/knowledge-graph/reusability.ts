@@ -38,11 +38,14 @@ function buildBreakdown(
   for (const signal of Object.keys(weights)) {
     const weight = weights[signal];
     const value = values[signal] ?? 0;
+    // Round the value first, then derive contribution from the rounded value so
+    // that value x weight and contribution stay internally consistent.
+    const rv = Math.round(value * 1000) / 1000;
     breakdown.push({
       signal,
-      value: Math.round(value * 1000) / 1000,
+      value: rv,
       weight,
-      contribution: Math.round(weight * value * 1000) / 1000,
+      contribution: Math.round(rv * weight * 1000) / 1000,
     });
   }
   return breakdown;
