@@ -191,6 +191,41 @@ deploy steps
     expect(result.parsed?.requires).toEqual(["setup-env"]);
     expect(result.parsed?.next).toEqual(["smoke-test"]);
   });
+
+  // Regression for #64: the synthesizer emits long descriptions as YAML folded
+  // block scalars (`>-`); the old hand-rolled parser rejected them and forced
+  // every skill's overallScore to 0.
+  it("accepts a folded (>-) multi-line description", () => {
+    const md = `---
+name: worktree-parallel-pr-workflow
+description: >-
+  Use when the user asks to break work into independent PRs, fan out
+  worktrees, and synthesize the results. Triggers on "split into PRs".
+---
+
+body content
+`;
+    const result = validateStructure(md);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.parsed?.description).toContain("independent PRs");
+    // Folded scalars join wrapped lines with spaces (no embedded newlines).
+    expect(result.parsed?.description).not.toContain("\n");
+  });
+
+  it("accepts a literal (|) multi-line description", () => {
+    const md = `---
+name: my-skill
+description: |
+  Line one of the description, long enough to pass the minimum length check.
+  Line two continues on a new line.
+---
+
+body content
+`;
+    const result = validateStructure(md);
+    expect(result.valid).toBe(true);
+  });
 });
 
 describe("extractFrontmatter", () => {
@@ -211,6 +246,19 @@ body
     const { data } = extractFrontmatter(md);
     expect(data.name).toBe("quoted-name");
     expect(data.description).toBe("single quoted long enough description for the validator");
+  });
+
+  it("parses folded block scalars (>-) into a single-line string", () => {
+    const md = `---
+name: x
+description: >-
+  folded line one
+  folded line two
+---
+body
+`;
+    const { data } = extractFrontmatter(md);
+    expect(data.description).toBe("folded line one folded line two");
   });
 });
 
