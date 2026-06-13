@@ -16,7 +16,9 @@ import {
 import {
   buildSemanticKnowledgeGraph,
   type SessionInput,
+  type TopicNode,
 } from "./knowledge-graph-builder.js";
+import type { SkillCandidate } from "./knowledge-graph/types.js";
 import {
   buildSynthesisPrompt,
   synthesizeWithClaude,
@@ -91,6 +93,35 @@ Options:
   --skip-eval            Skip skill evaluation pipeline (structural + rubric)
   --eval-model <model>   Claude model for rubric scoring (defaults to --model)
   -h, --help             Show this help message`);
+}
+
+// ─── Candidate rendering (pure) ────────────────────────────────────
+
+/**
+ * Render a human-readable detail view for a skill candidate as an array of
+ * lines (no I/O side effects). Used by the dry-run/preview output. The
+ * reusability breakdown is included only when the topic carries one.
+ */
+export function renderCandidateDetail(
+  candidate: SkillCandidate,
+  topic: TopicNode | undefined
+): string[] {
+  const label = topic?.label ?? candidate.topicId;
+  const lines: string[] = [];
+  lines.push(`  [${candidate.reusabilityScore}] ${label}`);
+  lines.push(`    Keywords: ${topic?.keywords.join(", ") ?? "—"}`);
+  lines.push(`    Sessions: ${topic?.sessionCount ?? "?"}`);
+
+  const breakdown = topic?.reusabilityScore?.breakdown;
+  if (breakdown && breakdown.length > 0) {
+    const profile = topic?.reusabilityScore?.weightProfile ?? "base";
+    lines.push(`    Breakdown (${profile}):`);
+    for (const b of breakdown) {
+      lines.push(`      ${b.signal}: ${b.value} x ${b.weight} = ${b.contribution}`);
+    }
+  }
+
+  return lines;
 }
 
 // ─── Main pipeline ─────────────────────────────────────────────────
@@ -188,11 +219,9 @@ async function main(): Promise<void> {
     console.error("\nSkill candidates (dry run):\n");
     for (const c of topCandidates) {
       const topic = knowledgeGraph.nodes.find((n) => n.id === c.topicId);
-      console.error(
-        `  [${c.reusabilityScore.toFixed(2)}] ${topic?.label ?? c.topicId}`
-      );
-      console.error(`    Keywords: ${topic?.keywords.join(", ") ?? "—"}`);
-      console.error(`    Sessions: ${topic?.sessionCount ?? "?"}`);
+      for (const line of renderCandidateDetail(c, topic)) {
+        console.error(line);
+      }
       console.error("");
     }
     process.exit(0);

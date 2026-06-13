@@ -1,5 +1,53 @@
 import { describe, it, expect } from "vitest";
-import { parseCliArgs } from "../cli.js";
+import { parseCliArgs, renderCandidateDetail } from "../cli.js";
+import type { TopicNode, SkillCandidate } from "../knowledge-graph/types.js";
+
+function makeCandidate(overrides: Partial<SkillCandidate> = {}): SkillCandidate {
+  return {
+    topicId: "topic-001",
+    reusabilityScore: 0.75,
+    skillMarkdown: "# skill",
+    ...overrides,
+  };
+}
+
+function makeTopic(overrides: Partial<TopicNode> = {}): TopicNode {
+  return {
+    id: "topic-001",
+    label: "my label",
+    keywords: ["alpha", "beta"],
+    project: "proj",
+    projects: ["proj"],
+    sessionIds: ["s1", "s2", "s3"],
+    sessionCount: 3,
+    totalDurationMinutes: 60,
+    totalToolCalls: 10,
+    firstSeen: "2026-01-01T00:00:00Z",
+    lastSeen: "2026-03-01T00:00:00Z",
+    betweennessCentrality: 0,
+    degreeCentrality: 0,
+    communityId: 0,
+    representativePrompts: [],
+    suggestedPrompt: "",
+    toolSignature: [],
+    dominantRole: "user-driven",
+    reusabilityScore: {
+      overall: 0.75,
+      frequency: 1,
+      timeCost: 1,
+      crossProjectScore: 0,
+      recency: 1,
+      weightProfile: "base",
+      breakdown: [
+        { signal: "frequency", value: 1, weight: 0.35, contribution: 0.35 },
+        { signal: "timeCost", value: 1, weight: 0.25, contribution: 0.25 },
+        { signal: "crossProjectScore", value: 0, weight: 0.25, contribution: 0 },
+        { signal: "recency", value: 1, weight: 0.15, contribution: 0.15 },
+      ],
+    },
+    ...overrides,
+  } as TopicNode;
+}
 
 describe("parseCliArgs", () => {
   it("returns defaults when no args given", () => {
@@ -80,5 +128,61 @@ describe("parseCliArgs", () => {
     expect(result.model).toBe("sonnet");
     expect(result.skipSynthesis).toBe(true);
     expect(result.dryRun).toBe(true);
+  });
+});
+
+describe("renderCandidateDetail", () => {
+  it("renders header, keywords, sessions, and breakdown block (with-facets/base)", () => {
+    const lines = renderCandidateDetail(makeCandidate(), makeTopic());
+    expect(lines[0]).toBe("  [0.75] my label");
+    expect(lines).toContain("    Keywords: alpha, beta");
+    expect(lines).toContain("    Sessions: 3");
+    // breakdown block with weightProfile
+    expect(lines.some((l) => l.includes("Breakdown (base)"))).toBe(true);
+    expect(
+      lines.some((l) => l.trim() === "frequency: 1 x 0.35 = 0.35")
+    ).toBe(true);
+    expect(
+      lines.some((l) => l.trim() === "recency: 1 x 0.15 = 0.15")
+    ).toBe(true);
+  });
+
+  it("renders facets weightProfile and successRate/helpfulness rows", () => {
+    const topic = makeTopic({
+      reusabilityScore: {
+        overall: 0.8,
+        frequency: 1,
+        timeCost: 1,
+        crossProjectScore: 0,
+        recency: 1,
+        successRate: 1,
+        helpfulness: 1,
+        weightProfile: "facets",
+        breakdown: [
+          { signal: "frequency", value: 1, weight: 0.3, contribution: 0.3 },
+          { signal: "successRate", value: 1, weight: 0.1, contribution: 0.1 },
+          { signal: "helpfulness", value: 1, weight: 0.1, contribution: 0.1 },
+        ],
+      },
+    });
+    const lines = renderCandidateDetail(makeCandidate({ reusabilityScore: 0.8 }), topic);
+    expect(lines[0]).toBe("  [0.8] my label");
+    expect(lines.some((l) => l.includes("Breakdown (facets)"))).toBe(true);
+    expect(
+      lines.some((l) => l.trim() === "successRate: 1 x 0.1 = 0.1")
+    ).toBe(true);
+  });
+
+  it("falls back to topicId and placeholders when topic is missing", () => {
+    const lines = renderCandidateDetail(makeCandidate(), undefined);
+    expect(lines[0]).toBe("  [0.75] topic-001");
+    expect(lines).toContain("    Keywords: —");
+    expect(lines).toContain("    Sessions: ?");
+    // no breakdown block when topic is missing
+    expect(lines.some((l) => l.includes("Breakdown"))).toBe(false);
+  });
+
+  it("does not contain console output side effects (returns array)", () => {
+    expect(Array.isArray(renderCandidateDetail(makeCandidate(), makeTopic()))).toBe(true);
   });
 });
