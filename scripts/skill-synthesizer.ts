@@ -266,10 +266,43 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
  */
 export function stripSynthesisPreamble(raw: string): string {
   const trimmed = raw.trimStart();
-  if (trimmed.startsWith("---")) return trimmed;
-  const idx = trimmed.indexOf("\n---");
-  if (idx !== -1) return trimmed.slice(idx + 1);
-  return trimmed;
+  let fromFrontmatter: string;
+  if (trimmed.startsWith("---")) {
+    fromFrontmatter = trimmed;
+  } else {
+    const idx = trimmed.indexOf("\n---");
+    fromFrontmatter = idx !== -1 ? trimmed.slice(idx + 1) : trimmed;
+  }
+  return ensureClosingFence(fromFrontmatter);
+}
+
+/**
+ * The synthesizer sometimes emits the opening `---` frontmatter fence but omits
+ * the closing one, flowing straight into the markdown body. That yields an
+ * invalid SKILL.md — unusable once installed, and rejected by structural
+ * validation (every such skill then scores 0). When an opening fence is present
+ * without a matching closing fence, insert one just before the body (the first
+ * markdown heading).
+ */
+export function ensureClosingFence(md: string): string {
+  if (!md.startsWith("---")) return md;
+  const afterOpen = md.indexOf("\n");
+  if (afterOpen === -1) return md;
+  const body = md.slice(afterOpen + 1);
+  // A closing fence already exists — nothing to do.
+  if (/^---\s*$/m.test(body)) return md;
+
+  const lines = body.split("\n");
+  // The markdown body begins at the first top-level heading.
+  const headingIdx = lines.findIndex((l) => /^#{1,6}\s/.test(l));
+  if (headingIdx === -1) return md; // can't locate the body; leave as-is
+
+  // Frontmatter = lines before the heading, minus trailing blank lines.
+  let fmEnd = headingIdx;
+  while (fmEnd > 0 && lines[fmEnd - 1].trim() === "") fmEnd--;
+  const frontmatter = lines.slice(0, fmEnd);
+  const rest = lines.slice(headingIdx);
+  return ["---", ...frontmatter, "---", "", ...rest].join("\n");
 }
 
 // ---------- Distill with Claude CLI ----------

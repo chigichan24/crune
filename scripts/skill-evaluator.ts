@@ -10,6 +10,7 @@
  * to a follow-up issue. Callers may still write the file when scores are low.
  */
 import { spawn } from "node:child_process";
+import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import type { SkillEvaluation } from "../src/types/session.js";
 
@@ -68,16 +69,11 @@ export interface EvaluatorOptions {
 // ---------- Frontmatter parsing ----------
 
 /**
- * Minimal YAML frontmatter parser tailored to SKILL.md (no full YAML lib needed).
- * Supports:
- *   - simple `key: value` scalars
- *   - inline arrays `key: [a, b, c]`
- *   - indented list items under a key:
- *       key:
- *         - a
- *         - b
- *   - quoted strings (single or double)
- * Throws on malformed structure.
+ * Extract and parse the YAML frontmatter block from SKILL.md. The block is
+ * delimited by a leading `---` and a closing `---`; the body after it is
+ * ignored here. The frontmatter is parsed with a real YAML parser so block /
+ * folded scalars (`>-`, `>`, `|`, `|-`) and flow collections are handled
+ * correctly. Throws when the fences are missing or the YAML is invalid.
  */
 export function extractFrontmatter(markdown: string): {
   raw: string;
@@ -100,69 +96,24 @@ export function extractFrontmatter(markdown: string): {
   }
   const raw = after.slice(0, closeIdx);
 
-  const data: Record<string, unknown> = {};
-  const lines = raw.split("\n");
-  let currentListKey: string | null = null;
-  let listAccumulator: string[] = [];
-
-  const flushList = () => {
-    if (currentListKey !== null) {
-      data[currentListKey] = listAccumulator;
-      currentListKey = null;
-      listAccumulator = [];
-    }
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === "") continue;
-
-    // Indented list item under previous key.
-    if (currentListKey !== null && /^\s+-\s+/.test(line)) {
-      const value = line.replace(/^\s+-\s+/, "").trim();
-      listAccumulator.push(unquote(value));
-      continue;
-    }
-
-    // New key — flush any pending list.
-    flushList();
-
-    const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$/);
-    if (!m) {
-      throw new Error(`malformed frontmatter line: ${JSON.stringify(line)}`);
-    }
-    const [, key, rawValue] = m;
-    const value = rawValue.trim();
-
-    if (value === "") {
-      // Possibly a list opener.
-      currentListKey = key;
-      listAccumulator = [];
-      continue;
-    }
-
-    if (value.startsWith("[") && value.endsWith("]")) {
-      const inner = value.slice(1, -1).trim();
-      data[key] = inner === ""
-        ? []
-        : inner.split(",").map((s) => unquote(s.trim()));
-      continue;
-    }
-
-    data[key] = unquote(value);
+  // Parse the frontmatter block with a real YAML parser so block/folded
+  // scalars (`>-`, `>`, `|`, `|-`) and flow collections are handled correctly.
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(raw);
+  } catch (e) {
+    throw new Error(`malformed frontmatter: invalid YAML (${(e as Error).message})`, { cause: e });
   }
-  flushList();
 
-  return { raw, data };
-}
-
-function unquote(s: string): string {
-  if (s.length >= 2) {
-    if ((s.startsWith("\"") && s.endsWith("\"")) || (s.startsWith("'") && s.endsWith("'"))) {
-      return s.slice(1, -1);
-    }
+  // An empty frontmatter block is a valid (empty) mapping.
+  if (parsed === null || parsed === undefined) {
+    return { raw, data: {} };
   }
-  return s;
+  if (typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("malformed frontmatter: expected a mapping of keys");
+  }
+
+  return { raw, data: parsed as Record<string, unknown> };
 }
 
 // ---------- Structural schema ----------
