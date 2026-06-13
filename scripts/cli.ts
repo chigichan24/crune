@@ -119,7 +119,8 @@ interface SerializedCandidate {
   topicId: string;
   label: string;
   keywords: string[];
-  sessionCount: number;
+  /** null when the topic is unknown (renders as '?'). */
+  sessionCount: number | null;
   reusabilityScore: number;
   reusabilityScoreBreakdown?: ReusabilityBreakdown;
   synthesizedMarkdown?: string;
@@ -138,7 +139,7 @@ export function serializeCandidate(
     topicId: candidate.topicId,
     label: topic?.label ?? candidate.topicId,
     keywords: topic?.keywords ?? [],
-    sessionCount: topic?.sessionCount ?? 0,
+    sessionCount: topic?.sessionCount ?? null,
     reusabilityScore: candidate.reusabilityScore,
   };
   const breakdown = topic?.reusabilityScore?.breakdown;
@@ -166,7 +167,7 @@ export function renderCandidateDetail(
   lines.push(
     `    Keywords: ${data.keywords.length > 0 ? data.keywords.join(", ") : "—"}`
   );
-  lines.push(`    Sessions: ${topic ? data.sessionCount : "?"}`);
+  lines.push(`    Sessions: ${data.sessionCount ?? "?"}`);
 
   const breakdown = topic?.reusabilityScore?.breakdown;
   if (breakdown && breakdown.length > 0) {

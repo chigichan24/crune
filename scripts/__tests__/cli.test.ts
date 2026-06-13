@@ -254,7 +254,7 @@ describe("serializeCandidate", () => {
     const obj = serializeCandidate(makeCandidate(), undefined);
     expect(obj.label).toBe("topic-001");
     expect(obj.keywords).toEqual([]);
-    expect(obj.sessionCount).toBe(0);
+    expect(obj.sessionCount).toBeNull();
     expect(obj.reusabilityScoreBreakdown).toBeUndefined();
   });
 });
