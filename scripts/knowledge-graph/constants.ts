@@ -31,6 +31,16 @@ export const STOP_WORDS = new Set([
   "こと", "もの", "ため", "よう", "から", "まで", "より", "ほど",
   "など", "ので", "けど", "でも", "しかし", "また", "そして",
   "って", "という", "ください", "お願い", "確認",
+  // Verb conjugation fragments and connective auxiliaries that
+  // `Intl.Segmenter('ja')` emits as standalone segments. These carry no
+  // standalone signal for TF-IDF / clustering. Content-bearing stems such
+  // as 行う / 書く / 修正 are intentionally NOT listed here.
+  //
+  // Note: `ている` is intentionally NOT in this list because the Segmenter
+  // does not emit it as one segment — it is split as て + いる. The
+  // standalone fragment we actually need to filter is `いる`.
+  // See https://github.com/chigichan24/crune/issues/29
+  "てい", "しない", "したら", "次に", "に従って",
 ]);
 
 // ─── Noise token patterns ───────────────────────────────────────────────────

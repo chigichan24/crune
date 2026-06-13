@@ -134,8 +134,63 @@ describe("tokenize", () => {
     expect(tokens).toContain("variable");
   });
 
-  it("handles Japanese text without crashing", () => {
-    expect(() => tokenize("セッションの分析を実行する")).not.toThrow();
+  it("segments Japanese text into meaningful word-ish units (Issue #29)", () => {
+    // Before this fix, the entire Japanese run collapsed into one token
+    // because `\s+` cannot split text without whitespace. With
+    // Intl.Segmenter, common kanji compounds like 分析 / 実行 surface as
+    // individual tokens.
+    const tokens = tokenize("セッションの分析を実行する");
+    expect(tokens).toContain("セッション");
+    expect(tokens).toContain("分析");
+    expect(tokens).toContain("実行");
+    // The whole sentence should NOT survive as one giant token.
+    expect(tokens).not.toContain("セッションの分析を実行する");
+  });
+
+  it("segments mixed Japanese / English text on both sides", () => {
+    const tokens = tokenize("TypeScriptの型エラーを修正");
+    // English side: lowercased CamelCase split
+    expect(tokens).toContain("type");
+    expect(tokens).toContain("script");
+    // Japanese side: 2-char kanji compounds preserved
+    expect(tokens).toContain("エラー");
+    expect(tokens).toContain("修正");
+  });
+
+  it("filters Japanese verb-conjugation fragments emitted by Intl.Segmenter (Issue #29)", () => {
+    // `Intl.Segmenter('ja')` emits verb auxiliary fragments such as
+    // `いる`, `したら`, `次に`, `に従って` as standalone segments. These
+    // carry no topic signal for TF-IDF / clustering, so STOP_WORDS must
+    // exclude them. Content-bearing stems (`実装`, `実行`, etc.) MUST
+    // still survive.
+    const tokens = tokenize(
+      "動いている実装が完了したら次に仕様に従ってテストを書く"
+    );
+    expect(tokens).not.toContain("いる");
+    expect(tokens).not.toContain("したら");
+    expect(tokens).not.toContain("次に");
+    expect(tokens).not.toContain("に従って");
+    // Content stems must still be present.
+    expect(tokens).toContain("実装");
+    expect(tokens).toContain("完了");
+    expect(tokens).toContain("仕様");
+    expect(tokens).toContain("テスト");
+  });
+
+  it("does not collapse a long Japanese paragraph into a single oversized token (Issue #29 regression)", () => {
+    // Reproduces the exact bug from #29: the issue's example string used
+    // to land in the vocabulary as one token. After the fix every token
+    // should be word-sized, not paragraph-sized.
+    const text =
+      "セッションの分析を実行する。次にテストを書く。" +
+      "実装が完了したらリファクタリングを行い、最後にコードレビューを依頼する。";
+    const tokens = tokenize(text);
+    expect(tokens.length).toBeGreaterThan(3);
+    for (const t of tokens) {
+      expect(t.length).toBeLessThanOrEqual(20);
+    }
+    // The whole paragraph must not survive as a single token.
+    expect(tokens).not.toContain(text);
   });
 
   it("filters out noise tokens", () => {
