@@ -3,6 +3,7 @@
  */
 
 import { STOP_WORDS, UUID_PATTERN, HEX_PATTERN, NUM_PATTERN } from "./constants.js";
+import { porterStem } from "./porter-stemmer.js";
 
 // CJK character ranges:
 //   U+3040–U+309F  Hiragana
@@ -136,7 +137,8 @@ export function tokenize(text: string): string[] {
 
 /**
  * Push a token through the standard post-processing pipeline:
- * lowercase, length filter, STOP_WORDS lookup, isNoiseToken check.
+ * lowercase, length filter, Porter stemming (non-CJK only), STOP_WORDS
+ * lookup, isNoiseToken check.
  *
  * The cleaning regex strips any leftover punctuation while preserving
  * ASCII alphanumerics and the CJK ranges we care about.
@@ -146,16 +148,42 @@ export function tokenize(text: string): string[] {
  *    drops "to", "is", "am", etc.)
  *  - pure-CJK tokens: length >= 2 (Japanese compounds such as
  *    bunseki / jissou / shusei are 2-character kanji words and must survive).
+ *
+ * Stemming rule (Issue #30):
+ *  - Apply stop-word filtering on the cleaned surface form first, then apply
+ *    Porter stemming, then re-check stop words on the stemmed form.
+ *    This drops natural surface forms such as `using` before stemming while
+ *    still letting inflections like `running`/`runs` collapse into `run`.
+ *  - Skip stemming for tokens containing CJK characters \u2014 those came from
+ *    `Intl.Segmenter` and Porter would corrupt them.
+ *  - Skip stemming for tokens containing digits (e.g. `abc123`, `v2`) since
+ *    Porter is undefined on alphanumerics.
  */
 function pushClean(token: string, sink: string[]): void {
   const clean = token.toLowerCase().replace(/[^a-z0-9\u3040-\u9fff]/g, "");
   if (clean.length === 0) return;
-  const minLen = CJK_CHAR_RE.test(clean) ? 2 : 3;
-  if (
-    clean.length >= minLen &&
-    !STOP_WORDS.has(clean) &&
-    !isNoiseToken(clean)
-  ) {
-    sink.push(clean);
-  }
+  const isCjk = CJK_CHAR_RE.test(clean);
+  const minLen = isCjk ? 2 : 3;
+  if (clean.length < minLen) return;
+  // Stop-word check is done on the pre-stem form so that NLTK-style entries
+  // like "was", "using", "needed" are dropped via their natural surface
+  // form. Otherwise Porter would map "was" -> "wa", "using" -> "us" and
+  // those fragments would slip through the filter.
+  if (STOP_WORDS.has(clean)) return;
+  if (isNoiseToken(clean)) return;
+  // Apply Porter stemming only to pure-ASCII alphabetic tokens.
+  // Skip CJK (would corrupt segmenter output) and tokens with digits
+  // (Porter is undefined on `abc123` etc.).
+  const stemmed =
+    !isCjk && /^[a-z]+$/.test(clean) ? porterStem(clean) : clean;
+  // Re-check stop words on the stemmed form to catch derived inflections
+  // whose stem coincides with a stop word (rare, but free).
+  if (STOP_WORDS.has(stemmed)) return;
+  // Re-check noise: stemming can leave a token alphabetic-only, so the
+  // post-stem form is essentially never noise, but the guard is cheap.
+  if (isNoiseToken(stemmed)) return;
+  // After stemming a 3-char token could shrink below the length floor
+  // (e.g. "ate" -> "at"). Drop those rather than push fragments.
+  if (stemmed.length < minLen) return;
+  sink.push(stemmed);
 }

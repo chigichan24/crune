@@ -179,9 +179,11 @@ describe("keywords extraction", () => {
     );
     expect(result.keywords.length).toBeGreaterThan(0);
     expect(result.keywords.length).toBeLessThanOrEqual(5);
-    // "refactor" and "authentication" appear in all prompts, should be top keywords
+    // "refactor" and "authentication" appear in all prompts, should be top
+    // keywords. Issue #30 introduced Porter stemming, so `authentication`
+    // surfaces as the stem `authent`.
     expect(result.keywords).toContain("refactor");
-    expect(result.keywords).toContain("authentication");
+    expect(result.keywords).toContain("authent");
     // Stop words should not appear
     for (const kw of result.keywords) {
       expect(kw.trim().length).toBeGreaterThan(0);
