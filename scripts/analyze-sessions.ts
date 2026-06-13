@@ -19,6 +19,7 @@ import {
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
 import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions } from "./skill-synthesizer.js";
+import { evaluateSkill, toSkillEvaluation, type EvaluatorOptions } from "./skill-evaluator.js";
 import { generateSessionSummary } from "./session-summarizer.js";
 import {
   discoverSessions,
@@ -35,7 +36,7 @@ import {
 
 // ─── CLI argument parsing ───────────────────────────────────────────────────
 
-interface CliArgs {
+export interface CliArgs {
   sessionsDir: string;
   outputDir: string;
   skipSynthesis: boolean;
@@ -43,10 +44,16 @@ interface CliArgs {
   synthesisCount: number;
   facetsDir: string;
   skipFacets: boolean;
+  skipEval: boolean;
+  evalModel?: string;
 }
 
-function parseArgs(): CliArgs {
-  const args = process.argv.slice(2);
+/**
+ * Parse analyze-sessions CLI flags. `argv` defaults to `process.argv.slice(2)`
+ * but is injectable for unit testing.
+ */
+export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
+  const args = argv;
   let sessionsDir = path.join(os.homedir(), ".claude", "projects");
   let outputDir = path.resolve("public", "data", "sessions");
   let skipSynthesis = false;
@@ -54,6 +61,8 @@ function parseArgs(): CliArgs {
   let synthesisCount = 5;
   let facetsDir = path.join(os.homedir(), ".claude", "usage-data", "facets");
   let skipFacets = false;
+  let skipEval = false;
+  let evalModel: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -76,9 +85,23 @@ function parseArgs(): CliArgs {
       facetsDir = path.resolve(args[++i]);
     } else if (args[i] === "--skip-facets") {
       skipFacets = true;
+    } else if (args[i] === "--skip-eval") {
+      skipEval = true;
+    } else if (args[i] === "--eval-model" && args[i + 1]) {
+      evalModel = args[++i];
     }
   }
-  return { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets };
+  return {
+    sessionsDir,
+    outputDir,
+    skipSynthesis,
+    synthesisModel,
+    synthesisCount,
+    facetsDir,
+    skipFacets,
+    skipEval,
+    evalModel,
+  };
 }
 
 // ─── Output types ───────────────────────────────────────────────────────────
@@ -252,6 +275,9 @@ interface SynthesisConfig {
   model?: string;
   count: number;
   facetsDir?: string;
+  skipEval?: boolean;
+  evalModel?: string;
+  evalThreshold?: number;
 }
 
 async function generateOverview(sessions: ParsedSession[], synthesisConfig: SynthesisConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
@@ -540,7 +566,20 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       if (result.success) {
         const original = knowledgeGraph.skillCandidates.find((sc) => sc.topicId === candidate.topicId);
         if (original) {
-          original.synthesizedMarkdown = stripSynthesisPreamble(result.stdout);
+          const markdown = stripSynthesisPreamble(result.stdout);
+          original.synthesizedMarkdown = markdown;
+
+          // Evaluate the synthesized SKILL.md. Gated behind synthesis success
+          // so heuristic markdown (skillMarkdown) is never scored. Rubric runs
+          // via claude -p unless --skip-eval is set.
+          if (!synthesisConfig.skipEval) {
+            const evalOpts: EvaluatorOptions = {};
+            if (synthesisConfig.evalModel) {
+              evalOpts.model = synthesisConfig.evalModel;
+            }
+            const evalResult = await evaluateSkill(markdown, evalOpts);
+            original.evaluation = toSkillEvaluation(evalResult);
+          }
         }
         console.error(`[crune]   [${i + 1}/${total}] Done.`);
       } else {
@@ -584,7 +623,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -706,6 +745,8 @@ async function main() {
     model: synthesisModel,
     count: synthesisCount,
     facetsDir: skipFacets ? undefined : facetsDir,
+    skipEval,
+    evalModel,
   });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));
@@ -724,7 +765,11 @@ async function main() {
   console.error(`[crune] Done.`);
 }
 
-main().catch((err) => {
-  console.error(`[crune] Fatal error: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+// Entry point — skip under Vitest so the module can be imported for unit tests
+// (e.g. parseArgs) without triggering the full pipeline.
+if (!process.env.VITEST) {
+  main().catch((err) => {
+    console.error(`[crune] Fatal error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  });
+}
