@@ -578,36 +578,53 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
           // so heuristic markdown (skillMarkdown) is never scored. Structural
           // validation ALWAYS runs locally; --skip-eval only turns off the LLM
           // rubric (structural-only mode).
-          const evalOpts: EvaluatorOptions = {
-            skipRubric: synthesisConfig.skipEval,
-          };
-          if (synthesisConfig.evalModel) {
-            evalOpts.model = synthesisConfig.evalModel;
-          }
-          let evalResult = await evaluateSkill(original.synthesizedMarkdown, evalOpts);
+          //
+          // Evaluation is best-effort and MUST NOT destroy the primary synthesis
+          // output: any throw here is caught, logged, and leaves
+          // `synthesizedMarkdown` intact (restored if a retry replaced it) with
+          // `evaluation` unset, so overview.json still captures the synthesis.
+          const primaryMarkdown = original.synthesizedMarkdown;
+          try {
+            const evalOpts: EvaluatorOptions = {
+              skipRubric: synthesisConfig.skipEval,
+            };
+            if (synthesisConfig.evalModel) {
+              evalOpts.model = synthesisConfig.evalModel;
+            }
+            let evalResult = await evaluateSkill(original.synthesizedMarkdown, evalOpts);
 
-          // Soft threshold: a SINGLE bounded re-synthesis retry when the
-          // overall score is below threshold. The candidate is never dropped
-          // — we keep whichever attempt scored higher and let the UI flag
-          // low scores. The retry only makes sense when the rubric is available;
-          // with --skip-eval the structural-only score can't improve, so skip it.
-          const threshold = synthesisConfig.evalThreshold ?? 60;
-          if (!synthesisConfig.skipEval && shouldRetrySynthesis(evalResult.overallScore, threshold)) {
-            console.error(
-              `[crune]   [${i + 1}/${total}] Score ${evalResult.overallScore ?? 0} < ${threshold}, re-synthesizing once...`
-            );
-            const retry = await synthesizeWithClaude(prompt, synthOpts);
-            if (retry.success) {
-              const retryMarkdown = stripSynthesisPreamble(retry.stdout);
-              const retryEval = await evaluateSkill(retryMarkdown, evalOpts);
-              if ((retryEval.overallScore ?? 0) >= (evalResult.overallScore ?? 0)) {
-                original.synthesizedMarkdown = retryMarkdown;
-                evalResult = retryEval;
+            // Soft threshold: a SINGLE bounded re-synthesis retry when the
+            // overall score is below threshold. The candidate is never dropped
+            // — we keep whichever attempt scored higher and let the UI flag
+            // low scores. The retry only makes sense when the rubric is available;
+            // with --skip-eval the structural-only score can't improve, so skip it.
+            const threshold = synthesisConfig.evalThreshold ?? 60;
+            if (!synthesisConfig.skipEval && shouldRetrySynthesis(evalResult.overallScore, threshold)) {
+              console.error(
+                `[crune]   [${i + 1}/${total}] Score ${evalResult.overallScore ?? 0} < ${threshold}, re-synthesizing once...`
+              );
+              const retry = await synthesizeWithClaude(prompt, synthOpts);
+              if (retry.success) {
+                const retryMarkdown = stripSynthesisPreamble(retry.stdout);
+                const retryEval = await evaluateSkill(retryMarkdown, evalOpts);
+                if ((retryEval.overallScore ?? 0) >= (evalResult.overallScore ?? 0)) {
+                  original.synthesizedMarkdown = retryMarkdown;
+                  evalResult = retryEval;
+                }
               }
             }
-          }
 
-          original.evaluation = toSkillEvaluation(evalResult);
+            original.evaluation = toSkillEvaluation(evalResult);
+          } catch (err) {
+            // Restore the primary synthesis output (a retry may have replaced it
+            // before the throw) and leave evaluation unset. Synthesis output is
+            // primary; evaluation must never destroy it.
+            original.synthesizedMarkdown = primaryMarkdown;
+            original.evaluation = undefined;
+            console.error(
+              `[crune]   [${i + 1}/${total}] Evaluation failed (keeping synthesized markdown): ${err instanceof Error ? err.message : String(err)}`
+            );
+          }
         }
         console.error(`[crune]   [${i + 1}/${total}] Done.`);
       } else {
