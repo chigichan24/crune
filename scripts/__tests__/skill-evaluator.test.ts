@@ -7,6 +7,7 @@ import {
   evaluateSkill,
   smokeFireTest,
   toSkillEvaluation,
+  shouldRetrySynthesis,
   type EvaluationResult,
 } from "../skill-evaluator.js";
 
@@ -335,6 +336,27 @@ describe("toSkillEvaluation (persistence mapper)", () => {
     expect(out.rubric?.skipped).toBe(true);
     expect(out.rubric?.error).toBe("boom");
     expect("rawResponse" in (out.rubric as object)).toBe(false);
+  });
+});
+
+describe("shouldRetrySynthesis (soft threshold)", () => {
+  it("retries when score is strictly below threshold", () => {
+    expect(shouldRetrySynthesis(59, 60)).toBe(true);
+    expect(shouldRetrySynthesis(0, 60)).toBe(true);
+  });
+
+  it("does not retry when score meets or exceeds threshold", () => {
+    expect(shouldRetrySynthesis(60, 60)).toBe(false);
+    expect(shouldRetrySynthesis(90, 60)).toBe(false);
+  });
+
+  it("treats undefined score as 0 (retry)", () => {
+    expect(shouldRetrySynthesis(undefined, 60)).toBe(true);
+  });
+
+  it("never retries when threshold is 0 (feature off)", () => {
+    expect(shouldRetrySynthesis(0, 0)).toBe(false);
+    expect(shouldRetrySynthesis(undefined, 0)).toBe(false);
   });
 });
 

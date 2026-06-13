@@ -19,7 +19,7 @@ import {
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
 import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions } from "./skill-synthesizer.js";
-import { evaluateSkill, toSkillEvaluation, type EvaluatorOptions } from "./skill-evaluator.js";
+import { evaluateSkill, toSkillEvaluation, shouldRetrySynthesis, type EvaluatorOptions } from "./skill-evaluator.js";
 import { generateSessionSummary } from "./session-summarizer.js";
 import {
   discoverSessions,
@@ -46,6 +46,7 @@ export interface CliArgs {
   skipFacets: boolean;
   skipEval: boolean;
   evalModel?: string;
+  evalThreshold: number;
 }
 
 /**
@@ -63,6 +64,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
   let skipFacets = false;
   let skipEval = false;
   let evalModel: string | undefined;
+  let evalThreshold = 60;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -89,6 +91,9 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
       skipEval = true;
     } else if (args[i] === "--eval-model" && args[i + 1]) {
       evalModel = args[++i];
+    } else if (args[i] === "--eval-threshold" && args[i + 1]) {
+      const raw = parseInt(args[++i], 10);
+      evalThreshold = Number.isNaN(raw) ? 60 : Math.min(100, Math.max(0, raw));
     }
   }
   return {
@@ -101,6 +106,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     skipFacets,
     skipEval,
     evalModel,
+    evalThreshold,
   };
 }
 
@@ -566,8 +572,7 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       if (result.success) {
         const original = knowledgeGraph.skillCandidates.find((sc) => sc.topicId === candidate.topicId);
         if (original) {
-          const markdown = stripSynthesisPreamble(result.stdout);
-          original.synthesizedMarkdown = markdown;
+          original.synthesizedMarkdown = stripSynthesisPreamble(result.stdout);
 
           // Evaluate the synthesized SKILL.md. Gated behind synthesis success
           // so heuristic markdown (skillMarkdown) is never scored. Rubric runs
@@ -577,7 +582,28 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
             if (synthesisConfig.evalModel) {
               evalOpts.model = synthesisConfig.evalModel;
             }
-            const evalResult = await evaluateSkill(markdown, evalOpts);
+            let evalResult = await evaluateSkill(original.synthesizedMarkdown, evalOpts);
+
+            // Soft threshold: a SINGLE bounded re-synthesis retry when the
+            // overall score is below threshold. The candidate is never dropped
+            // — we keep whichever attempt scored higher and let the UI flag
+            // low scores.
+            const threshold = synthesisConfig.evalThreshold ?? 60;
+            if (shouldRetrySynthesis(evalResult.overallScore, threshold)) {
+              console.error(
+                `[crune]   [${i + 1}/${total}] Score ${evalResult.overallScore ?? 0} < ${threshold}, re-synthesizing once...`
+              );
+              const retry = await synthesizeWithClaude(prompt, synthOpts);
+              if (retry.success) {
+                const retryMarkdown = stripSynthesisPreamble(retry.stdout);
+                const retryEval = await evaluateSkill(retryMarkdown, evalOpts);
+                if ((retryEval.overallScore ?? 0) >= (evalResult.overallScore ?? 0)) {
+                  original.synthesizedMarkdown = retryMarkdown;
+                  evalResult = retryEval;
+                }
+              }
+            }
+
             original.evaluation = toSkillEvaluation(evalResult);
           }
         }
@@ -623,7 +649,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel, evalThreshold } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -747,6 +773,7 @@ async function main() {
     facetsDir: skipFacets ? undefined : facetsDir,
     skipEval,
     evalModel,
+    evalThreshold,
   });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));

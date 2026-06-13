@@ -534,6 +534,24 @@ export async function evaluateSkill(
   return { structural, rubric, smokeFiring, overallScore };
 }
 
+// ---------- Soft threshold ----------
+
+/**
+ * Decide whether to trigger a (single, bounded) re-synthesis retry for a
+ * skill whose evaluation scored below the soft threshold.
+ *
+ * Pure decision function — the caller owns the actual retry budget (exactly
+ * one extra `claude -p` call). A missing score is treated as 0. A threshold
+ * of 0 disables retries entirely.
+ */
+export function shouldRetrySynthesis(
+  overallScore: number | undefined,
+  threshold: number
+): boolean {
+  if (threshold <= 0) return false;
+  return (overallScore ?? 0) < threshold;
+}
+
 // ---------- Persistence mapper ----------
 
 /**
