@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ToolCall, SubagentSession } from '../../types'
 import { SubagentBranch } from './SubagentBranch'
-import { getToolCategory, truncate } from './toolCallHelpers'
+import { countLines, getToolCategory, shouldCollapse, truncate } from './toolCallHelpers'
 import {
   AgentRenderer,
   AskUserQuestionRenderer,
@@ -31,22 +31,60 @@ interface Props {
   subagents: Record<string, SubagentSession>
 }
 
+/**
+ * Extract the primary "code body" of a tool input for collapse-detection,
+ * e.g. a Bash command (find/grep/ls -R bodies live here) or a search pattern.
+ * Returns null when the tool has no large code-like body.
+ */
+function extractInputBody(name: string, input: Record<string, unknown>): string | null {
+  const pick = (key: string): string | null =>
+    typeof input[key] === 'string' ? (input[key] as string) : null
+  switch (name) {
+    case 'Bash':
+      return pick('command')
+    case 'Grep':
+    case 'Glob':
+      return pick('pattern')
+    default:
+      return null
+  }
+}
+
 export function ToolCallBlock({ toolCall, subagents }: Props) {
   const name = toolCall.toolName ?? ''
   const input = toolCall.input ?? {}
   const result = toolCall.result ?? null
   const category = getToolCategory(name)
-  const isLongResult = typeof result === 'string' && result.length > 500
+  const resultStr =
+    result == null ? '' : typeof result === 'string' ? result : JSON.stringify(result)
+  const isLongResult = shouldCollapse(resultStr)
   const [resultOpen, setResultOpen] = useState(!isLongResult)
+
+  const inputBody = extractInputBody(name, input)
+  const isLongInput = inputBody != null && shouldCollapse(inputBody)
+  const [inputOpen, setInputOpen] = useState(!isLongInput)
 
   const subagentId = toolCall.subagentId ?? null
   const matchingSubagent = subagentId ? subagents[subagentId] : null
 
   const inputView = renderToolInput(name, input)
 
+  const renderInput = () => {
+    if (!isLongInput) return inputView
+    return (
+      <div className="tool-input-collapsible">
+        <button
+          className="tool-result-toggle"
+          onClick={() => setInputOpen(prev => !prev)}
+        >
+          入力を{inputOpen ? '非表示' : '表示'}（{countLines(inputBody!)}行）
+        </button>
+        {inputOpen && inputView}
+      </div>
+    )
+  }
+
   const renderResult = () => {
-    if (!result) return null
-    const resultStr = typeof result === 'string' ? result : JSON.stringify(result)
     if (!resultStr) return null
 
     return (
@@ -55,7 +93,7 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
           className="tool-result-toggle"
           onClick={() => setResultOpen(prev => !prev)}
         >
-          結果を{resultOpen ? '非表示' : '表示'}
+          結果を{resultOpen ? '非表示' : '表示'}（{countLines(resultStr)}行）
         </button>
         {resultOpen && (
           <pre className="tool-result-content">{truncate(resultStr, 2000)}</pre>
@@ -71,7 +109,7 @@ export function ToolCallBlock({ toolCall, subagents }: Props) {
           {name}
         </span>
       </div>
-      {inputView}
+      {renderInput()}
       {renderResult()}
       {(name === 'Agent' || name === 'Task') && matchingSubagent && (
         <SubagentBranch

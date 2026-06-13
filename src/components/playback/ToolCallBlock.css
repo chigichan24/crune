@@ -179,6 +179,15 @@
   margin-top: 4px;
 }
 
+/* Collapsible input section */
+.tool-input-collapsible {
+  padding: 6px 10px;
+}
+
+.tool-input-collapsible .tool-input {
+  padding: 6px 0 0;
+}
+
 /* Result section */
 .tool-result {
   border-top: 1px solid var(--border);

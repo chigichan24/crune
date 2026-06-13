@@ -1,11 +1,63 @@
 import { describe, it, expect } from 'vitest'
 import {
+  countLines,
   getToolCategory,
   parseMcpToolName,
   pickKeyInputArgs,
+  shouldCollapse,
   summarizeValue,
   truncate,
 } from '../toolCallHelpers'
+
+describe('countLines', () => {
+  it('returns 0 for an empty string', () => {
+    expect(countLines('')).toBe(0)
+  })
+
+  it('counts a single line with no trailing newline', () => {
+    expect(countLines('hello')).toBe(1)
+  })
+
+  it('counts lines separated by \\n', () => {
+    expect(countLines('a\nb\nc')).toBe(3)
+  })
+
+  it('does not count a trailing newline as an extra empty line', () => {
+    expect(countLines('a\nb\n')).toBe(2)
+  })
+
+  it('handles CRLF line endings', () => {
+    expect(countLines('a\r\nb\r\nc')).toBe(3)
+  })
+
+  it('counts blank interior lines', () => {
+    expect(countLines('a\n\nb')).toBe(3)
+  })
+})
+
+describe('shouldCollapse', () => {
+  it('does not collapse short single-line content', () => {
+    expect(shouldCollapse('hello world')).toBe(false)
+  })
+
+  it('collapses content with more than 15 lines', () => {
+    const sixteen = Array.from({ length: 16 }, (_, i) => `line ${i}`).join('\n')
+    expect(shouldCollapse(sixteen)).toBe(true)
+  })
+
+  it('does not collapse content with exactly 15 lines under the char limit', () => {
+    const fifteen = Array.from({ length: 15 }, () => 'x').join('\n')
+    expect(shouldCollapse(fifteen)).toBe(false)
+  })
+
+  it('collapses content longer than 500 chars even on a single line', () => {
+    expect(shouldCollapse('a'.repeat(501))).toBe(true)
+  })
+
+  it('does not collapse content of exactly 500 chars on few lines', () => {
+    expect(shouldCollapse('a'.repeat(500))).toBe(false)
+  })
+})
 
 describe('getToolCategory', () => {
   it('classifies the existing 7 tool surface', () => {

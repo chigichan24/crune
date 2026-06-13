@@ -91,6 +91,39 @@ export function parseMcpToolName(name: string): McpToolParts | null {
 }
 
 /**
+ * Count the number of lines in a string.
+ *
+ * An empty string has 0 lines. A trailing newline does not add a phantom
+ * empty line (so `"a\nb\n"` is 2 lines, not 3). CRLF endings are normalized.
+ */
+export function countLines(str: string): number {
+  if (str.length === 0) return 0
+  const normalized = str.replace(/\r\n/g, '\n')
+  const withoutTrailing = normalized.endsWith('\n')
+    ? normalized.slice(0, -1)
+    : normalized
+  if (withoutTrailing.length === 0) return 1
+  return withoutTrailing.split('\n').length
+}
+
+/** Thresholds for collapsing long tool input/output content. */
+export const COLLAPSE_LINE_THRESHOLD = 15
+export const COLLAPSE_CHAR_THRESHOLD = 500
+
+/**
+ * Decide whether a block of tool input/output text is large enough to be
+ * collapsed by default. Collapses when it exceeds either the line OR the
+ * character threshold.
+ */
+export function shouldCollapse(str: string): boolean {
+  if (!str) return false
+  return (
+    countLines(str) > COLLAPSE_LINE_THRESHOLD ||
+    str.length > COLLAPSE_CHAR_THRESHOLD
+  )
+}
+
+/**
  * Truncate a string to a max length, adding an ellipsis when truncated.
  */
 export function truncate(str: string, maxLen: number): string {
