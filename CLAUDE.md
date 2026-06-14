@@ -153,3 +153,19 @@ All domain types are in `src/types/session.ts`. Key types:
 Pipeline-internal types in `scripts/knowledge-graph/types.ts`:
 - `FacetsData` --- parsed `/insights` facets data per session
 - `FacetsInsightsSummary` --- aggregated facets for a topic (goals, categories, success rate, frictions)
+
+## Human Feedback (issue #24)
+
+Playback feedback (bookmark / tag / note, issue #23) is fed into skill synthesis as a human signal.
+
+**Persistence bridge**: localStorage (`crune.feedback.v1`) stays the offline source of truth. The UI best-effort POSTs each session's entries to the skill-server (`POST /api/feedback`, fire-and-forget via `src/components/playback/feedback/feedbackSync.ts`), which merges them into `public/data/feedback.json` (`GET /api/feedback` reads it back). The offline pipeline reads that file via `scripts/feedback-reader.ts`.
+
+**Meaningful tags** (free-text otherwise; constants in `src/components/playback/feedback/tagSemantics.ts` and mirrored in `scripts/feedback-reader.ts`):
+- `reusable` --- this turn is VALUABLE evidence to replicate in a skill.
+- `anti-pattern` --- this turn is a counter-example; skills should avoid it.
+
+Both are surfaced first in the `TagInput` datalist.
+
+**Synthesis** (gated behind `--use-human-feedback`, default OFF for A/B): `buildSynthesisPrompt` adds a "Human-Flagged Moments" section listing bookmarked turns, `reusable` turns marked as evidence to replicate, and `anti-pattern` turns marked as counter-examples to avoid. `--feedback-file <path>` overrides the default `public/data/feedback.json`.
+
+**Reusability score**: an optional `humanSignal` term (`ReusabilityScore.humanSignal`, weight 0.10) boosts clusters with bookmarks/`reusable` tags and dampens for `anti-pattern`, folded in alongside `successRate`/`helpfulness`.
