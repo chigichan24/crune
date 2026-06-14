@@ -186,8 +186,8 @@ export interface TopicNode {
 export interface TopicFacetsSummary {
   categories: string[] // normalized goal categories (feature / bugfix / refactoring / …)
   goals: string[] // raw underlying-goal phrases (a few, de-duplicated)
-  successRate?: number
-  helpfulness?: number
+  successRate: number // always set when a summary exists
+  helpfulness: number
 }
 
 export interface TopicEdge {

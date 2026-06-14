@@ -111,8 +111,9 @@ export interface TopicFacetsSummary {
   categories: string[];
   /** Raw underlying-goal phrases (a few, de-duplicated). */
   goals: string[];
-  successRate?: number;
-  helpfulness?: number;
+  /** Always set when a summary exists (the aggregation always computes them). */
+  successRate: number;
+  helpfulness: number;
 }
 
 export interface TopicEdge {
