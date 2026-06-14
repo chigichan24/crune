@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/synthesize': 'http://localhost:3456',
+      '/api/feedback': 'http://localhost:3456',
     },
   },
 })

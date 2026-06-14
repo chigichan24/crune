@@ -26,4 +26,6 @@ dist-ssr
 
 # Session data
 public/data/sessions/
+# Human playback feedback synced from the browser (issue #24)
+public/data/feedback.json
 .claude/worktrees/

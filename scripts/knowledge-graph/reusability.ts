@@ -24,6 +24,53 @@ export const FACETS_WEIGHTS = {
   helpfulness: 0.1,
 } as const;
 
+/**
+ * Weight given to the human feedback term when it is folded in (issue #24).
+ * Mirrors the per-facets weights. The remaining weights are scaled by
+ * (1 - this) so the total stays 1.0.
+ */
+export const HUMAN_SIGNAL_WEIGHT = 0.1;
+
+/** Per-session feedback counts used to derive a human signal. */
+export interface SessionHumanSignal {
+  bookmarked: boolean;
+  reusableCount: number;
+  antiPatternCount: number;
+}
+
+/**
+ * Map one session's feedback counts to a signal in [0,1]. Neutral baseline is
+ * 0.5; a bookmark nudges up, each `reusable` tag boosts further, each
+ * `anti-pattern` tag dampens. Monotonic in each lever and clamped to [0,1].
+ *
+ * Pure and deterministic so the synthesis pipeline (and tests) can reason about
+ * the signal independently of the topic-level aggregation.
+ */
+export function computeSessionHumanSignal(s: SessionHumanSignal): number {
+  let signal = 0.5;
+  if (s.bookmarked) signal += 0.15;
+  signal += 0.2 * Math.min(s.reusableCount, 3);
+  signal -= 0.2 * Math.min(s.antiPatternCount, 3);
+  return Math.max(0, Math.min(1, signal));
+}
+
+/**
+ * Aggregate per-session human signals for a topic. Sessions without feedback
+ * contribute the neutral baseline (0.5) so a single flagged session does not
+ * dominate a large cluster. Returns 0.5 for an empty topic.
+ */
+export function aggregateHumanSignal(
+  sessionIds: string[],
+  signalMap: Map<string, number>
+): number {
+  if (sessionIds.length === 0) return 0.5;
+  let sum = 0;
+  for (const sessionId of sessionIds) {
+    sum += signalMap.get(sessionId) ?? 0.5;
+  }
+  return sum / sessionIds.length;
+}
+
 type BreakdownEntry = NonNullable<ReusabilityScore["breakdown"]>[number];
 
 /**
@@ -54,7 +101,8 @@ function buildBreakdown(
 export function computeReusabilityScores(
   topics: TopicNode[],
   now: Date = new Date(),
-  facetsMap?: Map<string, FacetsData>
+  facetsMap?: Map<string, FacetsData>,
+  humanSignalMap?: Map<string, number>
 ): void {
   if (topics.length === 0) return;
 
@@ -74,6 +122,7 @@ export function computeReusabilityScores(
   const maxDays = Math.max(...daysSinceLastSeen.filter((d) => isFinite(d)), 1);
 
   const useFacets = facetsMap != null && facetsMap.size > 0;
+  const useHuman = humanSignalMap != null && humanSignalMap.size > 0;
 
   for (let i = 0; i < topics.length; i++) {
     const topic = topics[i];
@@ -98,13 +147,21 @@ export function computeReusabilityScores(
       ? 1 - days / maxDays
       : 0;
 
-    let overall: number;
     const score: ReusabilityScore = {
       overall: 0,
       frequency: Math.round(frequency * 1000) / 1000,
       timeCost: Math.round(timeCost * 1000) / 1000,
       crossProjectScore: Math.round(crossProjectScore * 1000) / 1000,
       recency: Math.round(recency * 1000) / 1000,
+    };
+
+    // Build the active weight set and matching signal values.
+    const weights: Record<string, number> = {};
+    const values: Record<string, number> = {
+      frequency,
+      timeCost,
+      crossProjectScore,
+      recency,
     };
 
     if (useFacets) {
@@ -128,42 +185,37 @@ export function computeReusabilityScores(
       const successRate = successSum / sessionCount;
       const helpfulness = helpfulnessSum / sessionCount;
 
-      overall =
-        FACETS_WEIGHTS.frequency * frequency +
-        FACETS_WEIGHTS.timeCost * timeCost +
-        FACETS_WEIGHTS.crossProjectScore * crossProjectScore +
-        FACETS_WEIGHTS.recency * recency +
-        FACETS_WEIGHTS.successRate * successRate +
-        FACETS_WEIGHTS.helpfulness * helpfulness;
+      Object.assign(weights, FACETS_WEIGHTS);
+      values.successRate = successRate;
+      values.helpfulness = helpfulness;
 
       score.successRate = Math.round(successRate * 1000) / 1000;
       score.helpfulness = Math.round(helpfulness * 1000) / 1000;
-
       score.weightProfile = "facets";
-      score.breakdown = buildBreakdown(FACETS_WEIGHTS, {
-        frequency,
-        timeCost,
-        crossProjectScore,
-        recency,
-        successRate,
-        helpfulness,
-      });
     } else {
-      overall =
-        BASE_WEIGHTS.frequency * frequency +
-        BASE_WEIGHTS.timeCost * timeCost +
-        BASE_WEIGHTS.crossProjectScore * crossProjectScore +
-        BASE_WEIGHTS.recency * recency;
-
+      Object.assign(weights, BASE_WEIGHTS);
       score.weightProfile = "base";
-      score.breakdown = buildBreakdown(BASE_WEIGHTS, {
-        frequency,
-        timeCost,
-        crossProjectScore,
-        recency,
-      });
     }
 
+    // Fold in the human feedback term (issue #24). Scale the existing weights by
+    // (1 - HUMAN_SIGNAL_WEIGHT) so the total stays 1.0 and append the new term,
+    // mirroring how facets weights make room for successRate/helpfulness.
+    if (useHuman) {
+      for (const key of Object.keys(weights)) {
+        weights[key] = weights[key] * (1 - HUMAN_SIGNAL_WEIGHT);
+      }
+      const humanSignal = aggregateHumanSignal(topic.sessionIds, humanSignalMap!);
+      weights.humanSignal = HUMAN_SIGNAL_WEIGHT;
+      values.humanSignal = humanSignal;
+      score.humanSignal = Math.round(humanSignal * 1000) / 1000;
+    }
+
+    let overall = 0;
+    for (const key of Object.keys(weights)) {
+      overall += weights[key] * (values[key] ?? 0);
+    }
+
+    score.breakdown = buildBreakdown(weights, values);
     score.overall = Math.round(overall * 1000) / 1000;
     topic.reusabilityScore = score;
   }

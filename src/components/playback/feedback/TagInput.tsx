@@ -1,4 +1,5 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
+import { SEMANTIC_TAGS } from './tagSemantics'
 
 interface Props {
   /** Existing tags on the entry. */
@@ -12,10 +13,21 @@ interface Props {
 /**
  * Controlled tag editor with native <datalist> autocomplete. Submits the
  * current value on Enter, deduping is handled upstream by the store.
+ *
+ * The two meaningful tags (`reusable` / `anti-pattern`) are always offered
+ * first so users can flag turns for the synthesis pipeline without recalling
+ * the exact spelling.
  */
 export function TagInput({ tags, suggestions, onAdd, onRemove }: Props) {
   const [value, setValue] = useState('')
   const listId = useId()
+
+  // Surface the semantic tags first, then any other known tags (deduped).
+  const options = useMemo(() => {
+    const seen = new Set<string>(SEMANTIC_TAGS)
+    const rest = suggestions.filter(s => !seen.has(s))
+    return [...SEMANTIC_TAGS, ...rest]
+  }, [suggestions])
 
   const commit = () => {
     const clean = value.trim()
@@ -56,7 +68,7 @@ export function TagInput({ tags, suggestions, onAdd, onRemove }: Props) {
         onBlur={commit}
       />
       <datalist id={listId}>
-        {suggestions.map(s => (
+        {options.map(s => (
           <option key={s} value={s} />
         ))}
       </datalist>

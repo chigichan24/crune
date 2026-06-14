@@ -71,12 +71,31 @@ export interface FacetsInsightsSummary {
   frictionDetails: string[];
 }
 
+/**
+ * A human-flagged playback moment threaded into synthesis (issue #24). The
+ * caller resolves a short snippet for the turn; this module only formats it.
+ */
+export interface HumanFeedbackSignal {
+  sessionId: string;
+  turnId: number;
+  /** Short turn snippet (userPrompt + first assistant text), or null if unknown. */
+  snippet: string | null;
+  /** User's freeform note for the turn, if any. */
+  note: string;
+  /** Tagged `reusable` — VALUABLE evidence to replicate. */
+  reusable: boolean;
+  /** Tagged `anti-pattern` — counter-example to avoid. */
+  antiPattern: boolean;
+}
+
 export interface SynthesisRequest {
   skillCandidate: SkillCandidate;
   topicNode: TopicNode;
   enrichedSequences?: EnrichedSequence[];
   graphContext?: GraphContext;
   facetsInsights?: FacetsInsightsSummary;
+  /** Human-flagged moments (issue #24); present only with --use-human-feedback. */
+  humanFeedback?: HumanFeedbackSignal[];
 }
 
 export interface SynthesisResponse {
@@ -87,8 +106,55 @@ export interface SynthesisResponse {
 
 // ---------- Prompt Builder ----------
 
+/**
+ * Render the "Human-Flagged Moments" section from explicit user feedback.
+ * `reusable` turns are framed as VALUABLE evidence to replicate, `anti-pattern`
+ * turns as counter-examples to avoid, and bare bookmarks as noteworthy moments.
+ * Returns "" when there is nothing to report.
+ */
+export function buildHumanFeedbackSection(signals: HumanFeedbackSignal[]): string {
+  if (!signals || signals.length === 0) return "";
+
+  const reusable = signals.filter((s) => s.reusable);
+  const antiPattern = signals.filter((s) => s.antiPattern);
+  // Bookmarked-only: flagged but without a meaningful tag.
+  const noteworthy = signals.filter((s) => !s.reusable && !s.antiPattern);
+
+  const render = (s: HumanFeedbackSignal): string => {
+    const body = s.snippet ?? "(snippet unavailable)";
+    const note = s.note.trim() ? ` — note: ${s.note.trim()}` : "";
+    return `- ${body}${note}`;
+  };
+
+  const lines = [`## Human-Flagged Moments (explicit user feedback)`];
+
+  if (reusable.length > 0) {
+    lines.push(
+      "### Reusable (VALUABLE — replicate this in the skill)",
+      "These moments were marked by a human as worth reusing. Treat them as strong positive evidence and reflect their approach in the workflow steps.",
+      ...reusable.map(render),
+    );
+  }
+  if (antiPattern.length > 0) {
+    lines.push(
+      "### Anti-Pattern (AVOID — counter-example)",
+      "These moments were marked by a human as things to avoid. Do NOT recommend this approach; where relevant, add explicit guidance steering away from it.",
+      ...antiPattern.map(render),
+    );
+  }
+  if (noteworthy.length > 0) {
+    lines.push(
+      "### Bookmarked (noteworthy)",
+      "These moments were bookmarked as noteworthy. Consider them when shaping the skill.",
+      ...noteworthy.map(render),
+    );
+  }
+
+  return lines.join("\n");
+}
+
 export function buildSynthesisPrompt(body: SynthesisRequest): string {
-  const { skillCandidate, topicNode, enrichedSequences, graphContext, facetsInsights } = body;
+  const { skillCandidate, topicNode, enrichedSequences, graphContext, facetsInsights, humanFeedback } = body;
 
   const topicInfo = [
     `## Topic Information`,
@@ -226,8 +292,18 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
     `7. Output ONLY the markdown content. No code fences wrapping the output, no explanations before or after.`,
   ];
 
+  // Rules 1-7 are fixed; additional conditional rules are numbered sequentially.
+  let nextRule = 8;
   if (graphContext && graphContext.connectedTopics.some(ct => ct.edgeType === "workflow-continuation")) {
-    instructionLines.push(`8. If workflow-continuation connections exist, include \`requires\` and/or \`next\` fields in the YAML frontmatter listing the connected topic labels.`);
+    instructionLines.push(`${nextRule++}. If workflow-continuation connections exist, include \`requires\` and/or \`next\` fields in the YAML frontmatter listing the connected topic labels.`);
+  }
+
+  // --- Human-flagged moments section (issue #24) ---
+  const humanFeedbackSection = buildHumanFeedbackSection(humanFeedback ?? []);
+  if (humanFeedbackSection) {
+    instructionLines.push(
+      `${nextRule}. Prioritize the **Human-Flagged Moments** above: replicate the \`reusable\` approaches and explicitly steer away from the \`anti-pattern\` ones. These are direct human signals and outrank heuristic inferences.`,
+    );
   }
 
   const instruction = instructionLines.join("\n");
@@ -253,7 +329,7 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
     facetsSection = lines.join("\n");
   }
 
-  const parts = [topicInfo, prompts, toolSig, toolPatterns, graphPosition, connectedTopicsSection, facetsSection, reference, instruction].filter(Boolean);
+  const parts = [topicInfo, prompts, toolSig, toolPatterns, graphPosition, connectedTopicsSection, facetsSection, humanFeedbackSection, reference, instruction].filter(Boolean);
   return parts.join("\n\n");
 }
 

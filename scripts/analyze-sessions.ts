@@ -18,7 +18,14 @@ import {
   type SessionInput,
   type SemanticKnowledgeGraph,
 } from "./knowledge-graph-builder.js";
-import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions } from "./skill-synthesizer.js";
+import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions, type HumanFeedbackSignal } from "./skill-synthesizer.js";
+import { computeSessionHumanSignal } from "./knowledge-graph/reusability.js";
+import {
+  readFeedbackFile,
+  computeSessionFeedbackCounts,
+  selectFlaggedTurns,
+  renderTurnSnippet,
+} from "./feedback-reader.js";
 import { evaluateSkill, toSkillEvaluation, shouldRetrySynthesis, type EvaluatorOptions } from "./skill-evaluator.js";
 import { generateSessionSummary } from "./session-summarizer.js";
 import {
@@ -47,6 +54,8 @@ export interface CliArgs {
   skipEval: boolean;
   evalModel?: string;
   evalThreshold: number;
+  useHumanFeedback: boolean;
+  feedbackFile: string;
 }
 
 /**
@@ -65,6 +74,8 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
   let skipEval = false;
   let evalModel: string | undefined;
   let evalThreshold = 60;
+  let useHumanFeedback = false;
+  let feedbackFile = path.resolve("public", "data", "feedback.json");
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -94,6 +105,10 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     } else if (args[i] === "--eval-threshold" && args[i + 1]) {
       const raw = parseInt(args[++i], 10);
       evalThreshold = Number.isNaN(raw) ? 60 : Math.min(100, Math.max(0, raw));
+    } else if (args[i] === "--use-human-feedback") {
+      useHumanFeedback = true;
+    } else if (args[i] === "--feedback-file" && args[i + 1]) {
+      feedbackFile = path.resolve(args[++i]);
     }
   }
   return {
@@ -107,6 +122,8 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     skipEval,
     evalModel,
     evalThreshold,
+    useHumanFeedback,
+    feedbackFile,
   };
 }
 
@@ -284,6 +301,8 @@ interface SynthesisConfig {
   skipEval?: boolean;
   evalModel?: string;
   evalThreshold?: number;
+  useHumanFeedback?: boolean;
+  feedbackFile?: string;
 }
 
 async function generateOverview(sessions: ParsedSession[], synthesisConfig: SynthesisConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
@@ -446,8 +465,23 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       subagentCount: s.meta.subagentCount,
     },
   }));
+  // Human feedback (issue #24): gated behind --use-human-feedback (default OFF).
+  // localStorage is synced to public/data/feedback.json by the skill-server.
+  const humanFeedbackMap = synthesisConfig.useHumanFeedback
+    ? readFeedbackFile(synthesisConfig.feedbackFile ?? path.resolve("public", "data", "feedback.json"))
+    : new Map();
+  const humanSignalMap = new Map<string, number>();
+  if (synthesisConfig.useHumanFeedback) {
+    for (const [sessionId, counts] of computeSessionFeedbackCounts(humanFeedbackMap)) {
+      humanSignalMap.set(sessionId, computeSessionHumanSignal(counts));
+    }
+    console.error(`[crune] Human feedback: ${humanFeedbackMap.size} sessions with bookmarks/tags/notes`);
+  }
+  const sessionInputMap = new Map(sessionInputs.map((s) => [s.sessionId, s]));
+
   const knowledgeGraph = buildSemanticKnowledgeGraph(sessionInputs, {
     facetsDir: synthesisConfig.facetsDir,
+    humanSignalMap: synthesisConfig.useHumanFeedback ? humanSignalMap : undefined,
   });
 
   // Top files
@@ -562,11 +596,28 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
         ? aggregateFacetsForTopic(topic.sessionIds, readFacetsDir(synthesisConfig.facetsDir))
         : undefined;
 
+      // Human-flagged moments for this topic (issue #24), only when enabled.
+      let humanFeedback: HumanFeedbackSignal[] | undefined;
+      if (synthesisConfig.useHumanFeedback && humanFeedbackMap.size > 0) {
+        const flagged = selectFlaggedTurns(humanFeedbackMap, topic.sessionIds);
+        if (flagged.length > 0) {
+          humanFeedback = flagged.map((f) => ({
+            sessionId: f.sessionId,
+            turnId: f.turnId,
+            snippet: renderTurnSnippet(sessionInputMap, f.sessionId, f.turnId),
+            note: f.note,
+            reusable: f.reusable,
+            antiPattern: f.antiPattern,
+          }));
+        }
+      }
+
       const prompt = buildSynthesisPrompt({
         skillCandidate: candidate,
         topicNode: topic as unknown as import("./skill-synthesizer.js").TopicNode,
         enrichedSequences: relatedSequences,
         facetsInsights: facetsInsights as unknown as import("./skill-synthesizer.js").FacetsInsightsSummary | undefined,
+        humanFeedback,
       });
       const result = await synthesizeWithClaude(prompt, synthOpts);
       if (result.success) {
@@ -669,7 +720,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel, evalThreshold } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel, evalThreshold, useHumanFeedback, feedbackFile } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -794,6 +845,8 @@ async function main() {
     skipEval,
     evalModel,
     evalThreshold,
+    useHumanFeedback,
+    feedbackFile,
   });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));
