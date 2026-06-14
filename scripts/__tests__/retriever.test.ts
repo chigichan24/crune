@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { createRetriever } from "../knowledge-graph/retriever.js";
+import {
+  createRetriever,
+  createRetrieverFromIndex,
+} from "../knowledge-graph/retriever.js";
 import type { EmbeddingBackend, ChunkMeta } from "../knowledge-graph/embedder.js";
 
 /**
@@ -136,5 +139,49 @@ describe("hybrid normalization", () => {
     for (let i = 1; i < results.length; i++) {
       expect(results[i - 1].score).toBeGreaterThanOrEqual(results[i].score);
     }
+  });
+});
+
+describe("createRetrieverFromIndex length guards", () => {
+  const backend = conceptBackend();
+  const chunks: ChunkMeta[] = [
+    { sessionId: "s1", turnIndex: 0, role: "user-turn", snippet: "auth" },
+    { sessionId: "s2", turnIndex: 1, role: "user-turn", snippet: "css" },
+  ];
+  const dim = 4;
+
+  it("throws when chunkTexts is not parallel to chunks", () => {
+    expect(() =>
+      createRetrieverFromIndex({
+        chunks,
+        matrix: new Int8Array(chunks.length * dim),
+        dim,
+        chunkTexts: ["only one text"], // length 1 != chunks length 2
+        backend,
+      }),
+    ).toThrow(/chunkTexts length/);
+  });
+
+  it("throws when the matrix length does not equal chunks * dim", () => {
+    expect(() =>
+      createRetrieverFromIndex({
+        chunks,
+        matrix: new Int8Array(chunks.length * dim - 1), // one short
+        dim,
+        chunkTexts: chunks.map((c) => c.snippet),
+        backend,
+      }),
+    ).toThrow(/matrix length/);
+  });
+
+  it("builds successfully when lengths line up", () => {
+    const r = createRetrieverFromIndex({
+      chunks,
+      matrix: new Int8Array(chunks.length * dim),
+      dim,
+      chunkTexts: chunks.map((c) => c.snippet),
+      backend,
+    });
+    expect(r.size).toBe(chunks.length);
   });
 });
