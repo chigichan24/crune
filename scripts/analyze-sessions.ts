@@ -488,45 +488,7 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
   }
 
   // Build semantic knowledge graph
-  const sessionInputs: SessionInput[] = sessions.map((s) => ({
-    sessionId: s.meta.sessionId,
-    projectDisplayName: s.projectDisplayName,
-    turns: s.turns.map((t) => ({
-      userPrompt: t.userPrompt,
-      assistantTexts: t.assistantTexts,
-      toolCalls: t.toolCalls.map((tc) => ({
-        toolName: tc.toolName,
-        input: tc.input,
-      })),
-    })),
-    subagents: Object.fromEntries(
-      Object.entries(s.subagents).map(([id, sub]) => [
-        id,
-        {
-          agentId: sub.agentId,
-          agentType: sub.agentType,
-          turns: sub.turns.map((t) => ({
-            userPrompt: t.userPrompt,
-            assistantTexts: t.assistantTexts,
-            toolCalls: t.toolCalls.map((tc) => ({
-              toolName: tc.toolName,
-              input: tc.input,
-            })),
-          })),
-        },
-      ])
-    ),
-    meta: {
-      sessionId: s.meta.sessionId,
-      createdAt: s.meta.createdAt,
-      lastActiveAt: s.meta.lastActiveAt,
-      durationMinutes: s.meta.durationMinutes,
-      filesEdited: s.meta.filesEdited,
-      gitBranch: s.meta.gitBranch,
-      toolBreakdown: s.meta.toolBreakdown,
-      subagentCount: s.meta.subagentCount,
-    },
-  }));
+  const sessionInputs: SessionInput[] = toSessionInputs(sessions);
   // Human feedback (issue #24): gated behind --use-human-feedback (default OFF).
   // localStorage is synced to public/data/feedback.json by the skill-server.
   const humanFeedbackMap = synthesisConfig.useHumanFeedback
@@ -641,6 +603,11 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     if (total > 0) {
       console.error(`[crune] Synthesizing top ${total} skill candidates${synthesisConfig.model ? ` (model: ${synthesisConfig.model})` : ""}...`);
     }
+    // Read facets once for the whole loop — the result is loop-invariant, so
+    // re-reading/re-parsing the directory per candidate was wasted I/O.
+    const facetsForSynthesis = synthesisConfig.facetsDir
+      ? readFacetsDir(synthesisConfig.facetsDir)
+      : undefined;
     for (let i = 0; i < topCandidates.length; i++) {
       const candidate = topCandidates[i];
       const topic = knowledgeGraph.nodes.find((n) => n.id === candidate.topicId);
@@ -654,8 +621,8 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
 
       // Build facets insights for this topic if facets data is available
-      const facetsInsights = synthesisConfig.facetsDir
-        ? aggregateFacetsForTopic(topic.sessionIds, readFacetsDir(synthesisConfig.facetsDir))
+      const facetsInsights = facetsForSynthesis
+        ? aggregateFacetsForTopic(topic.sessionIds, facetsForSynthesis)
         : undefined;
 
       // Human-flagged moments for this topic (issue #24), only when enabled.

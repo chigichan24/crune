@@ -1,9 +1,9 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble } from "./skill-synthesizer.js";
 import type { SynthesisRequest, SynthesisResponse } from "./skill-synthesizer.js";
-import { mergeFeedbackBlob, normalizeFeedbackBlob, type FeedbackBlob } from "./feedback-reader.js";
+import { mergeFeedbackBlob, readFeedbackBlob, type FeedbackBlob } from "./feedback-reader.js";
 
 // ---------- Constants ----------
 
@@ -23,10 +23,23 @@ const CORS_HEADERS: Record<string, string> = {
 
 // ---------- Helpers ----------
 
-function readBody(req: IncomingMessage): Promise<string> {
+/** Max request body size. Bounds memory for a local server that allows any
+ *  origin; synthesis graph-context payloads are well under this. */
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
+function readBody(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
     req.on("error", reject);
   });
@@ -65,24 +78,37 @@ async function handleSynthesize(req: IncomingMessage, res: ServerResponse) {
   sendJson(res, 200, { success: true, synthesizedMarkdown: stripSynthesisPreamble(result.stdout) } satisfies SynthesisResponse);
 }
 
-/** Read the on-disk feedback map (normalized), or {} if absent/corrupt. */
-function readFeedbackFile(): FeedbackBlob {
-  if (!existsSync(FEEDBACK_FILE)) return {};
-  try {
-    const raw = readFileSync(FEEDBACK_FILE, "utf-8");
-    return normalizeFeedbackBlob(JSON.parse(raw));
-  } catch {
-    return {};
-  }
+/** Atomically replace `filePath` with `blob` (write temp, then rename) so a
+ *  crash mid-write cannot leave a truncated, unparseable feedback.json. */
+function writeFeedbackFile(blob: FeedbackBlob, filePath = FEEDBACK_FILE): void {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(blob, null, 2), "utf-8");
+  renameSync(tmp, filePath);
 }
 
-function writeFeedbackFile(blob: FeedbackBlob): void {
-  mkdirSync(dirname(FEEDBACK_FILE), { recursive: true });
-  writeFileSync(FEEDBACK_FILE, JSON.stringify(blob, null, 2), "utf-8");
+/**
+ * Serialize the feedback read-modify-write. The browser fires fire-and-forget
+ * sync POSTs, so two requests for different sessions can otherwise both read the
+ * same snapshot and the second writer silently reverts the first's bucket. The
+ * chain guarantees each merge sees the previous one's result. Exported for tests.
+ */
+let feedbackChain: Promise<unknown> = Promise.resolve();
+export function mergeFeedbackPost(
+  sessionId: string,
+  entries: unknown[],
+  filePath = FEEDBACK_FILE,
+): Promise<void> {
+  const task = feedbackChain.then(() => {
+    const merged = mergeFeedbackBlob(readFeedbackBlob(filePath), sessionId, entries);
+    writeFeedbackFile(merged, filePath);
+  });
+  feedbackChain = task.catch(() => {});
+  return task;
 }
 
 function handleGetFeedback(res: ServerResponse) {
-  sendJson(res, 200, readFeedbackFile());
+  sendJson(res, 200, readFeedbackBlob(FEEDBACK_FILE));
 }
 
 /**
@@ -105,9 +131,7 @@ async function handlePostFeedback(req: IncomingMessage, res: ServerResponse) {
   }
 
   try {
-    const current = readFeedbackFile();
-    const merged = mergeFeedbackBlob(current, body.sessionId, body.entries);
-    writeFeedbackFile(merged);
+    await mergeFeedbackPost(body.sessionId, body.entries);
     sendJson(res, 200, { ok: true });
   } catch (err) {
     sendJson(res, 500, { error: err instanceof Error ? err.message : "Failed to persist feedback" });

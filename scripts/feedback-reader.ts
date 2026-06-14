@@ -12,7 +12,9 @@
  * `src/types/session.ts`.
  */
 import { existsSync, readFileSync } from "node:fs";
-import type { SessionInput } from "./knowledge-graph/types.js";
+import type { SessionInput, SessionFeedbackCounts } from "./knowledge-graph/types.js";
+
+export type { SessionFeedbackCounts };
 
 export interface FeedbackEntry {
   sessionId: string;
@@ -93,19 +95,27 @@ export function mergeFeedbackBlob(
 }
 
 /**
- * Read `public/data/feedback.json` into a Map. Returns an empty Map when the
- * file is absent or unreadable (offline / no feedback yet — never throws).
+ * Read a feedback file into a normalized blob. Returns {} when the file is
+ * absent or unreadable (offline / no feedback yet — never throws). Single source
+ * of the tolerant-read contract, shared by the pipeline and the skill-server.
+ */
+export function readFeedbackBlob(filePath: string): FeedbackBlob {
+  if (!existsSync(filePath)) return {};
+  try {
+    return normalizeFeedbackBlob(JSON.parse(readFileSync(filePath, "utf-8")));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Read `public/data/feedback.json` into a Map (the pipeline's preferred shape).
+ * Thin wrapper over {@link readFeedbackBlob}.
  */
 export function readFeedbackFile(
   filePath: string,
 ): Map<string, FeedbackEntry[]> {
-  if (!existsSync(filePath)) return new Map();
-  try {
-    const blob = normalizeFeedbackBlob(JSON.parse(readFileSync(filePath, "utf-8")));
-    return new Map(Object.entries(blob));
-  } catch {
-    return new Map();
-  }
+  return new Map(Object.entries(readFeedbackBlob(filePath)));
 }
 
 // ─── Turn selection helpers ──────────────────────────────────────────────────
@@ -122,13 +132,17 @@ export interface FlaggedTurn {
 }
 
 function tagSetHas(entry: FeedbackEntry, tag: string): boolean {
-  return entry.tags.some((t) => t.toLowerCase() === tag);
+  const needle = tag.toLowerCase();
+  return entry.tags.some((t) => t.toLowerCase() === needle);
 }
 
 /**
  * Select human-flagged turns for the given sessions. A turn qualifies when it is
- * bookmarked OR carries a meaningful tag (`reusable` / `anti-pattern`). Returns
- * one FlaggedTurn per qualifying entry, ordered by sessionId then turnId.
+ * bookmarked OR carries a meaningful tag (`reusable` / `anti-pattern`). Multiple
+ * (block-level) entries on the same turn are collapsed into a single FlaggedTurn
+ * — unioning tags/flags and keeping the first non-empty note — so a turn flagged
+ * on several tool-call blocks is not listed (or weighted) more than once. Result
+ * is ordered by sessionId then turnId.
  */
 export function selectFlaggedTurns(
   feedback: Map<string, FeedbackEntry[]>,
@@ -138,19 +152,31 @@ export function selectFlaggedTurns(
   for (const sessionId of sessionIds) {
     const entries = feedback.get(sessionId);
     if (!entries) continue;
+    const byTurn = new Map<number, FlaggedTurn>();
     for (const entry of entries) {
       const reusable = tagSetHas(entry, REUSABLE_TAG);
       const antiPattern = tagSetHas(entry, ANTI_PATTERN_TAG);
       if (!entry.bookmarked && !reusable && !antiPattern) continue;
-      flagged.push({
-        sessionId,
-        turnId: entry.turnId,
-        note: entry.note,
-        tags: entry.tags,
-        reusable,
-        antiPattern,
-      });
+      const existing = byTurn.get(entry.turnId);
+      if (existing) {
+        existing.reusable = existing.reusable || reusable;
+        existing.antiPattern = existing.antiPattern || antiPattern;
+        for (const t of entry.tags) {
+          if (!existing.tags.includes(t)) existing.tags.push(t);
+        }
+        if (!existing.note.trim() && entry.note.trim()) existing.note = entry.note;
+      } else {
+        byTurn.set(entry.turnId, {
+          sessionId,
+          turnId: entry.turnId,
+          note: entry.note,
+          tags: [...entry.tags],
+          reusable,
+          antiPattern,
+        });
+      }
     }
+    flagged.push(...byTurn.values());
   }
   flagged.sort((a, b) =>
     a.sessionId === b.sessionId ? a.turnId - b.turnId : a.sessionId < b.sessionId ? -1 : 1,
@@ -189,13 +215,6 @@ function truncate(text: string, maxLen: number): string {
 
 // ─── Reusability signal aggregation ──────────────────────────────────────────
 
-/** Per-session feedback counts used to derive a human reusability signal. */
-export interface SessionFeedbackCounts {
-  bookmarked: boolean;
-  reusableCount: number;
-  antiPatternCount: number;
-}
-
 /**
  * Aggregate each session's feedback into bookmark / reusable / anti-pattern
  * counts. Only sessions with at least one such signal appear in the result.
@@ -206,13 +225,17 @@ export function computeSessionFeedbackCounts(
   const counts = new Map<string, SessionFeedbackCounts>();
   for (const [sessionId, entries] of feedback) {
     let bookmarked = false;
-    let reusableCount = 0;
-    let antiPatternCount = 0;
+    // Count distinct flagged TURNS, not entries: block-level feedback can carry
+    // several entries for one turn, which must not inflate the human signal.
+    const reusableTurns = new Set<number>();
+    const antiPatternTurns = new Set<number>();
     for (const entry of entries) {
       if (entry.bookmarked) bookmarked = true;
-      if (tagSetHas(entry, REUSABLE_TAG)) reusableCount++;
-      if (tagSetHas(entry, ANTI_PATTERN_TAG)) antiPatternCount++;
+      if (tagSetHas(entry, REUSABLE_TAG)) reusableTurns.add(entry.turnId);
+      if (tagSetHas(entry, ANTI_PATTERN_TAG)) antiPatternTurns.add(entry.turnId);
     }
+    const reusableCount = reusableTurns.size;
+    const antiPatternCount = antiPatternTurns.size;
     if (bookmarked || reusableCount > 0 || antiPatternCount > 0) {
       counts.set(sessionId, { bookmarked, reusableCount, antiPatternCount });
     }

@@ -2,6 +2,20 @@ import { describe, it, expect } from "vitest";
 import { buildBm25 } from "../knowledge-graph-builder.js";
 
 describe("buildBm25", () => {
+  it("admits single-document terms when minDf=1 (turn-level retrieval)", () => {
+    const documents = new Map<string, string[]>();
+    documents.set("doc1", ["alpha", "beta", "gamma"]);
+    documents.set("doc2", ["alpha", "beta", "delta"]);
+    // Default (minDf=2) drops the df==1 terms...
+    expect(buildBm25(documents).vocabulary).not.toContain("gamma");
+    // ...minDf=1 keeps them so the sparse channel isn't inert on short docs.
+    const vocab = buildBm25(documents, 1).vocabulary;
+    expect(vocab).toContain("gamma");
+    expect(vocab).toContain("delta");
+    // A term in EVERY doc is still excluded by the maxDf cap.
+    expect(vocab).not.toContain("alpha");
+  });
+
   it("excludes terms that appear in only 1 document", () => {
     const documents = new Map<string, string[]>();
     documents.set("doc1", ["alpha", "beta", "gamma"]);

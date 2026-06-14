@@ -56,6 +56,15 @@ export interface LoadedEmbeddingIndex {
 export function readEmbeddingIndex(dir: string): LoadedEmbeddingIndex {
   const metaRaw = fs.readFileSync(path.join(dir, META_FILENAME), "utf8");
   const meta = JSON.parse(metaRaw) as EmbeddingMeta;
+  // Validate the externally-stored shape before arithmetic, so a corrupt/old
+  // meta.json fails with a clear cause instead of a misleading NaN mismatch.
+  if (
+    !Number.isInteger(meta?.dim) || meta.dim <= 0 ||
+    !Number.isInteger(meta?.count) || meta.count < 0 ||
+    !Array.isArray(meta?.chunks)
+  ) {
+    throw new Error(`malformed embedding ${META_FILENAME} in ${dir}`);
+  }
   const buf = fs.readFileSync(path.join(dir, INDEX_FILENAME));
   const matrix = new Int8Array(buf.buffer, buf.byteOffset, buf.byteLength);
   if (matrix.length !== meta.count * meta.dim) {
@@ -83,7 +92,7 @@ export function createTransformersBackend(
 
   async function getExtractor() {
     if (extractorPromise) return extractorPromise;
-    extractorPromise = (async () => {
+    const loading = (async () => {
       // Dynamic import so test code that never calls embed() does not load the
       // heavy native dependency.
       const { pipeline } = await import("@huggingface/transformers");
@@ -98,7 +107,13 @@ export function createTransformersBackend(
         return rows.map((r) => Float32Array.from(r));
       };
     })();
-    return extractorPromise;
+    // Don't cache a rejected load: a transient network error should stay
+    // retryable rather than poison every later embed() call.
+    loading.catch(() => {
+      if (extractorPromise === loading) extractorPromise = null;
+    });
+    extractorPromise = loading;
+    return loading;
   }
 
   return {

@@ -23,7 +23,15 @@ export const BM25_B = 0.75; // document-length normalization strength
  * unchanged.
  */
 export function buildBm25(
-  documents: Map<string, string[]>
+  documents: Map<string, string[]>,
+  /**
+   * Minimum document frequency for a term to enter the vocabulary. The default
+   * (2) suits the cross-session knowledge graph, where df==1 terms are noise.
+   * Turn-level retrieval (one short doc per turn) should pass 1, otherwise a
+   * distinctive query term that appears in a single turn is dropped and the
+   * whole sparse channel collapses to zero.
+   */
+  minDf = 2
 ): Bm25Result {
   // Build vocabulary
   const df = new Map<string, number>(); // document frequency
@@ -38,12 +46,12 @@ export function buildBm25(
   // The absolute cap (n - 1) guarantees a term present in EVERY doc (df == n)
   // is always excluded, even for tiny corpora where floor(n*0.8) would admit it.
   const n = documents.size;
-  const maxDf = Math.min(Math.max(2, Math.floor(n * 0.8)), n - 1);
+  const maxDf = Math.min(Math.max(minDf, Math.floor(n * 0.8)), n - 1);
   const vocabulary: string[] = [];
   const vocabIndex = new Map<string, number>();
 
   for (const [term, count] of df) {
-    if (count >= 2 && count <= maxDf) {
+    if (count >= minDf && count <= maxDf) {
       vocabIndex.set(term, vocabulary.length);
       vocabulary.push(term);
     }

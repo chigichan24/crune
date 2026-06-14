@@ -66,6 +66,16 @@ export interface ReusabilityScore {
   weightProfile?: "base" | "facets";
 }
 
+/**
+ * Per-session human-feedback counts (issue #24). Canonical home so the feedback
+ * reader and the reusability scorer share one shape instead of structural twins.
+ */
+export interface SessionFeedbackCounts {
+  bookmarked: boolean;
+  reusableCount: number;
+  antiPatternCount: number;
+}
+
 export interface TopicNode {
   id: string;
   label: string;

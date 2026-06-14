@@ -65,4 +65,22 @@ describe("writeEmbeddingIndex / readEmbeddingIndex", () => {
     fs.writeFileSync(metaPath, JSON.stringify(meta));
     expect(() => readEmbeddingIndex(dir)).toThrow(/size mismatch/);
   });
+
+  it("throws a clear error on a malformed meta.json (not a NaN mismatch)", () => {
+    const dir = mkTmp();
+    const result: EmbedResult = {
+      model: "m",
+      dim: 2,
+      count: 1,
+      scale: 1 / 127,
+      matrix: Int8Array.from([1, 2]),
+      chunks: [{ sessionId: "s1", turnIndex: 0, role: "user-turn", snippet: "x" }],
+    };
+    writeEmbeddingIndex(dir, result);
+    const metaPath = path.join(dir, "meta.json");
+    const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+    delete meta.dim; // simulate an old/corrupt meta
+    fs.writeFileSync(metaPath, JSON.stringify(meta));
+    expect(() => readEmbeddingIndex(dir)).toThrow(/malformed embedding meta\.json/);
+  });
 });

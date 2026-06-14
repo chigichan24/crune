@@ -174,4 +174,46 @@ describe("computeSessionFeedbackCounts", () => {
     expect(counts.get("s1")).toEqual({ bookmarked: true, reusableCount: 2, antiPatternCount: 1 });
     expect(counts.has("s2")).toBe(false);
   });
+
+  it("counts a turn flagged on multiple blocks once (no block-level inflation)", () => {
+    const feedback = new Map<string, FeedbackEntry[]>([
+      [
+        "s1",
+        [
+          entry({ turnId: 5, blockId: "a", tags: [REUSABLE_TAG] }),
+          entry({ turnId: 5, blockId: "b", tags: [REUSABLE_TAG] }),
+          entry({ turnId: 5, blockId: "c", tags: [REUSABLE_TAG] }),
+        ],
+      ],
+    ]);
+    expect(computeSessionFeedbackCounts(feedback).get("s1")).toEqual({
+      bookmarked: false,
+      reusableCount: 1,
+      antiPatternCount: 0,
+    });
+  });
+});
+
+describe("selectFlaggedTurns block-level collapse", () => {
+  it("collapses multiple block entries on one turn into a single FlaggedTurn", () => {
+    const feedback = new Map<string, FeedbackEntry[]>([
+      [
+        "s1",
+        [
+          entry({ turnId: 3, blockId: "a", bookmarked: true }),
+          entry({ turnId: 3, blockId: "b", tags: [REUSABLE_TAG], note: "good" }),
+          entry({ turnId: 3, blockId: "c", tags: [ANTI_PATTERN_TAG] }),
+        ],
+      ],
+    ]);
+    const flagged = selectFlaggedTurns(feedback, ["s1"]);
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0]).toMatchObject({
+      turnId: 3,
+      reusable: true,
+      antiPattern: true,
+      note: "good",
+    });
+    expect(flagged[0].tags).toEqual([REUSABLE_TAG, ANTI_PATTERN_TAG]);
+  });
 });

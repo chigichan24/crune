@@ -55,9 +55,10 @@ interface RetrieverInputs {
   backend: EmbeddingBackend;
 }
 
-/** Min-max normalize an array into [0, 1]. A flat array maps to all-zeros. */
+/** Min-max normalize an array into [0, 1]. A flat array maps to all-zeros.
+ *  Always returns a fresh array (never the input reference). */
 function minMaxNormalize(values: number[]): number[] {
-  if (values.length === 0) return values;
+  if (values.length === 0) return [];
   let min = Infinity;
   let max = -Infinity;
   for (const v of values) {
@@ -92,9 +93,11 @@ export function createRetriever(inputs: RetrieverInputs): Retriever {
   const { chunks, texts, denseVectors, backend } = inputs;
 
   // Precompute BM25 over chunk texts once. Document ids are chunk indices.
+  // minDf=1: each chunk is one short turn, so a distinctive term in a single
+  // turn must stay in the vocabulary or the sparse channel goes inert.
   const docs = new Map<string, string[]>();
   texts.forEach((t, i) => docs.set(String(i), tokenize(t)));
-  const bm25 = buildBm25(docs);
+  const bm25 = buildBm25(docs, 1);
 
   async function retrieve(
     query: string,
@@ -169,6 +172,18 @@ export function createRetrieverFromIndex(params: {
   backend: EmbeddingBackend;
 }): Retriever {
   const { chunks, matrix, dim, chunkTexts, backend } = params;
+  // chunkTexts (re-derived for BM25) must align 1:1 with the indexed chunks;
+  // a silent misalignment would score chunk i with another chunk's text.
+  if (chunkTexts.length !== chunks.length) {
+    throw new Error(
+      `retriever chunkTexts length (${chunkTexts.length}) != chunks length (${chunks.length})`
+    );
+  }
+  if (matrix.length !== chunks.length * dim) {
+    throw new Error(
+      `retriever matrix length (${matrix.length}) != chunks * dim (${chunks.length} * ${dim})`
+    );
+  }
   const denseVectors: Float32Array[] = chunks.map((_, i) =>
     dequantize(matrix.subarray(i * dim, (i + 1) * dim))
   );
