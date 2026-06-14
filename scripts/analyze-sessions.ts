@@ -603,6 +603,11 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     if (total > 0) {
       console.error(`[crune] Synthesizing top ${total} skill candidates${synthesisConfig.model ? ` (model: ${synthesisConfig.model})` : ""}...`);
     }
+    // Read facets once for the whole loop — the result is loop-invariant, so
+    // re-reading/re-parsing the directory per candidate was wasted I/O.
+    const facetsForSynthesis = synthesisConfig.facetsDir
+      ? readFacetsDir(synthesisConfig.facetsDir)
+      : undefined;
     for (let i = 0; i < topCandidates.length; i++) {
       const candidate = topCandidates[i];
       const topic = knowledgeGraph.nodes.find((n) => n.id === candidate.topicId);
@@ -616,8 +621,8 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
 
       // Build facets insights for this topic if facets data is available
-      const facetsInsights = synthesisConfig.facetsDir
-        ? aggregateFacetsForTopic(topic.sessionIds, readFacetsDir(synthesisConfig.facetsDir))
+      const facetsInsights = facetsForSynthesis
+        ? aggregateFacetsForTopic(topic.sessionIds, facetsForSynthesis)
         : undefined;
 
       // Human-flagged moments for this topic (issue #24), only when enabled.
