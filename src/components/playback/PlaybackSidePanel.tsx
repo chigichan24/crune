@@ -97,6 +97,12 @@ export function PlaybackSidePanel({ detail }: Props) {
               <h3 className="side-section-title">Session Info</h3>
               <dl className="side-info-list">
                 <div className="side-info-item">
+                  <dt>Session ID</dt>
+                  <dd className="side-info-mono" title={detail.sessionId}>
+                    {detail.sessionId}
+                  </dd>
+                </div>
+                <div className="side-info-item">
                   <dt>Project</dt>
                   <dd>{meta.project}</dd>
                 </div>
