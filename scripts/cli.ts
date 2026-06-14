@@ -23,20 +23,17 @@ import {
   buildSynthesisPrompt,
   synthesizeWithClaude,
   stripSynthesisPreamble,
-  buildRetrievalQuery,
   type TopicNode as SynthTopicNode,
   type RetrievedChunk,
 } from "./skill-synthesizer.js";
 import {
-  extractChunks,
-  embedSessions,
-  dequantize,
-  createRetriever,
-  createTransformersBackend,
   DEFAULT_EMBED_MODEL,
-  DEFAULT_EMBED_DIM,
   type Retriever,
 } from "./knowledge-graph-builder.js";
+import {
+  buildSynthesisRetriever,
+  retrieveContextForCandidate,
+} from "./knowledge-graph/synthesis-retriever.js";
 import { evaluateSkill } from "./skill-evaluator.js";
 
 // ─── CLI argument parsing ─────────────────────────────────────────
@@ -338,34 +335,21 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Retrieval-enriched synthesis context (issue #33, opt-in). Build an
-  // in-memory hybrid retriever over the analyzed sessions; on any failure we
-  // fall back to the cluster-blob examples (retriever stays undefined).
+  // Retrieval-enriched synthesis context (issue #33, opt-in). Build a hybrid
+  // retriever over the analyzed sessions via the shared helper (reuses an
+  // on-disk index if one exists under outputDir, else embeds fresh). On any
+  // failure the retriever stays undefined and synthesis falls back to the blob.
   let retriever: Retriever | undefined;
   if (config.retrievalContext && !config.skipSynthesis) {
     console.error("\nBuilding retrieval context (issue #33)...");
-    try {
-      const extracted = extractChunks(sessionInputs);
-      if (extracted.length === 0) {
-        console.error("  No chunks to index — falling back to cluster blob");
-      } else {
-        const backend = createTransformersBackend(DEFAULT_EMBED_MODEL, DEFAULT_EMBED_DIM);
-        const result = await embedSessions(sessionInputs, backend, { model: DEFAULT_EMBED_MODEL });
-        const denseVectors = result.chunks.map((_, i) =>
-          dequantize(result.matrix.subarray(i * result.dim, (i + 1) * result.dim))
-        );
-        retriever = createRetriever({
-          chunks: result.chunks,
-          texts: extracted.map((c) => c.text),
-          denseVectors,
-          backend,
-        });
-        console.error(`  Retrieval strategy: freshly embedded (in-memory), ${retriever.size} chunks`);
-      }
-    } catch (err) {
-      console.error(
-        `  Retrieval context unavailable (falling back to cluster blob): ${err instanceof Error ? err.message : String(err)}`
-      );
+    const built = await buildSynthesisRetriever(
+      sessionInputs,
+      path.join(config.outputDir, "embeddings"),
+      DEFAULT_EMBED_MODEL
+    );
+    if (built) {
+      retriever = built.retriever;
+      console.error(`  Retrieval strategy: ${built.strategy}, ${retriever.size} chunks`);
     }
   }
 
@@ -394,18 +378,14 @@ async function main(): Promise<void> {
       );
 
       // Retrieve top-k relevant moments for this candidate (issue #33). On any
-      // failure, leave undefined so the cluster-blob examples are used.
+      // failure `retrieveContextForCandidate` returns undefined so the
+      // cluster-blob examples are used.
       let retrievedContext: RetrievedChunk[] | undefined;
       if (retriever) {
-        try {
-          const query = buildRetrievalQuery(candidate, topic as unknown as SynthTopicNode);
-          const chunks = await retriever.retrieve(query, 8);
-          if (chunks.length > 0) retrievedContext = chunks;
-        } catch (err) {
-          console.error(
-            `    Retrieval failed (using cluster blob): ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
+        retrievedContext = await retrieveContextForCandidate(retriever, candidate, {
+          label: topic.label,
+          keywords: topic.keywords,
+        });
       }
 
       // Surface the chosen context strategy so a human can A/B blob vs retrieval.
