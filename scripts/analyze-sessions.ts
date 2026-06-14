@@ -488,45 +488,7 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
   }
 
   // Build semantic knowledge graph
-  const sessionInputs: SessionInput[] = sessions.map((s) => ({
-    sessionId: s.meta.sessionId,
-    projectDisplayName: s.projectDisplayName,
-    turns: s.turns.map((t) => ({
-      userPrompt: t.userPrompt,
-      assistantTexts: t.assistantTexts,
-      toolCalls: t.toolCalls.map((tc) => ({
-        toolName: tc.toolName,
-        input: tc.input,
-      })),
-    })),
-    subagents: Object.fromEntries(
-      Object.entries(s.subagents).map(([id, sub]) => [
-        id,
-        {
-          agentId: sub.agentId,
-          agentType: sub.agentType,
-          turns: sub.turns.map((t) => ({
-            userPrompt: t.userPrompt,
-            assistantTexts: t.assistantTexts,
-            toolCalls: t.toolCalls.map((tc) => ({
-              toolName: tc.toolName,
-              input: tc.input,
-            })),
-          })),
-        },
-      ])
-    ),
-    meta: {
-      sessionId: s.meta.sessionId,
-      createdAt: s.meta.createdAt,
-      lastActiveAt: s.meta.lastActiveAt,
-      durationMinutes: s.meta.durationMinutes,
-      filesEdited: s.meta.filesEdited,
-      gitBranch: s.meta.gitBranch,
-      toolBreakdown: s.meta.toolBreakdown,
-      subagentCount: s.meta.subagentCount,
-    },
-  }));
+  const sessionInputs: SessionInput[] = toSessionInputs(sessions);
   // Human feedback (issue #24): gated behind --use-human-feedback (default OFF).
   // localStorage is synced to public/data/feedback.json by the skill-server.
   const humanFeedbackMap = synthesisConfig.useHumanFeedback
