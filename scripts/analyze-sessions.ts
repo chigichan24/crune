@@ -22,8 +22,14 @@ import {
   createTransformersBackend,
   DEFAULT_EMBED_MODEL,
   DEFAULT_EMBED_DIM,
+  type Retriever,
+  type EmbedResult,
 } from "./knowledge-graph-builder.js";
-import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions, type HumanFeedbackSignal } from "./skill-synthesizer.js";
+import {
+  buildSynthesisRetriever,
+  retrieveContextForCandidate,
+} from "./knowledge-graph/synthesis-retriever.js";
+import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions, type HumanFeedbackSignal, type RetrievedChunk } from "./skill-synthesizer.js";
 import { computeSessionHumanSignal } from "./knowledge-graph/reusability.js";
 import {
   readFeedbackFile,
@@ -63,6 +69,7 @@ export interface CliArgs {
   feedbackFile: string;
   embed: boolean;
   embedModel?: string;
+  retrievalContext: boolean;
 }
 
 /**
@@ -85,6 +92,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
   let feedbackFile = path.resolve("public", "data", "feedback.json");
   let embed = false;
   let embedModel: string | undefined;
+  let retrievalContext = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -122,6 +130,8 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
       embed = true;
     } else if (args[i] === "--embed-model" && args[i + 1]) {
       embedModel = args[++i];
+    } else if (args[i] === "--retrieval-context") {
+      retrievalContext = true;
     }
   }
   return {
@@ -139,6 +149,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     feedbackFile,
     embed,
     embedModel,
+    retrievalContext,
   };
 }
 
@@ -318,6 +329,12 @@ interface SynthesisConfig {
   evalThreshold?: number;
   useHumanFeedback?: boolean;
   feedbackFile?: string;
+  /**
+   * Hybrid retriever for retrieval-enriched synthesis (issue #33). When present,
+   * each candidate's cluster-blob examples are replaced by the top-k retrieved
+   * relevant moments. Absent => existing cluster-blob behaviour (default A/B).
+   */
+  retriever?: Retriever;
 }
 
 /**
@@ -641,12 +658,30 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
         }
       }
 
+      // Retrieval-enriched context (issue #33). When a retriever is available,
+      // pull the top-k most relevant turn snippets for this candidate; on any
+      // failure `retrieveContextForCandidate` returns undefined so
+      // buildSynthesisPrompt falls back to the cluster-blob examples (never crash).
+      let retrievedContext: RetrievedChunk[] | undefined;
+      if (synthesisConfig.retriever) {
+        retrievedContext = await retrieveContextForCandidate(synthesisConfig.retriever, candidate, {
+          label: topic.label,
+          keywords: topic.keywords,
+        });
+        console.error(
+          retrievedContext
+            ? `[crune]   [${i + 1}/${total}] Retrieved ${retrievedContext.length} relevant moments`
+            : `[crune]   [${i + 1}/${total}] No relevant moments retrieved, using cluster blob`
+        );
+      }
+
       const prompt = buildSynthesisPrompt({
         skillCandidate: candidate,
         topicNode: topic as unknown as import("./skill-synthesizer.js").TopicNode,
         enrichedSequences: relatedSequences,
         facetsInsights: facetsInsights as unknown as import("./skill-synthesizer.js").FacetsInsightsSummary | undefined,
         humanFeedback,
+        retrievedContext,
       });
       const result = await synthesizeWithClaude(prompt, synthOpts);
       if (result.success) {
@@ -749,7 +784,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel, evalThreshold, useHumanFeedback, feedbackFile, embed, embedModel } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel, evalThreshold, useHumanFeedback, feedbackFile, embed, embedModel, retrievalContext } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -865,6 +900,49 @@ async function main() {
     `[crune] Wrote ${parsedSessions.length} detail files (${(totalDetailSize / 1024).toFixed(1)} KB total)`
   );
 
+  // Optional: chunk-level embedding index for RAG retrieval (issue #32).
+  // Opt-in (default OFF). Promotion to default is gated on the PoC (#35).
+  // Runs BEFORE overview generation so retrieval-enriched synthesis (#33) can
+  // reuse the freshly-computed EmbedResult instead of embedding twice.
+  const embeddingsDir = path.join(outputDir, "..", "embeddings");
+  const embedModelId = embedModel ?? DEFAULT_EMBED_MODEL;
+  let embedResult: EmbedResult | undefined;
+  if (embed) {
+    console.error(`\n[crune] Embedding chunks with ${embedModelId}...`);
+    try {
+      const backend = createTransformersBackend(embedModelId, DEFAULT_EMBED_DIM);
+      const embedInputs = toSessionInputs(parsedSessions);
+      embedResult = await embedSessions(embedInputs, backend, { model: embedModelId });
+      writeEmbeddingIndex(embeddingsDir, embedResult);
+      const binSize = embedResult.matrix.byteLength;
+      console.error(
+        `[crune] Wrote embeddings index: ${embedResult.count} chunks × ${embedResult.dim} dim (${(binSize / 1024).toFixed(1)} KB) → ${embeddingsDir}`
+      );
+    } catch (err) {
+      console.error(
+        `[crune] Embedding step failed (continuing without index): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  // Retrieval-enriched synthesis context (issue #33, opt-in, default OFF).
+  // Build a hybrid retriever over the analyzed sessions. Falls back to the
+  // cluster-blob examples (retriever stays undefined) on any failure.
+  let synthesisRetriever: Retriever | undefined;
+  if (retrievalContext && !skipSynthesis) {
+    console.error(`\n[crune] Building retrieval context (issue #33)...`);
+    const built = await buildSynthesisRetriever(
+      toSessionInputs(parsedSessions),
+      embeddingsDir,
+      embedModelId,
+      embedResult
+    );
+    if (built) {
+      synthesisRetriever = built.retriever;
+      console.error(`[crune] Retrieval strategy: ${built.strategy} (${built.retriever.size} chunks)`);
+    }
+  }
+
   // overview.json
   const overviewData = await generateOverview(parsedSessions, {
     skip: skipSynthesis,
@@ -876,6 +954,7 @@ async function main() {
     evalThreshold,
     useHumanFeedback,
     feedbackFile,
+    retriever: synthesisRetriever,
   });
   const overviewPath = path.join(outputDir, "overview.json");
   fs.writeFileSync(overviewPath, JSON.stringify(overviewData, null, 2));
@@ -883,28 +962,6 @@ async function main() {
   console.error(
     `[crune] Wrote ${overviewPath} (${(overviewSize / 1024).toFixed(1)} KB)`
   );
-
-  // Optional: chunk-level embedding index for RAG retrieval (issue #32).
-  // Opt-in (default OFF). Promotion to default is gated on the PoC (#35).
-  if (embed) {
-    const model = embedModel ?? DEFAULT_EMBED_MODEL;
-    const embeddingsDir = path.join(outputDir, "..", "embeddings");
-    console.error(`\n[crune] Embedding chunks with ${model}...`);
-    try {
-      const backend = createTransformersBackend(model, DEFAULT_EMBED_DIM);
-      const embedInputs = toSessionInputs(parsedSessions);
-      const result = await embedSessions(embedInputs, backend, { model });
-      writeEmbeddingIndex(embeddingsDir, result);
-      const binSize = result.matrix.byteLength;
-      console.error(
-        `[crune] Wrote embeddings index: ${result.count} chunks × ${result.dim} dim (${(binSize / 1024).toFixed(1)} KB) → ${embeddingsDir}`
-      );
-    } catch (err) {
-      console.error(
-        `[crune] Embedding step failed (continuing without index): ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
 
   // Summary
   console.error(`\n[crune] --- Summary ---`);

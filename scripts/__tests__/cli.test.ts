@@ -67,6 +67,12 @@ describe("parseCliArgs", () => {
     expect(result.evalModel).toBeUndefined();
     expect(result.preview).toBe(false);
     expect(result.json).toBe(false);
+    expect(result.retrievalContext).toBe(false);
+  });
+
+  it("sets retrievalContext with --retrieval-context (issue #33)", () => {
+    const result = parseCliArgs(["node", "cli.ts", "--retrieval-context"]);
+    expect(result.retrievalContext).toBe(true);
   });
 
   it("sets preview with --preview", () => {
