@@ -141,6 +141,12 @@ export interface ReusabilityScore {
   recency: number
   successRate?: number
   helpfulness?: number
+  /**
+   * Human feedback signal in [0,1] (issue #24): boosted by bookmarks and
+   * `reusable` tags, dampened by `anti-pattern` tags. Present only when human
+   * feedback is folded in (--use-human-feedback).
+   */
+  humanSignal?: number
   breakdown?: {
     signal: string
     value: number

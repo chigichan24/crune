@@ -79,7 +79,8 @@ export {
   findCommonPathPrefix,
 } from "./edges.js";
 export { louvainDetection, brandesBetweenness } from "./community.js";
-export { computeReusabilityScores } from "./reusability.js";
+export { computeReusabilityScores, computeSessionHumanSignal, aggregateHumanSignal, HUMAN_SIGNAL_WEIGHT } from "./reusability.js";
+export type { SessionHumanSignal } from "./reusability.js";
 export { abstractToolCall, extractEnrichedSequences } from "./tool-pattern.js";
 export { generateSkillMarkdown, generateHookJson, generateSkillCandidates } from "./skill-generator.js";
 export { readFacetsDir, normalizeGoalCategory, helpfulnessToScore, aggregateFacetsForTopic } from "./facets-reader.js";
@@ -90,7 +91,7 @@ export function buildSemanticKnowledgeGraph(
   sessions: SessionInput[],
   options: KnowledgeGraphOptions = {}
 ): SemanticKnowledgeGraph {
-  const { enableLouvain = true, enableBrandes = true, facetsDir } = options;
+  const { enableLouvain = true, enableBrandes = true, facetsDir, humanSignalMap } = options;
 
   console.error(`  [Knowledge Graph] Processing ${sessions.length} sessions...`);
 
@@ -181,7 +182,7 @@ export function buildSemanticKnowledgeGraph(
       toolIdf,
       facetsMap
     );
-    computeReusabilityScores(singleTopic, new Date(), facetsMap);
+    computeReusabilityScores(singleTopic, new Date(), facetsMap, humanSignalMap);
     const skillCandidates = generateSkillCandidates(singleTopic, enrichedSequences);
     return {
       nodes: singleTopic,
@@ -300,7 +301,7 @@ export function buildSemanticKnowledgeGraph(
   const topics = buildTopicNodes(clusterMembers, activeSessions, bm25, toolIdf, facetsMap);
 
   // Step 5b: Compute reusability scores
-  computeReusabilityScores(topics, new Date(), facetsMap);
+  computeReusabilityScores(topics, new Date(), facetsMap, humanSignalMap);
   console.error(
     `  [Knowledge Graph] Reusability scores computed for ${topics.length} topics`
   );
