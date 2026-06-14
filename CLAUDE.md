@@ -95,13 +95,15 @@ Synthesis calls use `--no-session-persistence` to prevent creating spurious JSON
 
 ### On-demand re-synthesis
 
-The UI provides a "再合成" button for on-demand re-synthesis with full graph context (connected topics, community, centrality). Synthesis state resets automatically when the selected topic changes. This requires the local skill server:
+The UI provides a "再合成" button for on-demand re-synthesis with full graph context (connected topics, community, centrality). This requires the local skill server:
 
 ```bash
 npm run dev:full    # Runs skill-server + Vite dev server
 ```
 
 The skill server (`scripts/skill-server.ts`) accepts POST requests at `/api/synthesize` and calls `claude -p` with the enriched prompt including graph context.
+
+**Synthesis jobs are global** (`SkillSynthesisProvider`, `src/hooks/`): each `useSkillSynthesis(key)` reads/triggers a job keyed by a stable id (topic id, or an `adhoc:<sorted topic ids>` slice id). The fetch lives in the provider, so a synthesis **keeps running in the background and its result persists** when you change filters, switch tabs, or deselect a node — coming back to the same key shows the running/finished job. (Earlier the state was component-local and was lost on unmount.)
 
 ### Skill Evaluation (issue #20)
 

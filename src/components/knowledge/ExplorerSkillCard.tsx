@@ -34,7 +34,7 @@ export function ExplorerSkillCard({
   bridgeTopicIds,
   onSessionSelect,
 }: Props) {
-  const { synthesize, loading, result, error, reset } = useSkillSynthesis()
+  const { synthesize, loading, result, error, reset } = useSkillSynthesis(topic.id)
   const [expanded, setExpanded] = useState(false)
 
   const score = Math.round((topic.reusabilityScore?.overall ?? 0) * 100)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedToolSequence, KnowledgeCommunity } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
@@ -75,11 +75,9 @@ export function KnowledgeNodeDetail({
   onClose,
 }: Props) {
   const [synthCopied, setSynthCopied] = useState(false)
-  const { synthesize, loading: synthLoading, result: synthResult, error: synthError, reset: resetSynth } = useSkillSynthesis()
-
-  useEffect(() => {
-    resetSynth()
-  }, [node?.id, resetSynth])
+  // Keyed by node id so the synthesis job persists in the provider when the
+  // selection changes and back (#73 follow-up: keep results across navigation).
+  const { synthesize, loading: synthLoading, result: synthResult, error: synthError, reset: resetSynth } = useSkillSynthesis(node?.id ?? '__none__')
 
   const skillCandidate = useMemo(() => {
     if (!node || !skillCandidates) return null

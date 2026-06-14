@@ -177,7 +177,6 @@ export function SkillExplorerView({ overview, loading, error, onSessionSelect }:
           </span>
         </div>
         <AdHocSynthesisPanel
-          key={filtered.map((t) => t.id).join(',')}
           topics={filtered}
           enrichedSequences={overview?.tacitKnowledge?.enrichedToolSequences ?? []}
         />

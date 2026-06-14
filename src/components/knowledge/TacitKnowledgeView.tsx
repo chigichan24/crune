@@ -30,7 +30,7 @@ function DistillButton({
   communities?: KnowledgeCommunity[]
   bridgeTopicIds?: string[]
 }) {
-  const { synthesize, loading, result, error, reset } = useSkillSynthesis()
+  const { synthesize, loading, result, error, reset } = useSkillSynthesis(candidate.topicId)
 
   if (!topic) return null
 
