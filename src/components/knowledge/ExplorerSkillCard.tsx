@@ -11,6 +11,7 @@ import { buildGraphContext } from '../../utils/buildGraphContext'
 import { SkillEvaluationBadge } from './SkillEvaluationBadge'
 import { SkillCopyButton } from './SkillCopyButton'
 import { ROLE_LABELS } from './skillExplorerFilter'
+import { topicSynthesisKey } from './synthesisKeys'
 import './ExplorerSkillCard.css'
 
 interface Props {
@@ -34,7 +35,7 @@ export function ExplorerSkillCard({
   bridgeTopicIds,
   onSessionSelect,
 }: Props) {
-  const { synthesize, loading, result, error, reset } = useSkillSynthesis()
+  const { synthesize, loading, result, error } = useSkillSynthesis(topicSynthesisKey(topic.id))
   const [expanded, setExpanded] = useState(false)
 
   const score = Math.round((topic.reusabilityScore?.overall ?? 0) * 100)
@@ -42,7 +43,6 @@ export function ExplorerSkillCard({
 
   const onSynthesize = useCallback(() => {
     if (!candidate) return
-    reset()
     const relatedSequences = enrichedSequences.filter((seq) =>
       seq.sessionIds.some((sid) => topic.sessionIds.includes(sid)),
     )
@@ -53,7 +53,7 @@ export function ExplorerSkillCard({
       enrichedSequences: relatedSequences,
       graphContext: buildGraphContext(topic, topicEdges, allTopics, communities, bridgeTopicIds),
     })
-  }, [candidate, enrichedSequences, edges, topic, allTopics, communities, bridgeTopicIds, synthesize, reset])
+  }, [candidate, enrichedSequences, edges, topic, allTopics, communities, bridgeTopicIds, synthesize])
 
   return (
     <article className="fse-card">

@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import type { TopicNode, EnrichedToolSequence } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildAdHocSynthesisRequest } from './adHocSynthesis'
+import { sliceSynthesisKey } from './synthesisKeys'
 import { SkillCopyButton } from './SkillCopyButton'
 import './AdHocSynthesisPanel.css'
 
@@ -12,22 +12,20 @@ interface Props {
 
 /**
  * Synthesize a single skill from the *whole filtered slice* (issue #73): builds
- * a synthetic union topic and runs it through the skill-server. Needs the local
+ * a synthetic union topic and runs it through the skill-server. The job is keyed
+ * per slice in the SkillSynthesisProvider, so it keeps running in the background
+ * and its result persists when you change filters and come back. Needs the local
  * skill-server (npm run dev:full).
  */
 export function AdHocSynthesisPanel({ topics, enrichedSequences }: Props) {
-  const { synthesize, loading, result, error, reset } = useSkillSynthesis()
-  const [open, setOpen] = useState(false)
+  const { synthesize, loading, result, error, reset } = useSkillSynthesis(sliceSynthesisKey(topics))
 
   if (topics.length < 2) return null // a single topic already has its own card
 
   const onSynthesize = () => {
-    if (loading) return // don't start a second synthesis while one is in flight
+    if (loading) return // a synthesis for this slice is already in flight
     const req = buildAdHocSynthesisRequest(topics, enrichedSequences)
-    if (!req) return
-    reset()
-    setOpen(true)
-    synthesize(req)
+    if (req) synthesize(req)
   }
 
   return (
@@ -35,7 +33,7 @@ export function AdHocSynthesisPanel({ topics, enrichedSequences }: Props) {
       <button className="adhoc-btn" onClick={onSynthesize} disabled={loading}>
         {loading ? '合成中…' : `このフィルタ集合から合成 (${topics.length} topics)`}
       </button>
-      {open && (result || error) && (
+      {(result || error) && (
         <div className="adhoc-result">
           {error ? (
             <p className="adhoc-error">{error}</p>
@@ -45,7 +43,7 @@ export function AdHocSynthesisPanel({ topics, enrichedSequences }: Props) {
               <SkillCopyButton text={result} className="adhoc-copy" />
             </>
           ) : null}
-          <button className="adhoc-close" onClick={() => setOpen(false)}>
+          <button className="adhoc-close" onClick={reset}>
             閉じる
           </button>
         </div>
