@@ -22,18 +22,36 @@ interface RetrieveResponse {
  * Map a `/api/retrieve` HTTP outcome onto the hook state. Extracted as a pure
  * function so it can be unit tested without React or a real fetch.
  *
- * - non-OK responses surface the server's `error` field (e.g. the "run --embed"
- *   hint) so the UI can tell the user how to fix it;
- * - OK responses return the results array (or empty).
+ * - 2xx responses return the results array (or empty);
+ * - non-2xx responses surface the server's `error` field when present, else a
+ *   status-specific fallback (503 → model not ready, 404 → search unsupported,
+ *   else a generic message). Always degrades gracefully (empty results).
+ *
+ * `ok` is `Response.ok` (2xx); `status` is the numeric HTTP status so the UI can
+ * distinguish a transient 503 ("モデル準備中") from a 404 ("検索未対応") rather
+ * than collapsing every failure into one generic message.
  */
 export function mapRetrieveResponse(
   ok: boolean,
   body: RetrieveResponse,
+  status?: number,
 ): { results: RetrievedChunk[]; error: string | null } {
   if (!ok) {
-    return { results: [], error: body.error ?? '検索サーバーでエラーが発生しました' }
+    return { results: [], error: body.error ?? fallbackErrorForStatus(status) }
   }
   return { results: body.results ?? [], error: null }
+}
+
+/** Status-specific Japanese fallback when the server sends no `error` body. */
+function fallbackErrorForStatus(status?: number): string {
+  switch (status) {
+    case 503:
+      return 'モデル準備中です。しばらくしてから再度お試しください'
+    case 404:
+      return 'このサーバーは検索に対応していません'
+    default:
+      return '検索サーバーでエラーが発生しました'
+  }
 }
 
 /**
@@ -62,7 +80,7 @@ export async function runSearchRequest(
     })
     const body: RetrieveResponse = await res.json().catch(() => ({}))
     if (seq !== getCurrentSeq()) return null
-    const { results, error } = mapRetrieveResponse(res.ok, body)
+    const { results, error } = mapRetrieveResponse(res.ok, body, res.status)
     return { results, loading: false, error }
   } catch (e) {
     if (signal.aborted || seq !== getCurrentSeq()) return null

@@ -31,6 +31,23 @@ describe('mapRetrieveResponse', () => {
     expect(out.results).toEqual([])
     expect(out.error).not.toBeNull()
   })
+
+  it('uses a status-specific fallback when the body carries no error', () => {
+    const notReady = mapRetrieveResponse(false, {}, 503)
+    const unsupported = mapRetrieveResponse(false, {}, 404)
+    const generic = mapRetrieveResponse(false, {}, 500)
+    // 503 (model warming) and 404 (no endpoint) must be distinguishable, not
+    // collapsed into one generic message.
+    expect(notReady.error).toMatch(/モデル準備中/)
+    expect(unsupported.error).toMatch(/検索に対応/)
+    expect(generic.error).not.toBe(notReady.error)
+    expect(generic.error).not.toBe(unsupported.error)
+  })
+
+  it('prefers the server-provided error over the status fallback', () => {
+    const out = mapRetrieveResponse(false, { error: 'index unreadable' }, 503)
+    expect(out.error).toBe('index unreadable')
+  })
 })
 
 /** Build a mock Response good enough for `runSearchRequest`. */
