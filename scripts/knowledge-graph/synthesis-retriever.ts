@@ -19,9 +19,7 @@ import {
   embedSessions,
   readEmbeddingIndex,
   createTransformersBackend,
-  createRetriever,
   createRetrieverFromIndex,
-  dequantize,
   DEFAULT_EMBED_DIM,
   type SessionInput,
   type EmbedResult,
@@ -96,15 +94,14 @@ export async function buildSynthesisRetriever(
       );
     }
 
-    // (3) Embed fresh in-memory.
+    // (3) Embed fresh in-memory. createRetrieverFromIndex owns the dequantize
+    // step AND the chunks/matrix/chunkTexts length-consistency guard.
     const result = await embedSessions(sessionInputs, backend, { model });
-    const denseVectors = result.chunks.map((_, i) =>
-      dequantize(result.matrix.subarray(i * result.dim, (i + 1) * result.dim))
-    );
-    const retriever = createRetriever({
+    const retriever = createRetrieverFromIndex({
       chunks: result.chunks,
-      texts: chunkTexts,
-      denseVectors,
+      matrix: result.matrix,
+      dim: result.dim,
+      chunkTexts,
       backend,
     });
     return { retriever, strategy: "freshly embedded (in-memory)" };
