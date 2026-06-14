@@ -15,6 +15,7 @@ import {
   buildSemanticKnowledgeGraph,
   readFacetsDir,
   aggregateFacetsForTopic,
+  attachFacetsSummaries,
   type SessionInput,
   type SemanticKnowledgeGraph,
   embedSessions,
@@ -525,6 +526,16 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     humanSignalMap: synthesisConfig.useHumanFeedback ? humanSignalMap : undefined,
   });
 
+  // Read facets once here in generateOverview and reuse for both topic-level
+  // filtering metadata (#73) and the synthesis loop below.
+  const facetsMap = synthesisConfig.facetsDir
+    ? readFacetsDir(synthesisConfig.facetsDir)
+    : undefined;
+
+  // Attach a compact facets summary to each topic so the UI can filter by goal
+  // category without recomputing the aggregation (issue #73).
+  attachFacetsSummaries(knowledgeGraph.nodes, facetsMap);
+
   // Top files
   const topFiles = [...fileEditCounts.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -620,11 +631,7 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     if (total > 0) {
       console.error(`[crune] Synthesizing top ${total} skill candidates${synthesisConfig.model ? ` (model: ${synthesisConfig.model})` : ""}...`);
     }
-    // Read facets once for the whole loop — the result is loop-invariant, so
-    // re-reading/re-parsing the directory per candidate was wasted I/O.
-    const facetsForSynthesis = synthesisConfig.facetsDir
-      ? readFacetsDir(synthesisConfig.facetsDir)
-      : undefined;
+    // facetsMap was read once above (loop-invariant) — reuse it directly.
     for (let i = 0; i < topCandidates.length; i++) {
       const candidate = topCandidates[i];
       const topic = knowledgeGraph.nodes.find((n) => n.id === candidate.topicId);
@@ -638,8 +645,8 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
 
       // Build facets insights for this topic if facets data is available
-      const facetsInsights = facetsForSynthesis
-        ? aggregateFacetsForTopic(topic.sessionIds, facetsForSynthesis)
+      const facetsInsights = facetsMap
+        ? aggregateFacetsForTopic(topic.sessionIds, facetsMap)
         : undefined;
 
       // Human-flagged moments for this topic (issue #24), only when enabled.

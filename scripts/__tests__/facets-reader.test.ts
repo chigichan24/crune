@@ -4,7 +4,10 @@ import {
   normalizeGoalCategory,
   helpfulnessToScore,
   aggregateFacetsForTopic,
+  buildTopicFacetsSummary,
+  attachFacetsSummaries,
 } from "../knowledge-graph-builder.js";
+import type { FacetsInsightsSummary, TopicNode } from "../knowledge-graph/types.js";
 
 describe("normalizeGoalCategory", () => {
   it("maps feature_implementation → feature", () => {
@@ -218,5 +221,91 @@ describe("aggregateFacetsForTopic", () => {
     expect(result!.successRate).toBe(0.75);
     // helpfulnessScore: (1.0 + 0.5) / 2 = 0.75
     expect(result!.helpfulnessScore).toBe(0.75);
+  });
+});
+
+describe("buildTopicFacetsSummary", () => {
+  const agg = (over: Partial<FacetsInsightsSummary> = {}): FacetsInsightsSummary => ({
+    aggregatedGoals: ["ship the feature"],
+    normalizedCategories: ["feature", "testing"],
+    successRate: 0.8,
+    helpfulnessScore: 0.6,
+    commonFrictions: [],
+    frictionDetails: [],
+    ...over,
+  });
+
+  it("maps the compact subset for the UI", () => {
+    expect(buildTopicFacetsSummary(agg())).toEqual({
+      categories: ["feature", "testing"],
+      goals: ["ship the feature"],
+      successRate: 0.8,
+      helpfulness: 0.6,
+    });
+  });
+
+  it("returns undefined for no aggregation (no facets matched)", () => {
+    expect(buildTopicFacetsSummary(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined when there is no category or goal signal", () => {
+    expect(
+      buildTopicFacetsSummary(agg({ normalizedCategories: [], aggregatedGoals: [] }))
+    ).toBeUndefined();
+  });
+
+  // The empty-signal guard is AND, not OR: a summary with only one side empty
+  // is still kept (pin the semantics so a future `||` regression is caught).
+  it("keeps the summary when only categories are empty", () => {
+    expect(buildTopicFacetsSummary(agg({ normalizedCategories: [] }))).toEqual({
+      categories: [],
+      goals: ["ship the feature"],
+      successRate: 0.8,
+      helpfulness: 0.6,
+    });
+  });
+
+  it("keeps the summary when only goals are empty", () => {
+    expect(buildTopicFacetsSummary(agg({ aggregatedGoals: [] }))).toEqual({
+      categories: ["feature", "testing"],
+      goals: [],
+      successRate: 0.8,
+      helpfulness: 0.6,
+    });
+  });
+});
+
+describe("attachFacetsSummaries", () => {
+  function node(sessionIds: string[]): TopicNode {
+    return { id: "t", sessionIds } as unknown as TopicNode;
+  }
+  function facets(sessionId: string): FacetsData {
+    return {
+      sessionId,
+      underlyingGoal: "Fix the bug",
+      goalCategories: { bug_fix: 1 },
+      outcome: "fully_achieved",
+      claudeHelpfulness: "very_helpful",
+      sessionType: "debugging",
+      frictionCounts: {},
+      frictionDetail: "",
+      primarySuccess: "",
+      briefSummary: "",
+    };
+  }
+
+  it("attaches a summary to topics whose sessions have facets", () => {
+    const nodes = [node(["s1", "s2"]), node(["s9"])]; // s9 has no facets
+    const map = new Map<string, FacetsData>([["s1", facets("s1")]]);
+    attachFacetsSummaries(nodes, map);
+    expect(nodes[0].facetsSummary?.categories).toContain("bugfix");
+    expect(nodes[1].facetsSummary).toBeUndefined();
+  });
+
+  it("is a no-op when the facets map is absent or empty", () => {
+    const nodes = [node(["s1"])];
+    attachFacetsSummaries(nodes, undefined);
+    attachFacetsSummaries(nodes, new Map());
+    expect(nodes[0].facetsSummary).toBeUndefined();
   });
 });

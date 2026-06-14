@@ -96,6 +96,24 @@ export interface TopicNode {
   toolSignature: { tool: string; weight: number }[];
   dominantRole: "user-driven" | "tool-heavy" | "subagent-delegated";
   reusabilityScore: ReusabilityScore;
+  /** Compact /insights facets summary for UI filtering (issue #73). Present only
+   *  when facets data was available at build time. */
+  facetsSummary?: TopicFacetsSummary;
+}
+
+/**
+ * Compact per-topic facets summary persisted onto {@link TopicNode} so the UI
+ * can filter topics by goal category without recomputing the aggregation
+ * (issue #73). A serializable subset of {@link FacetsInsightsSummary}.
+ */
+export interface TopicFacetsSummary {
+  /** Normalized goal categories (feature / bugfix / refactoring / …). */
+  categories: string[];
+  /** Raw underlying-goal phrases (a few, de-duplicated). */
+  goals: string[];
+  /** Always set when a summary exists (the aggregation always computes them). */
+  successRate: number;
+  helpfulness: number;
 }
 
 export interface TopicEdge {

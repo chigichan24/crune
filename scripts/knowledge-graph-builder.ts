@@ -63,10 +63,13 @@ export {
   // Facets
   type FacetsData,
   type FacetsInsightsSummary,
+  type TopicFacetsSummary,
   readFacetsDir,
   normalizeGoalCategory,
   helpfulnessToScore,
   aggregateFacetsForTopic,
+  buildTopicFacetsSummary,
+  attachFacetsSummaries,
   // RAG embedding pipeline + retriever (issue #32)
   extractChunks,
   embedSessions,

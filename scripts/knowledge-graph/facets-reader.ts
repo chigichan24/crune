@@ -5,7 +5,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import type { FacetsData, FacetsInsightsSummary } from "./types.js";
+import type { FacetsData, FacetsInsightsSummary, TopicFacetsSummary, TopicNode } from "./types.js";
 
 // ─── Goal category normalization ────────────────────────────────────────────
 
@@ -217,4 +217,42 @@ export function aggregateFacetsForTopic(
     commonFrictions,
     frictionDetails,
   };
+}
+
+/**
+ * Map an aggregated facets summary to the compact per-topic shape persisted on
+ * a TopicNode for UI filtering (issue #73). Returns undefined when there is no
+ * category/goal signal (so the field stays absent rather than empty).
+ */
+export function buildTopicFacetsSummary(
+  agg: FacetsInsightsSummary | undefined
+): TopicFacetsSummary | undefined {
+  if (!agg) return undefined;
+  if (agg.normalizedCategories.length === 0 && agg.aggregatedGoals.length === 0) {
+    return undefined;
+  }
+  return {
+    categories: agg.normalizedCategories,
+    goals: agg.aggregatedGoals,
+    successRate: agg.successRate,
+    helpfulness: agg.helpfulnessScore,
+  };
+}
+
+/**
+ * Attach a {@link TopicFacetsSummary} to every topic that has facets signal
+ * (issue #73). No-op when no facets data is available. Mutates the nodes in
+ * place; extracted from analyze-sessions so the attachment is unit-testable.
+ */
+export function attachFacetsSummaries(
+  nodes: TopicNode[],
+  facetsMap: Map<string, FacetsData> | undefined
+): void {
+  if (!facetsMap || facetsMap.size === 0) return;
+  for (const node of nodes) {
+    const summary = buildTopicFacetsSummary(
+      aggregateFacetsForTopic(node.sessionIds, facetsMap)
+    );
+    if (summary) node.facetsSummary = summary;
+  }
 }

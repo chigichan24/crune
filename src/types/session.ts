@@ -176,6 +176,18 @@ export interface TopicNode {
   toolSignature: { tool: string; weight: number }[] // top tools by Tool-IDF weight
   dominantRole: 'user-driven' | 'tool-heavy' | 'subagent-delegated'
   reusabilityScore: ReusabilityScore
+  facetsSummary?: TopicFacetsSummary // /insights facets summary for filtering (#73), when available
+}
+
+/**
+ * Compact per-topic facets summary for UI filtering (issue #73).
+ * Present only when /insights facets data was available at build time.
+ */
+export interface TopicFacetsSummary {
+  categories: string[] // normalized goal categories (feature / bugfix / refactoring / …)
+  goals: string[] // raw underlying-goal phrases (a few, de-duplicated)
+  successRate: number // always set when a summary exists
+  helpfulness: number
 }
 
 export interface TopicEdge {
