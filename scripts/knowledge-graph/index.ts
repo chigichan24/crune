@@ -50,6 +50,7 @@ export type {
   SkillCandidate,
   FacetsData,
   FacetsInsightsSummary,
+  TopicFacetsSummary,
 } from "./types.js";
 
 export { tokenize, splitCamelCase, extractPathTokens, isNoiseToken } from "./tokenizer.js";

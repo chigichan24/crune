@@ -63,6 +63,7 @@ export {
   // Facets
   type FacetsData,
   type FacetsInsightsSummary,
+  type TopicFacetsSummary,
   readFacetsDir,
   normalizeGoalCategory,
   helpfulnessToScore,
