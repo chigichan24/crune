@@ -85,6 +85,39 @@ export { abstractToolCall, extractEnrichedSequences } from "./tool-pattern.js";
 export { generateSkillMarkdown, generateHookJson, generateSkillCandidates } from "./skill-generator.js";
 export { readFacetsDir, normalizeGoalCategory, helpfulnessToScore, aggregateFacetsForTopic } from "./facets-reader.js";
 
+// ─── RAG embedding pipeline + retriever (issue #32) ──────────────────────────
+export {
+  extractChunks,
+  embedSessions,
+  quantize,
+  dequantize,
+  DEFAULT_EMBED_MODEL,
+  DEFAULT_EMBED_DIM,
+  QUANT_SCALE,
+  QUANT_MAX_ERROR,
+} from "./embedder.js";
+export type {
+  EmbeddingBackend,
+  ChunkMeta,
+  ExtractedChunk,
+  EmbedResult,
+  EmbedOptions,
+  EmbeddingMeta,
+} from "./embedder.js";
+export {
+  writeEmbeddingIndex,
+  readEmbeddingIndex,
+  createTransformersBackend,
+  INDEX_FILENAME,
+  META_FILENAME,
+} from "./embedding-io.js";
+export type { LoadedEmbeddingIndex } from "./embedding-io.js";
+export {
+  createRetriever,
+  createRetrieverFromIndex,
+} from "./retriever.js";
+export type { Retriever, RetrievedChunk, RetrieveOptions } from "./retriever.js";
+
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 
 export function buildSemanticKnowledgeGraph(
