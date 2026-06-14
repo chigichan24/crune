@@ -4,6 +4,13 @@ import { dirname, resolve } from "node:path";
 import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble } from "./skill-synthesizer.js";
 import type { SynthesisRequest, SynthesisResponse } from "./skill-synthesizer.js";
 import { mergeFeedbackBlob, readFeedbackBlob, type FeedbackBlob } from "./feedback-reader.js";
+import {
+  createLazyRetrieverProvider,
+  handleRetrieveRequest,
+  type RetrieveRequestBody,
+} from "./retrieve-service.js";
+import { createTransformersBackend } from "./knowledge-graph/embedding-io.js";
+import type { Retriever } from "./knowledge-graph/retriever.js";
 
 // ---------- Constants ----------
 
@@ -138,12 +145,47 @@ async function handlePostFeedback(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/**
+ * Semantic retrieval over the chunk-level embedding index (issue #34).
+ *
+ * The production embedding backend and on-disk index are built lazily ONCE via
+ * `retrieverProvider` (closed over below) and reused across requests — the
+ * Transformers.js model is never reloaded per request. The actual ranking lives
+ * in the pure `handleRetrieveRequest` so it can be unit tested with a fake
+ * retriever.
+ */
+async function handleRetrieve(
+  req: IncomingMessage,
+  res: ServerResponse,
+  retrieverProvider: () => Retriever | null,
+) {
+  let body: RetrieveRequestBody;
+  try {
+    body = JSON.parse(await readBody(req));
+  } catch {
+    sendJson(res, 400, { error: "Invalid JSON in request body" });
+    return;
+  }
+
+  try {
+    const { status, body: out } = await handleRetrieveRequest(body, retrieverProvider());
+    sendJson(res, status, out);
+  } catch (err) {
+    sendJson(res, 500, { error: err instanceof Error ? err.message : "Retrieval failed" });
+  }
+}
+
 // ---------- Server ----------
 
 const isDirectRun = process.argv[1]?.endsWith("skill-server.ts") || process.argv[1]?.endsWith("skill-server.js");
 
 if (isDirectRun) {
   const PORT = 3456;
+
+  // Build the embedding backend + index lazily ONCE and reuse across requests.
+  // The Transformers.js model is materialized on the first retrieval call, not
+  // at startup, so the server boots fast even without an index present.
+  const retrieverProvider = createLazyRetrieverProvider(createTransformersBackend());
 
   const server = createServer(async (req, res) => {
     if (req.method === "OPTIONS") {
@@ -157,6 +199,8 @@ if (isDirectRun) {
       handleGetFeedback(res);
     } else if (req.method === "POST" && req.url === "/api/feedback") {
       await handlePostFeedback(req, res);
+    } else if (req.method === "POST" && req.url === "/api/retrieve") {
+      await handleRetrieve(req, res, retrieverProvider);
     } else {
       sendJson(res, 404, { error: "Not found" });
     }
