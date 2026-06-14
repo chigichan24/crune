@@ -40,4 +40,20 @@ describe("parseArgs (analyze-sessions)", () => {
     expect(args.skipEval).toBe(false);
     expect(args.evalModel).toBe("sonnet");
   });
+
+  it("defaults embed OFF with no embed model", () => {
+    const args = parseArgs([]);
+    expect(args.embed).toBe(false);
+    expect(args.embedModel).toBeUndefined();
+  });
+
+  it("enables embedding with --embed", () => {
+    expect(parseArgs(["--embed"]).embed).toBe(true);
+  });
+
+  it("sets embedModel with --embed-model", () => {
+    const args = parseArgs(["--embed", "--embed-model", "Xenova/custom"]);
+    expect(args.embed).toBe(true);
+    expect(args.embedModel).toBe("Xenova/custom");
+  });
 });
