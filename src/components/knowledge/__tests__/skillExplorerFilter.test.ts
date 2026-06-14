@@ -3,6 +3,7 @@ import type { TopicNode } from '../../../types'
 import {
   collectFilterOptions,
   filterTopics,
+  sortByReusability,
   isEmptyCriteria,
   EMPTY_CRITERIA,
   type TopicFilterCriteria,
@@ -88,20 +89,46 @@ describe('filterTopics', () => {
     expect(filterTopics(nodes, criteria({ minReusability: 0.5 })).map((n) => n.id)).toEqual(['t1'])
   })
 
-  it('filters by since (lastSeen lower bound)', () => {
-    expect(filterTopics(nodes, criteria({ since: '2026-03-01T00:00:00Z' })).map((n) => n.id)).toEqual(['t1'])
+  it('filters by sinceDays window (relative to injected now)', () => {
+    const now = new Date('2026-06-10T00:00:00Z')
+    // t1 lastSeen 2026-06-01 (9 days ago), t2 2026-01-15 (months ago)
+    expect(filterTopics(nodes, criteria({ sinceDays: 30 }), undefined, now).map((n) => n.id)).toEqual(['t1'])
+    expect(filterTopics(nodes, criteria({ sinceDays: 365 }), undefined, now).map((n) => n.id)).toEqual(['t1', 't2'])
+  })
+
+  it('treats the sinceDays boundary as inclusive', () => {
+    const n = [node({ id: 't', lastSeen: '2026-06-01T00:00:00Z' })]
+    const now = new Date('2026-06-08T00:00:00Z') // exactly 7 days after lastSeen
+    expect(filterTopics(n, criteria({ sinceDays: 7 }), undefined, now).map((x) => x.id)).toEqual(['t'])
+    expect(filterTopics(n, criteria({ sinceDays: 6 }), undefined, now)).toEqual([])
   })
 
   it('filters by min eval score, excluding topics without a score', () => {
     const evalScores = new Map([['t1', 90]]) // t2 has no eval
     expect(filterTopics(nodes, criteria({ minEvalScore: 80 }), evalScores).map((n) => n.id)).toEqual(['t1'])
+    expect(filterTopics(nodes, criteria({ minEvalScore: 90 }), evalScores).map((n) => n.id)).toEqual(['t1']) // equality passes
     expect(filterTopics(nodes, criteria({ minEvalScore: 95 }), evalScores)).toEqual([])
+  })
+
+  it('drops every topic for minEvalScore > 0 when no score map is supplied', () => {
+    expect(filterTopics(nodes, criteria({ minEvalScore: 1 }))).toEqual([])
   })
 
   it('combines axes with AND', () => {
     expect(
       filterTopics(nodes, criteria({ projects: ['crune'], categories: ['bugfix'] })),
     ).toEqual([])
+  })
+})
+
+describe('sortByReusability', () => {
+  it('orders topics by reusability descending without mutating the input', () => {
+    const input = [
+      node({ id: 'lo', reusabilityScore: { overall: 0.2 } as TopicNode['reusabilityScore'] }),
+      node({ id: 'hi', reusabilityScore: { overall: 0.9 } as TopicNode['reusabilityScore'] }),
+    ]
+    expect(sortByReusability(input).map((n) => n.id)).toEqual(['hi', 'lo'])
+    expect(input.map((n) => n.id)).toEqual(['lo', 'hi']) // input untouched
   })
 })
 

@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react'
 import type { SessionOverviewData } from '../../types'
 import {
   EMPTY_CRITERIA,
+  ROLE_LABELS,
   collectFilterOptions,
   filterTopics,
+  sortByReusability,
   isEmptyCriteria,
   type TopicFilterCriteria,
-  type DominantRole,
 } from './skillExplorerFilter'
 import { ExplorerSkillCard } from './ExplorerSkillCard'
 import './SkillExplorerView.css'
@@ -18,11 +19,8 @@ interface Props {
   onSessionSelect: (sessionId: string) => void
 }
 
-const ROLE_LABELS: Record<DominantRole, string> = {
-  'user-driven': 'ユーザー主導',
-  'tool-heavy': 'ツール多用',
-  'subagent-delegated': 'サブエージェント委譲',
-}
+/** Keys of TopicFilterCriteria whose value is an array (the multi-select axes). */
+type ArrayKeys<T> = { [K in keyof T]: T[K] extends unknown[] ? K : never }[keyof T]
 
 const SINCE_OPTIONS: { label: string; days: number | null }[] = [
   { label: '全期間', days: null },
@@ -83,27 +81,22 @@ export function SkillExplorerView({ overview, loading, error, onSessionSelect }:
     return m
   }, [candidates])
 
-  const filtered = useMemo(() => {
-    const result = filterTopics(nodes, criteria, evalScores)
-    return result.sort((a, b) => (b.reusabilityScore?.overall ?? 0) - (a.reusabilityScore?.overall ?? 0))
-  }, [nodes, criteria, evalScores])
+  const filtered = useMemo(
+    () => sortByReusability(filterTopics(nodes, criteria, evalScores)),
+    [nodes, criteria, evalScores],
+  )
 
-  const toggle = <K extends 'projects' | 'categories' | 'communities' | 'roles'>(
+  const toggle = <K extends ArrayKeys<TopicFilterCriteria>>(
     key: K,
     value: TopicFilterCriteria[K][number],
   ) => {
     setCriteria((c) => {
+      // Cast: TS can't narrow a generic union of array-valued props to one
+      // element type, but ArrayKeys already guarantees `key` is an array axis.
       const arr = c[key] as TopicFilterCriteria[K][number][]
       const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]
       return { ...c, [key]: next }
     })
-  }
-
-  const setSince = (days: number | null) => {
-    if (days === null) return setCriteria((c) => ({ ...c, since: null }))
-    const d = new Date()
-    d.setDate(d.getDate() - days)
-    setCriteria((c) => ({ ...c, since: d.toISOString() }))
   }
 
   if (loading) return <div className="fse-state">読み込み中…</div>
@@ -163,18 +156,15 @@ export function SkillExplorerView({ overview, loading, error, onSessionSelect }:
         <div className="fse-filter-group">
           <span className="fse-filter-label">期間</span>
           <div className="fse-filter-chips">
-            {SINCE_OPTIONS.map((o) => {
-              const active = o.days === null ? criteria.since === null : criteria.since !== null
-              return (
-                <button
-                  key={o.label}
-                  className={`fse-chip${active && (o.days !== null || criteria.since === null) ? ' fse-chip--on' : ''}`}
-                  onClick={() => setSince(o.days)}
-                >
-                  {o.label}
-                </button>
-              )
-            })}
+            {SINCE_OPTIONS.map((o) => (
+              <button
+                key={o.label}
+                className={`fse-chip${o.days === criteria.sinceDays ? ' fse-chip--on' : ''}`}
+                onClick={() => setCriteria((c) => ({ ...c, sinceDays: o.days }))}
+              >
+                {o.label}
+              </button>
+            ))}
           </div>
         </div>
       </aside>

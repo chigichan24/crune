@@ -15,7 +15,7 @@ export interface TopicFilterCriteria {
   keyword: string // case-insensitive substring over label + keywords
   minReusability: number // 0–1, topic.reusabilityScore.overall >= this
   minEvalScore: number // 0–100, evaluation.overallScore >= this (0 = no constraint)
-  since: string | null // ISO date; topic.lastSeen >= this (null = no constraint)
+  sinceDays: number | null // keep topics active within the last N days (null = no constraint)
 }
 
 export const EMPTY_CRITERIA: TopicFilterCriteria = {
@@ -26,7 +26,14 @@ export const EMPTY_CRITERIA: TopicFilterCriteria = {
   keyword: '',
   minReusability: 0,
   minEvalScore: 0,
-  since: null,
+  sinceDays: null,
+}
+
+/** Role labels (shared by the filter sidebar and the cards). */
+export const ROLE_LABELS: Record<DominantRole, string> = {
+  'user-driven': 'ユーザー主導',
+  'tool-heavy': 'ツール多用',
+  'subagent-delegated': 'サブエージェント委譲',
 }
 
 /** Available filter options derived from the current topic set (for the UI). */
@@ -56,31 +63,38 @@ export function collectFilterOptions(nodes: TopicNode[]): FilterOptions {
   }
 }
 
-function someOverlap<T>(selected: T[], values: T[]): boolean {
+/** True when nothing is selected (no constraint) or some value is selected. */
+function matchesAnySelected<T>(selected: T[], values: T[]): boolean {
   if (selected.length === 0) return true // no constraint
   return values.some((v) => selected.includes(v))
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
 /**
  * Filter topics by the criteria. `evalScores` maps topicId → evaluation
  * overallScore (absent when a topic has no synthesized+evaluated candidate);
- * a topic is dropped by `minEvalScore > 0` when it has no score.
+ * a topic is dropped by `minEvalScore > 0` when it has no score. `now` is
+ * injectable so the `sinceDays` window is deterministic in tests.
  */
 export function filterTopics(
   nodes: TopicNode[],
   criteria: TopicFilterCriteria,
   evalScores?: Map<string, number>,
+  now: Date = new Date(),
 ): TopicNode[] {
   const keyword = criteria.keyword.trim().toLowerCase()
+  const cutoffMs =
+    criteria.sinceDays !== null ? now.getTime() - criteria.sinceDays * DAY_MS : null
   return nodes.filter((n) => {
-    if (!someOverlap(criteria.projects, n.projects ?? [])) return false
-    if (!someOverlap(criteria.categories, n.facetsSummary?.categories ?? [])) return false
-    if (criteria.communities.length > 0 && !criteria.communities.includes(n.communityId)) return false
-    if (!someOverlap(criteria.roles, n.dominantRole ? [n.dominantRole] : [])) return false
-    if ((n.reusabilityScore?.overall ?? 0) < criteria.minReusability) return false
-    if (criteria.since && (n.lastSeen ?? '') < criteria.since) return false
+    if (!matchesAnySelected(criteria.projects, n.projects)) return false
+    if (!matchesAnySelected(criteria.categories, n.facetsSummary?.categories ?? [])) return false
+    if (!matchesAnySelected(criteria.communities, [n.communityId])) return false
+    if (!matchesAnySelected(criteria.roles, [n.dominantRole])) return false
+    if (n.reusabilityScore.overall < criteria.minReusability) return false
+    if (cutoffMs !== null && Date.parse(n.lastSeen) < cutoffMs) return false
     if (keyword) {
-      const hay = `${n.label ?? ''} ${(n.keywords ?? []).join(' ')}`.toLowerCase()
+      const hay = `${n.label} ${n.keywords.join(' ')}`.toLowerCase()
       if (!hay.includes(keyword)) return false
     }
     if (criteria.minEvalScore > 0) {
@@ -89,6 +103,11 @@ export function filterTopics(
     }
     return true
   })
+}
+
+/** Sort topics by reusability (descending) — the explorer's default ranking. */
+export function sortByReusability(nodes: TopicNode[]): TopicNode[] {
+  return [...nodes].sort((a, b) => b.reusabilityScore.overall - a.reusabilityScore.overall)
 }
 
 /** True when the criteria impose no constraint (all topics pass). */
@@ -101,6 +120,6 @@ export function isEmptyCriteria(c: TopicFilterCriteria): boolean {
     c.keyword.trim() === '' &&
     c.minReusability === 0 &&
     c.minEvalScore === 0 &&
-    c.since === null
+    c.sinceDays === null
   )
 }

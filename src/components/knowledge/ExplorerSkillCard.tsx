@@ -9,6 +9,8 @@ import type {
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
 import { SkillEvaluationBadge } from './SkillEvaluationBadge'
+import { SkillCopyButton } from './SkillCopyButton'
+import { ROLE_LABELS } from './skillExplorerFilter'
 import './ExplorerSkillCard.css'
 
 interface Props {
@@ -20,24 +22,6 @@ interface Props {
   communities: KnowledgeCommunity[]
   bridgeTopicIds: string[]
   onSessionSelect: (sessionId: string) => void
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  const onCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      /* clipboard unavailable — ignore */
-    }
-  }, [text])
-  return (
-    <button className="fse-card-copy" onClick={onCopy}>
-      {copied ? 'コピーしました' : 'Skillをコピー'}
-    </button>
-  )
 }
 
 export function ExplorerSkillCard({
@@ -81,7 +65,7 @@ export function ExplorerSkillCard({
       </header>
 
       <div className="fse-card-meta">
-        <span className="fse-card-role">{topic.dominantRole}</span>
+        <span className="fse-card-role">{ROLE_LABELS[topic.dominantRole]}</span>
         <span className="fse-card-sessions">{topic.sessionCount} sessions</span>
         {topic.projects.slice(0, 2).map((p) => (
           <span key={p} className="fse-card-project">{p}</span>
@@ -112,7 +96,7 @@ export function ExplorerSkillCard({
           {expanded && (
             <div className="fse-card-md">
               <pre className="fse-card-md-pre">{markdown}</pre>
-              <CopyButton text={markdown} />
+              <SkillCopyButton text={markdown} className="fse-card-copy" />
             </div>
           )}
         </div>
