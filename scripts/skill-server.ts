@@ -23,10 +23,23 @@ const CORS_HEADERS: Record<string, string> = {
 
 // ---------- Helpers ----------
 
-function readBody(req: IncomingMessage): Promise<string> {
+/** Max request body size. Bounds memory for a local server that allows any
+ *  origin; synthesis graph-context payloads are well under this. */
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
+function readBody(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
     req.on("error", reject);
   });
