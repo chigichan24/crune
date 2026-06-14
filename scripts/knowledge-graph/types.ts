@@ -2,6 +2,8 @@
  * Type definitions for semantic knowledge graph construction.
  */
 
+import type { SkillEvaluation } from "../../src/types/session.js";
+
 // ─── Input types (subset of analyze-sessions.ts types) ──────────────────────
 
 export interface SessionInput {
@@ -148,6 +150,7 @@ export interface SkillCandidate {
   skillMarkdown: string;
   synthesizedMarkdown?: string;
   hookJson?: string;
+  evaluation?: SkillEvaluation;
 }
 
 // ─── Knowledge graph options ─────────────────────────────────────────────────
