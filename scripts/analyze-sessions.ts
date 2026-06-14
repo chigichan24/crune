@@ -19,18 +19,17 @@ import {
   type SemanticKnowledgeGraph,
   embedSessions,
   writeEmbeddingIndex,
-  readEmbeddingIndex,
   createTransformersBackend,
-  createRetriever,
-  createRetrieverFromIndex,
-  extractChunks,
-  dequantize,
   DEFAULT_EMBED_MODEL,
   DEFAULT_EMBED_DIM,
   type Retriever,
   type EmbedResult,
 } from "./knowledge-graph-builder.js";
-import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, buildRetrievalQuery, type SynthesisOptions, type HumanFeedbackSignal, type RetrievedChunk } from "./skill-synthesizer.js";
+import {
+  buildSynthesisRetriever,
+  retrieveContextForCandidate,
+} from "./knowledge-graph/synthesis-retriever.js";
+import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions, type HumanFeedbackSignal, type RetrievedChunk } from "./skill-synthesizer.js";
 import { computeSessionHumanSignal } from "./knowledge-graph/reusability.js";
 import {
   readFeedbackFile,
@@ -338,9 +337,6 @@ interface SynthesisConfig {
   retriever?: Retriever;
 }
 
-/** Top-k turn snippets retrieved per candidate for synthesis context (#33). */
-const RETRIEVAL_TOP_K = 8;
-
 /**
  * Map parsed sessions onto the `SessionInput` shape consumed by the knowledge
  * graph builder and the embedding pipeline. Extracted so both the overview
@@ -386,88 +382,6 @@ function toSessionInputs(sessions: ParsedSession[]): SessionInput[] {
       subagentCount: s.meta.subagentCount,
     },
   }));
-}
-
-/**
- * Build a hybrid retriever for retrieval-enriched synthesis (issue #33).
- *
- * Strategy, in order of preference:
- *   1. Reuse an embedding index already computed this run (`precomputed`, from
- *      the `--embed` step) — zero extra model calls.
- *   2. Read an on-disk index at `embeddingsDir` (from a prior `--embed` run).
- *   3. Embed the analyzed sessions fresh via the production backend.
- *
- * BM25 needs the full chunk text, which the persisted meta.json does NOT store
- * (only the short snippet). We re-derive it with `extractChunks` (same order as
- * the index) and zip by index. Returns `null` (never throws) when no index and
- * no usable backend are available, so the caller falls back to the cluster blob.
- */
-async function buildSynthesisRetriever(
-  sessionInputs: SessionInput[],
-  embeddingsDir: string,
-  model: string,
-  precomputed?: EmbedResult
-): Promise<{ retriever: Retriever; strategy: string } | null> {
-  // extractChunks is the canonical chunk order shared with the embedder; its
-  // `text` field is what BM25 indexes.
-  const extracted = extractChunks(sessionInputs);
-  if (extracted.length === 0) {
-    console.error("[crune] Retrieval context: no chunks to index, falling back to cluster blob");
-    return null;
-  }
-  const chunkTexts = extracted.map((c) => c.text);
-
-  try {
-    const backend = createTransformersBackend(model, DEFAULT_EMBED_DIM);
-
-    // (1) Reuse embeddings computed earlier this run.
-    if (precomputed && precomputed.count === extracted.length) {
-      const retriever = createRetrieverFromIndex({
-        chunks: precomputed.chunks,
-        matrix: precomputed.matrix,
-        dim: precomputed.dim,
-        chunkTexts,
-        backend,
-      });
-      return { retriever, strategy: "reused --embed index (this run)" };
-    }
-
-    // (2) Reuse an index persisted by a prior run.
-    if (fs.existsSync(path.join(embeddingsDir, "meta.json"))) {
-      const { meta, matrix } = readEmbeddingIndex(embeddingsDir);
-      if (meta.count === extracted.length) {
-        const retriever = createRetrieverFromIndex({
-          chunks: meta.chunks,
-          matrix,
-          dim: meta.dim,
-          chunkTexts,
-          backend,
-        });
-        return { retriever, strategy: `on-disk index (${embeddingsDir})` };
-      }
-      console.error(
-        `[crune] Retrieval context: on-disk index count ${meta.count} != ${extracted.length} chunks, re-embedding`
-      );
-    }
-
-    // (3) Embed fresh in-memory.
-    const result = await embedSessions(sessionInputs, backend, { model });
-    const denseVectors = result.chunks.map((_, i) =>
-      dequantize(result.matrix.subarray(i * result.dim, (i + 1) * result.dim))
-    );
-    const retriever = createRetriever({
-      chunks: result.chunks,
-      texts: chunkTexts,
-      denseVectors,
-      backend,
-    });
-    return { retriever, strategy: "freshly embedded (in-memory)" };
-  } catch (err) {
-    console.error(
-      `[crune] Retrieval context unavailable (falling back to cluster blob): ${err instanceof Error ? err.message : String(err)}`
-    );
-    return null;
-  }
 }
 
 async function generateOverview(sessions: ParsedSession[], synthesisConfig: SynthesisConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
@@ -746,24 +660,19 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
 
       // Retrieval-enriched context (issue #33). When a retriever is available,
       // pull the top-k most relevant turn snippets for this candidate; on any
-      // failure we leave `retrievedContext` undefined so buildSynthesisPrompt
-      // falls back to the cluster-blob examples (never crash).
+      // failure `retrieveContextForCandidate` returns undefined so
+      // buildSynthesisPrompt falls back to the cluster-blob examples (never crash).
       let retrievedContext: RetrievedChunk[] | undefined;
       if (synthesisConfig.retriever) {
-        try {
-          const query = buildRetrievalQuery(candidate, topic as unknown as import("./skill-synthesizer.js").TopicNode);
-          const chunks = await synthesisConfig.retriever.retrieve(query, RETRIEVAL_TOP_K);
-          if (chunks.length > 0) {
-            retrievedContext = chunks;
-            console.error(`[crune]   [${i + 1}/${total}] Retrieved ${chunks.length} relevant moments`);
-          } else {
-            console.error(`[crune]   [${i + 1}/${total}] No relevant moments retrieved, using cluster blob`);
-          }
-        } catch (err) {
-          console.error(
-            `[crune]   [${i + 1}/${total}] Retrieval failed (using cluster blob): ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
+        retrievedContext = await retrieveContextForCandidate(synthesisConfig.retriever, candidate, {
+          label: topic.label,
+          keywords: topic.keywords,
+        });
+        console.error(
+          retrievedContext
+            ? `[crune]   [${i + 1}/${total}] Retrieved ${retrievedContext.length} relevant moments`
+            : `[crune]   [${i + 1}/${total}] No relevant moments retrieved, using cluster blob`
+        );
       }
 
       const prompt = buildSynthesisPrompt({
