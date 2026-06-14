@@ -46,16 +46,43 @@ export interface ExtractedChunk extends ChunkMeta {
 }
 
 const SNIPPET_MAX = 200;
+// Cap the assistant contribution so a long, tool-output-heavy turn cannot drown
+// out the user's intent in the embedding (issue #35 PoC: noise degraded recall).
+const ASSISTANT_MAX = 1000;
 
 /** Collapse whitespace and trim a string for snippet/embedding text. */
 function normalizeText(s: string): string {
   return s.replace(/\s+/g, " ").trim();
 }
 
+// Harness/tool-output blocks that carry no semantic signal about the work and,
+// left in, dominate retrieval (issue #35 PoC found <bash-stdout>/npm-notice/
+// <task-notification> fragments outranking real auth/db turns).
+const NOISE_BLOCK =
+  /<(bash-stdout|bash-stderr|stdout|stderr|task-notification|system-reminder|function_results|function_calls|local-command-stdout|local-command-stderr)>[\s\S]*?<\/\1>/gi;
+const NOISE_LINE =
+  /^\s*(?:npm (?:notice|warn|warning|error|audit)\b|added \d+ packages?\b|removed \d+ packages?\b|changed \d+ packages?\b|\+ \S+@[\w.+-]+|Full transcript available at:|API Error:).*$/gim;
+// Stray tag-like tokens (open/close/self-closing element names) — deliberately
+// narrow so it never touches arithmetic such as "a < b".
+const STRAY_TAG = /<\/?[a-zA-Z][\w-]*(?:\s[^>]*)?\/?>/g;
+
+/**
+ * Strip harness noise (tool-output blocks, npm chatter, stray tags) so chunk
+ * embeddings reflect the actual conversation rather than command spew.
+ */
+export function cleanseNoise(s: string): string {
+  return s
+    .replace(NOISE_BLOCK, " ")
+    .replace(NOISE_LINE, " ")
+    .replace(STRAY_TAG, " ");
+}
+
 /**
  * Extract one chunk per session turn. The embedding text concatenates the user
- * prompt, the assistant texts, and the (deduplicated) tool names invoked during
- * the turn. The stored snippet is a short, human-readable prefix.
+ * prompt, the (noise-cleansed, length-capped) assistant texts, and the
+ * deduplicated tool names invoked during the turn. The user prompt is kept in
+ * full while the assistant part is capped, upweighting intent over tool spew.
+ * The stored snippet is a short, human-readable prefix.
  *
  * Turns whose combined text is empty are skipped so the index never contains
  * zero-information chunks.
@@ -64,8 +91,10 @@ export function extractChunks(sessions: SessionInput[]): ExtractedChunk[] {
   const chunks: ExtractedChunk[] = [];
   for (const session of sessions) {
     session.turns.forEach((turn, turnIndex) => {
-      const userPart = normalizeText(turn.userPrompt);
-      const assistantPart = normalizeText(turn.assistantTexts.join(" "));
+      const userPart = normalizeText(cleanseNoise(turn.userPrompt));
+      const assistantPart = normalizeText(
+        cleanseNoise(turn.assistantTexts.join(" "))
+      ).slice(0, ASSISTANT_MAX);
       const toolNames = [...new Set(turn.toolCalls.map((tc) => tc.toolName))];
       const toolPart = toolNames.join(" ");
 

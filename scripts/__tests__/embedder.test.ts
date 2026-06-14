@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   extractChunks,
+  cleanseNoise,
   embedSessions,
   quantize,
   dequantize,
@@ -85,6 +86,49 @@ describe("extractChunks", () => {
     ]);
     expect(chunks[0].snippet.length).toBeLessThanOrEqual(201); // 200 + ellipsis
     expect(chunks[0].text.length).toBeGreaterThan(400);
+  });
+
+  it("strips tool-output noise so chunk text reflects intent (issue #35)", () => {
+    const chunks = extractChunks([
+      session("s4", [
+        {
+          userPrompt: "set up OAuth login",
+          assistantTexts: [
+            "I'll configure auth. <bash-stdout>npm notice\nadded 412 packages\n</bash-stdout> Done.",
+          ],
+          toolCalls: [{ toolName: "Bash", input: {} }],
+        },
+      ]),
+    ]);
+    expect(chunks[0].text).toContain("set up OAuth login");
+    expect(chunks[0].text).toContain("configure auth");
+    expect(chunks[0].text).not.toMatch(/bash-stdout/i);
+    expect(chunks[0].text).not.toMatch(/npm notice/i);
+    expect(chunks[0].text).not.toContain("412 packages");
+  });
+
+  it("caps the assistant contribution but keeps the full user prompt", () => {
+    const chunks = extractChunks([
+      session("s5", [
+        {
+          userPrompt: "deploy the staging environment",
+          assistantTexts: ["y".repeat(5000)],
+          toolCalls: [],
+        },
+      ]),
+    ]);
+    expect(chunks[0].text).toContain("deploy the staging environment");
+    // assistant capped at 1000 + the user prompt + a space
+    expect(chunks[0].text.length).toBeLessThan(1100);
+  });
+
+  it("cleanseNoise leaves ordinary prose (and arithmetic) untouched", () => {
+    expect(cleanseNoise("if a < b and c > d then ok")).toBe(
+      "if a < b and c > d then ok"
+    );
+    expect(cleanseNoise("<system-reminder>ignore me</system-reminder>keep")).not.toContain(
+      "ignore me"
+    );
   });
 });
 
