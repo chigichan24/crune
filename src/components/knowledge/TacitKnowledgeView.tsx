@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
 import type { KnowledgeGraphMetrics, TopicNode, TopicEdge, KnowledgeCommunity, TacitKnowledge, SkillCandidate, EnrichedToolSequence } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
 import { SkillEvaluationBadge } from './SkillEvaluationBadge'
+import { SkillCopyButton } from './SkillCopyButton'
 import './TacitKnowledgeView.css'
 
 interface Props {
@@ -11,32 +11,6 @@ interface Props {
   topics?: TopicNode[]
   edges?: TopicEdge[]
   communities?: KnowledgeCommunity[]
-}
-
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      const blob = new Blob([text], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'skill.md'
-      a.click()
-      URL.revokeObjectURL(url)
-    }
-  }, [text])
-
-  return (
-    <button className="tk-export-btn" onClick={handleCopy}>
-      {copied ? 'Copied!' : label}
-    </button>
-  )
 }
 
 function DistillButton({
@@ -75,7 +49,7 @@ function DistillButton({
       {candidate.synthesizedMarkdown && !result && (
         <div className="tk-synth-result">
           <div className="tk-synth-preview">{candidate.synthesizedMarkdown}</div>
-          <CopyButton text={candidate.synthesizedMarkdown} label="Copy Skill" />
+          <SkillCopyButton text={candidate.synthesizedMarkdown} className="tk-export-btn" />
         </div>
       )}
       {/* Re-synthesize button */}
@@ -98,7 +72,7 @@ function DistillButton({
       {result && (
         <div className="tk-synth-result">
           <div className="tk-synth-preview">{result}</div>
-          <CopyButton text={result} label="Copy Skill" />
+          <SkillCopyButton text={result} className="tk-export-btn" />
         </div>
       )}
     </>
