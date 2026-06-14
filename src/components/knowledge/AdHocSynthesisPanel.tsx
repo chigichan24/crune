@@ -22,6 +22,7 @@ export function AdHocSynthesisPanel({ topics, enrichedSequences }: Props) {
   if (topics.length < 2) return null // a single topic already has its own card
 
   const onSynthesize = () => {
+    if (loading) return // don't start a second synthesis while one is in flight
     const req = buildAdHocSynthesisRequest(topics, enrichedSequences)
     if (!req) return
     reset()
@@ -38,12 +39,12 @@ export function AdHocSynthesisPanel({ topics, enrichedSequences }: Props) {
         <div className="adhoc-result">
           {error ? (
             <p className="adhoc-error">{error}</p>
-          ) : (
+          ) : result ? (
             <>
               <pre className="adhoc-md">{result}</pre>
-              <SkillCopyButton text={result!} className="adhoc-copy" />
+              <SkillCopyButton text={result} className="adhoc-copy" />
             </>
-          )}
+          ) : null}
           <button className="adhoc-close" onClick={() => setOpen(false)}>
             閉じる
           </button>
