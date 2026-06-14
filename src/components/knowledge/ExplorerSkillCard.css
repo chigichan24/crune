@@ -1,0 +1,272 @@
+.fse-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fse-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fse-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.fse-card-score {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.fse-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.fse-card-role {
+  font-weight: 600;
+}
+
+.fse-card-project {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.fse-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fse-card-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-subtle);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.fse-card-skill {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fse-card-toggle,
+.fse-card-synth,
+.fse-card-copy,
+.fse-card-session {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.fse-card-toggle {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 3px 8px;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+
+.fse-card-md-pre {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.fse-card-copy {
+  margin-top: 6px;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.fse-card-nosynth {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.fse-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fse-card-synth {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.fse-card-synth:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.fse-card-error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.fse-card-related summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.fse-card-session-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fse-card-session {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  padding: 2px 6px;
+  color: var(--text-secondary);
+}
+
+.fse-card-session:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* SkillEvaluationBadge host styles (prefix="fse") */
+.fse-eval {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fse-eval--pass {
+  border-left-color: var(--success);
+}
+
+.fse-eval--borderline {
+  border-left-color: var(--warning);
+}
+
+.fse-eval--fail {
+  border-left-color: var(--danger);
+}
+
+.fse-eval-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fse-eval-chip {
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.fse-eval-chip--ok {
+  color: var(--success);
+  background-color: rgba(22, 163, 74, 0.1);
+}
+
+.fse-eval-chip--ng {
+  color: var(--danger);
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+.fse-eval-score {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fse-eval-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fse-eval-issue {
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.fse-eval-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.fse-eval-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fse-eval-hints-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fse-eval-hints-list {
+  list-style: disc;
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fse-eval-hint {
+  font-size: 11px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}

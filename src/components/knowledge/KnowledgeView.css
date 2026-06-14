@@ -1,0 +1,37 @@
+.kv-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.kv-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.kv-toggle-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+}
+
+.kv-toggle-btn--on {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.kv-body {
+  flex: 1;
+  min-height: 0;
+}

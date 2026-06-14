@@ -4,7 +4,7 @@ import { SessionDashboardView } from './components/overview/SessionDashboardView
 import { SessionPlayback } from './components/playback/SessionPlayback'
 import { HelpModal } from './components/HelpModal'
 import './App.css'
-import { KnowledgeGraphView } from './components/knowledge/KnowledgeGraphView'
+import { KnowledgeView } from './components/knowledge/KnowledgeView'
 import { useSessionOverview } from './hooks/useSessionOverview'
 
 type ViewMode = 'overview' | 'knowledge'
@@ -83,7 +83,7 @@ function App() {
           </>
         )}
         {activeTab === 'knowledge' && (
-          <KnowledgeGraphView
+          <KnowledgeView
             overview={overviewData}
             loading={overviewLoading}
             error={overviewError}
