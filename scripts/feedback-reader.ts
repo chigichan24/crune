@@ -122,7 +122,8 @@ export interface FlaggedTurn {
 }
 
 function tagSetHas(entry: FeedbackEntry, tag: string): boolean {
-  return entry.tags.some((t) => t.toLowerCase() === tag);
+  const needle = tag.toLowerCase();
+  return entry.tags.some((t) => t.toLowerCase() === needle);
 }
 
 /**
