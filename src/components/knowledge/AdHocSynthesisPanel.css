@@ -1,0 +1,64 @@
+.adhoc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adhoc-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.adhoc-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.adhoc-result {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adhoc-md {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.adhoc-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.adhoc-copy,
+.adhoc-close {
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}

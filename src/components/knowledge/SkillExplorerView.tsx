@@ -10,6 +10,7 @@ import {
   type TopicFilterCriteria,
 } from './skillExplorerFilter'
 import { ExplorerSkillCard } from './ExplorerSkillCard'
+import { AdHocSynthesisPanel } from './AdHocSynthesisPanel'
 import './SkillExplorerView.css'
 
 interface Props {
@@ -175,6 +176,10 @@ export function SkillExplorerView({ overview, loading, error, onSessionSelect }:
             {filtered.length} / {nodes.length} トピック
           </span>
         </div>
+        <AdHocSynthesisPanel
+          topics={filtered}
+          enrichedSequences={overview?.tacitKnowledge?.enrichedToolSequences ?? []}
+        />
         {filtered.length === 0 ? (
           <div className="fse-state">条件に一致するトピックがありません</div>
         ) : (
