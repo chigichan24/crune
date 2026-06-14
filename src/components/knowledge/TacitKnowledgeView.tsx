@@ -3,6 +3,7 @@ import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
 import { SkillEvaluationBadge } from './SkillEvaluationBadge'
 import { SkillCopyButton } from './SkillCopyButton'
+import { topicSynthesisKey } from './synthesisKeys'
 import './TacitKnowledgeView.css'
 
 interface Props {
@@ -30,7 +31,7 @@ function DistillButton({
   communities?: KnowledgeCommunity[]
   bridgeTopicIds?: string[]
 }) {
-  const { synthesize, loading, result, error, reset } = useSkillSynthesis(candidate.topicId)
+  const { synthesize, loading, result, error } = useSkillSynthesis(topicSynthesisKey(candidate.topicId))
 
   if (!topic) return null
 
@@ -57,7 +58,6 @@ function DistillButton({
         className="tk-synth-btn"
         disabled={loading}
         onClick={() => {
-          reset()
           synthesize({
             skillCandidate: candidate,
             topicNode: topic,

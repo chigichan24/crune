@@ -3,6 +3,7 @@ import type { TopicNode, TopicEdge, SemanticEdgeType, SkillCandidate, EnrichedTo
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildGraphContext } from '../../utils/buildGraphContext'
 import { SkillEvaluationBadge } from './SkillEvaluationBadge'
+import { topicSynthesisKey, NO_TOPIC_KEY } from './synthesisKeys'
 import './KnowledgeNodeDetail.css'
 
 interface Props {
@@ -77,7 +78,9 @@ export function KnowledgeNodeDetail({
   const [synthCopied, setSynthCopied] = useState(false)
   // Keyed by node id so the synthesis job persists in the provider when the
   // selection changes and back (#73 follow-up: keep results across navigation).
-  const { synthesize, loading: synthLoading, result: synthResult, error: synthError, reset: resetSynth } = useSkillSynthesis(node?.id ?? '__none__')
+  const { synthesize, loading: synthLoading, result: synthResult, error: synthError } = useSkillSynthesis(
+    node ? topicSynthesisKey(node.id) : NO_TOPIC_KEY,
+  )
 
   const skillCandidate = useMemo(() => {
     if (!node || !skillCandidates) return null
@@ -211,7 +214,6 @@ export function KnowledgeNodeDetail({
               className="knd-synth-btn"
               disabled={synthLoading}
               onClick={() => {
-                resetSynth()
                 synthesize({
                   skillCandidate,
                   topicNode: node,

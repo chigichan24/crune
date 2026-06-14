@@ -1,6 +1,7 @@
 import type { TopicNode, EnrichedToolSequence } from '../../types'
 import { useSkillSynthesis } from '../../hooks/useSkillSynthesis'
 import { buildAdHocSynthesisRequest } from './adHocSynthesis'
+import { sliceSynthesisKey } from './synthesisKeys'
 import { SkillCopyButton } from './SkillCopyButton'
 import './AdHocSynthesisPanel.css'
 
@@ -17,8 +18,7 @@ interface Props {
  * skill-server (npm run dev:full).
  */
 export function AdHocSynthesisPanel({ topics, enrichedSequences }: Props) {
-  const sliceKey = `adhoc:${topics.map((t) => t.id).sort().join(',')}`
-  const { synthesize, loading, result, error, reset } = useSkillSynthesis(sliceKey)
+  const { synthesize, loading, result, error, reset } = useSkillSynthesis(sliceSynthesisKey(topics))
 
   if (topics.length < 2) return null // a single topic already has its own card
 
