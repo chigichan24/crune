@@ -121,6 +121,21 @@ Flags (next to the `--synthesize-*` flags, eval defaults **ON**):
 
 **UI badge**: When `candidate.evaluation` exists, `KnowledgeNodeDetail` and `TacitKnowledgeView` render a compact評価バッジ --- 構造 OK/NG, スコア NN/100, optional rubric内訳, and 改善ヒント list. Pass/borderline/fail tone uses `--success`/`--warning`/`--danger` (pass ≥70, borderline ≥50, fail otherwise or structural NG).
 
+## RAG Embedding Pipeline (issue #32, opt-in)
+
+A chunk-level dense vector index for retrieval, alongside (not replacing) the whole-session embedding path in `scripts/knowledge-graph/`. PoC findings + Go/Hold/Pivot recommendation are in [docs/rag-poc.md](docs/rag-poc.md) (issue #35).
+
+Modules (`scripts/knowledge-graph/`):
+- `embedder.ts` --- `EmbeddingBackend` interface (injectable; tests use a deterministic fake, no network), turn-level chunk extraction (`extractChunks`: `userPrompt + assistantTexts + tool names` per turn), int8 `quantize`/`dequantize` (L2-normalized components → `[-127,127]`, scale `1/127`, bounded round-trip error), and `embedSessions` orchestration.
+- `embedding-io.ts` --- `writeEmbeddingIndex`/`readEmbeddingIndex` (`public/data/embeddings/index.bin` row-major int8 + `meta.json`) and `createTransformersBackend` (lazy-loaded Transformers.js, `Xenova/paraphrase-multilingual-MiniLM-L12-v2`, 384-dim, mean pooling + normalize). Kept separate so tests never import `@huggingface/transformers`.
+- `retriever.ts` --- hybrid `createRetriever`/`createRetrieverFromIndex`: dense cosine (dequantized) + sparse BM25 (reuses `buildBm25`), per-query min-max normalized, blended `alpha*dense + (1-alpha)*bm25` (default `alpha=0.6`), with a per-session diversification cap (default 2). `retrieve(query, k, opts)` returns `RetrievedChunk[]`.
+
+Flags on `analyze-sessions` (default **OFF**, promotion gated on the PoC):
+- `--embed` --- run the embedder over analyzed sessions and write `public/data/embeddings/`.
+- `--embed-model <id>` --- override the default model.
+
+PoC harness: `npx tsx scripts/rag-poc.ts` (measures footprint / throughput / latency + A/B; `--fake` forces the no-network backend).
+
 ## Session Summarization
 
 セッション一覧の `firstUserPrompt` フィールドは、facetsデータが利用可能な場合は `/insights` の `brief_summary`（LLM生成の要約）で置き換えられる。facetsがないセッションは従来通り最初のユーザープロンプトを表示する。
