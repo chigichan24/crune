@@ -28,8 +28,14 @@ describe('runSynthesis', () => {
     expect(await runSynthesis(req)).toEqual({ status: 'error', error: 'bad prompt' })
   })
 
-  it('reports a friendly message when the server is unreachable', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+  it('reports an empty-result error when success has no markdown', async () => {
+    mockFetch(() => ({ ok: true, json: async () => ({ success: true }) }))
+    expect(await runSynthesis(req)).toEqual({ status: 'error', error: 'Empty synthesis result' })
+  })
+
+  it('reports a friendly message for any connection TypeError (browser-independent)', async () => {
+    // Safari throws "Load failed" (no "fetch" substring) — must still be caught.
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Load failed') }))
     const job = await runSynthesis(req)
     expect(job.status).toBe('error')
     expect(job.error).toMatch(/skill server is not running/i)

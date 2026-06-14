@@ -20,12 +20,17 @@ export async function runSynthesis(req: SynthesisRequest): Promise<SynthesisJob>
       return { status: 'error', error: `Server error (${res.status}): ${text}` }
     }
     const data: SynthesisResponse = await res.json()
-    if (data.success && data.synthesizedMarkdown) {
-      return { status: 'success', markdown: data.synthesizedMarkdown }
+    if (data.success) {
+      return data.synthesizedMarkdown
+        ? { status: 'success', markdown: data.synthesizedMarkdown }
+        : { status: 'error', error: 'Empty synthesis result' }
     }
     return { status: 'error', error: data.error ?? 'Unknown error' }
   } catch (e) {
-    if (e instanceof TypeError && e.message.includes('fetch')) {
+    // fetch() rejects with a TypeError on a connection failure (the server not
+    // running); a bad JSON body rejects with SyntaxError, handled separately.
+    // Don't match on the message text — it differs across browsers.
+    if (e instanceof TypeError) {
       return { status: 'error', error: 'Skill server is not running. Start it with: npm run skill-server' }
     }
     return { status: 'error', error: e instanceof Error ? e.message : 'Unknown error' }

@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import type { SynthesisRequest } from '../types'
 import { SkillSynthesisContext, runSynthesis, type SynthesisJob } from './skillSynthesisContext'
 
@@ -9,8 +9,14 @@ import { SkillSynthesisContext, runSynthesis, type SynthesisJob } from './skillS
  */
 export function SkillSynthesisProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<Record<string, SynthesisJob>>({})
+  // Per-key generation counter: every synthesize/reset bumps it, and an
+  // in-flight resolution only writes if its generation is still current. This
+  // prevents a dismissed (reset) job from being resurrected by a late fetch and
+  // a slow earlier re-synthesis from overwriting a faster later one.
+  const gen = useRef<Record<string, number>>({})
 
   const reset = useCallback((key: string) => {
+    gen.current[key] = (gen.current[key] ?? 0) + 1 // invalidate any in-flight job
     setJobs((prev) => {
       if (!(key in prev)) return prev
       const next = { ...prev }
@@ -20,8 +26,10 @@ export function SkillSynthesisProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const synthesize = useCallback((key: string, req: SynthesisRequest) => {
+    const generation = (gen.current[key] = (gen.current[key] ?? 0) + 1)
     setJobs((prev) => ({ ...prev, [key]: { status: 'loading' } }))
     void runSynthesis(req).then((job) => {
+      if (gen.current[key] !== generation) return // superseded by a reset or newer call
       setJobs((prev) => ({ ...prev, [key]: job }))
     })
   }, [])
