@@ -186,3 +186,36 @@ function truncate(text: string, maxLen: number): string {
   const collapsed = text.replace(/\s+/g, " ");
   return collapsed.length <= maxLen ? collapsed : collapsed.slice(0, maxLen - 1) + "…";
 }
+
+// ─── Reusability signal aggregation ──────────────────────────────────────────
+
+/** Per-session feedback counts used to derive a human reusability signal. */
+export interface SessionFeedbackCounts {
+  bookmarked: boolean;
+  reusableCount: number;
+  antiPatternCount: number;
+}
+
+/**
+ * Aggregate each session's feedback into bookmark / reusable / anti-pattern
+ * counts. Only sessions with at least one such signal appear in the result.
+ */
+export function computeSessionFeedbackCounts(
+  feedback: Map<string, FeedbackEntry[]>,
+): Map<string, SessionFeedbackCounts> {
+  const counts = new Map<string, SessionFeedbackCounts>();
+  for (const [sessionId, entries] of feedback) {
+    let bookmarked = false;
+    let reusableCount = 0;
+    let antiPatternCount = 0;
+    for (const entry of entries) {
+      if (entry.bookmarked) bookmarked = true;
+      if (tagSetHas(entry, REUSABLE_TAG)) reusableCount++;
+      if (tagSetHas(entry, ANTI_PATTERN_TAG)) antiPatternCount++;
+    }
+    if (bookmarked || reusableCount > 0 || antiPatternCount > 0) {
+      counts.set(sessionId, { bookmarked, reusableCount, antiPatternCount });
+    }
+  }
+  return counts;
+}

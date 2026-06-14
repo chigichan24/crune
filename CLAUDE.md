@@ -86,6 +86,8 @@ Flags:
 - `--skip-synthesize` --- Skip LLM synthesis for faster builds
 - `--facets-dir <path>` --- Custom facets directory (default: `~/.claude/usage-data/facets`)
 - `--skip-facets` --- Skip `/insights` refresh and facets integration
+- `--use-human-feedback` --- Fold playback feedback (issue #24) into synthesis + reusability scoring (default OFF for A/B)
+- `--feedback-file <path>` --- Custom feedback file (default `public/data/feedback.json`)
 
 Pre-synthesized results are stored in `overview.json` as `synthesizedMarkdown` on each `SkillCandidate` and displayed immediately in the Knowledge Graph UI. Synthesis output is post-processed by `stripSynthesisPreamble()` to remove any LLM preamble before the YAML frontmatter.
 
