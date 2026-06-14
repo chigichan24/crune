@@ -6,7 +6,8 @@ import {
   type SynthesisRequest,
   type RetrievedChunk,
 } from "../skill-synthesizer.js";
-import { createRetriever } from "../knowledge-graph/retriever.js";
+import { createRetriever, type Retriever } from "../knowledge-graph/retriever.js";
+import { retrieveContextForCandidate } from "../knowledge-graph/synthesis-retriever.js";
 import type { EmbeddingBackend, ChunkMeta } from "../knowledge-graph/embedder.js";
 
 function baseRequest(): SynthesisRequest {
@@ -196,8 +197,13 @@ describe("retrieval → synthesis integration (fake backend, no network)", () =>
     const query = buildRetrievalQuery(req.skillCandidate, req.topicNode);
     const hits = await retriever.retrieve(query, 8);
     expect(hits.length).toBeGreaterThan(0);
-    // The "bug" concept in label/keywords/markdown should surface s2 first.
-    expect(hits[0].sessionId).toBe("s2");
+    // Relative assertion (tests wiring, not the exact dense/BM25 blend): the
+    // "bug" concept in label/keywords/markdown should surface s2 and rank it
+    // above the irrelevant css session s1.
+    const ranked = hits.map((h) => h.sessionId);
+    expect(ranked).toContain("s2");
+    const s1Pos = ranked.indexOf("s1");
+    expect(ranked.indexOf("s2")).toBeLessThan(s1Pos === -1 ? Infinity : s1Pos);
 
     const prompt = buildSynthesisPrompt({ ...req, retrievedContext: hits });
     expect(prompt).toContain("Retrieved Relevant Moments");
@@ -216,5 +222,54 @@ describe("retrieval → synthesis integration (fake backend, no network)", () =>
     const prompt = buildSynthesisPrompt({ ...req, retrievedContext: hits.length > 0 ? hits : undefined });
     expect(prompt).not.toContain("Retrieved Relevant Moments");
     expect(prompt).toContain("Representative User Prompts");
+  });
+});
+
+// ─── retrieveContextForCandidate fallback (no network) ───────────────────────
+
+describe("retrieveContextForCandidate fallback (issue #33)", () => {
+  const req = baseRequest();
+  const topic = { label: req.topicNode.label, keywords: req.topicNode.keywords };
+
+  it("returns undefined and the prompt falls back to the blob when retrieve throws", async () => {
+    // Fake retriever whose retrieve rejects — mimics a backend/model failure.
+    const throwing: Retriever = {
+      size: 3,
+      async retrieve(): Promise<never> {
+        throw new Error("backend unavailable");
+      },
+    };
+
+    const ctx = await retrieveContextForCandidate(throwing, req.skillCandidate, topic);
+    expect(ctx).toBeUndefined();
+
+    // The orchestration passes the undefined context straight through, so the
+    // cluster-blob examples are retained (never crashes synthesis).
+    const prompt = buildSynthesisPrompt({ ...req, retrievedContext: ctx });
+    expect(prompt).not.toContain("Retrieved Relevant Moments");
+    expect(prompt).toContain("Representative User Prompts");
+    expect(prompt).toContain("Enriched Tool Patterns");
+  });
+
+  it("returns undefined when retrieve yields no hits (empty index)", async () => {
+    const empty: Retriever = {
+      size: 0,
+      async retrieve() {
+        return [];
+      },
+    };
+    const ctx = await retrieveContextForCandidate(empty, req.skillCandidate, topic);
+    expect(ctx).toBeUndefined();
+  });
+
+  it("returns the hits when retrieve succeeds", async () => {
+    const ok: Retriever = {
+      size: 1,
+      async retrieve() {
+        return retrieved;
+      },
+    };
+    const ctx = await retrieveContextForCandidate(ok, req.skillCandidate, topic);
+    expect(ctx).toEqual(retrieved);
   });
 });
