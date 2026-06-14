@@ -10,6 +10,7 @@ import {
   setNote as storeSetNote,
   toggleBookmark as storeToggleBookmark,
 } from '../components/playback/feedback/feedbackStore'
+import { syncSessionFeedback } from '../components/playback/feedback/feedbackSync'
 
 /**
  * React binding over the pure feedbackStore, scoped to one session.
@@ -17,10 +18,23 @@ import {
  * The store itself is the source of truth (localStorage); this hook keeps a
  * `version` counter that is bumped after every mutation so consuming
  * components re-render. Returns a value shaped for FeedbackContext.
+ *
+ * After every mutation the session's entries are also best-effort mirrored to
+ * the skill-server (`syncSessionFeedback`) so the offline pipeline can read
+ * them. The sync is fire-and-forget and never blocks the UI.
  */
 export function useSessionFeedback(sessionId: string | null): FeedbackContextValue {
   const [version, setVersion] = useState(0)
-  const bump = useCallback(() => setVersion(v => v + 1), [])
+
+  // Bump the re-render counter, then mirror the freshly-persisted entries to
+  // the skill-server. Reading from the store (not local state) guarantees we
+  // POST exactly what is on disk, including the store's empty-entry pruning.
+  const commit = useCallback(() => {
+    setVersion(v => v + 1)
+    if (sessionId) {
+      syncSessionFeedback(sessionId, loadSessionFeedback(sessionId))
+    }
+  }, [sessionId])
 
   // Parse the current session's feedback blob exactly once per mutation and
   // index it by entryKey, so per-block/per-turn lookups during a render are
@@ -45,36 +59,36 @@ export function useSessionFeedback(sessionId: string | null): FeedbackContextVal
     (turnId: number, blockId?: string) => {
       if (!sessionId) return
       storeToggleBookmark(sessionId, turnId, blockId)
-      bump()
+      commit()
     },
-    [sessionId, bump],
+    [sessionId, commit],
   )
 
   const addTag = useCallback(
     (turnId: number, blockId: string | undefined, tag: string) => {
       if (!sessionId) return
       storeAddTag(sessionId, turnId, blockId, tag)
-      bump()
+      commit()
     },
-    [sessionId, bump],
+    [sessionId, commit],
   )
 
   const removeTag = useCallback(
     (turnId: number, blockId: string | undefined, tag: string) => {
       if (!sessionId) return
       storeRemoveTag(sessionId, turnId, blockId, tag)
-      bump()
+      commit()
     },
-    [sessionId, bump],
+    [sessionId, commit],
   )
 
   const setNote = useCallback(
     (turnId: number, blockId: string | undefined, note: string) => {
       if (!sessionId) return
       storeSetNote(sessionId, turnId, blockId, note)
-      bump()
+      commit()
     },
-    [sessionId, bump],
+    [sessionId, commit],
   )
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute when feedback changes
