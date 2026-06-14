@@ -56,6 +56,15 @@ export interface LoadedEmbeddingIndex {
 export function readEmbeddingIndex(dir: string): LoadedEmbeddingIndex {
   const metaRaw = fs.readFileSync(path.join(dir, META_FILENAME), "utf8");
   const meta = JSON.parse(metaRaw) as EmbeddingMeta;
+  // Validate the externally-stored shape before arithmetic, so a corrupt/old
+  // meta.json fails with a clear cause instead of a misleading NaN mismatch.
+  if (
+    !Number.isInteger(meta?.dim) || meta.dim <= 0 ||
+    !Number.isInteger(meta?.count) || meta.count < 0 ||
+    !Array.isArray(meta?.chunks)
+  ) {
+    throw new Error(`malformed embedding ${META_FILENAME} in ${dir}`);
+  }
   const buf = fs.readFileSync(path.join(dir, INDEX_FILENAME));
   const matrix = new Int8Array(buf.buffer, buf.byteOffset, buf.byteLength);
   if (matrix.length !== meta.count * meta.dim) {
