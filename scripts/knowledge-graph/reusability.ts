@@ -3,7 +3,7 @@
  * Quantifies how valuable a topic pattern is for automation as skill/hook.
  */
 
-import type { TopicNode, ReusabilityScore, FacetsData } from "./types.js";
+import type { TopicNode, ReusabilityScore, FacetsData, SessionFeedbackCounts } from "./types.js";
 import { helpfulnessToScore } from "./facets-reader.js";
 
 /** Weight profile used when no facets data is available. */
@@ -31,12 +31,11 @@ export const FACETS_WEIGHTS = {
  */
 export const HUMAN_SIGNAL_WEIGHT = 0.1;
 
-/** Per-session feedback counts used to derive a human signal. */
-export interface SessionHumanSignal {
-  bookmarked: boolean;
-  reusableCount: number;
-  antiPatternCount: number;
-}
+/**
+ * Per-session feedback counts used to derive a human signal. Alias of the
+ * canonical {@link SessionFeedbackCounts} (kept for the public barrel export).
+ */
+export type SessionHumanSignal = SessionFeedbackCounts;
 
 /**
  * Map one session's feedback counts to a signal in [0,1]. Neutral baseline is
@@ -46,7 +45,7 @@ export interface SessionHumanSignal {
  * Pure and deterministic so the synthesis pipeline (and tests) can reason about
  * the signal independently of the topic-level aggregation.
  */
-export function computeSessionHumanSignal(s: SessionHumanSignal): number {
+export function computeSessionHumanSignal(s: SessionFeedbackCounts): number {
   let signal = 0.5;
   if (s.bookmarked) signal += 0.15;
   signal += 0.2 * Math.min(s.reusableCount, 3);

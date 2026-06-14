@@ -12,7 +12,9 @@
  * `src/types/session.ts`.
  */
 import { existsSync, readFileSync } from "node:fs";
-import type { SessionInput } from "./knowledge-graph/types.js";
+import type { SessionInput, SessionFeedbackCounts } from "./knowledge-graph/types.js";
+
+export type { SessionFeedbackCounts };
 
 export interface FeedbackEntry {
   sessionId: string;
@@ -212,13 +214,6 @@ function truncate(text: string, maxLen: number): string {
 }
 
 // ─── Reusability signal aggregation ──────────────────────────────────────────
-
-/** Per-session feedback counts used to derive a human reusability signal. */
-export interface SessionFeedbackCounts {
-  bookmarked: boolean;
-  reusableCount: number;
-  antiPatternCount: number;
-}
 
 /**
  * Aggregate each session's feedback into bookmark / reusable / anti-pattern
