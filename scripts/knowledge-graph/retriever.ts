@@ -55,9 +55,10 @@ interface RetrieverInputs {
   backend: EmbeddingBackend;
 }
 
-/** Min-max normalize an array into [0, 1]. A flat array maps to all-zeros. */
+/** Min-max normalize an array into [0, 1]. A flat array maps to all-zeros.
+ *  Always returns a fresh array (never the input reference). */
 function minMaxNormalize(values: number[]): number[] {
-  if (values.length === 0) return values;
+  if (values.length === 0) return [];
   let min = Infinity;
   let max = -Infinity;
   for (const v of values) {
