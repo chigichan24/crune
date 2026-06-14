@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
 
+// Canonical retrieved-chunk shape lives with the hybrid retriever (issue #32);
+// re-export it (type-only = no runtime coupling to the embedding pipeline) so
+// this module's public API is unchanged while there is a single definition.
+import type { RetrievedChunk } from "./knowledge-graph/retriever.js";
+export type { RetrievedChunk } from "./knowledge-graph/retriever.js";
+
 // ---------- Types ----------
 
 export interface ToolSignatureEntry {
@@ -69,18 +75,6 @@ export interface FacetsInsightsSummary {
   helpfulnessScore: number;
   commonFrictions: string[];
   frictionDetails: string[];
-}
-
-/**
- * A retrieved conversation moment threaded into synthesis (issue #33). Mirrors
- * `RetrievedChunk` from the hybrid retriever (issue #32) — duplicated here so
- * this module stays free of any embedding/retriever imports.
- */
-export interface RetrievedChunk {
-  sessionId: string;
-  turnIndex: number;
-  snippet: string;
-  score: number;
 }
 
 /**
