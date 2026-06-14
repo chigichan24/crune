@@ -17,6 +17,11 @@ import {
   aggregateFacetsForTopic,
   type SessionInput,
   type SemanticKnowledgeGraph,
+  embedSessions,
+  writeEmbeddingIndex,
+  createTransformersBackend,
+  DEFAULT_EMBED_MODEL,
+  DEFAULT_EMBED_DIM,
 } from "./knowledge-graph-builder.js";
 import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble, type SynthesisOptions, type HumanFeedbackSignal } from "./skill-synthesizer.js";
 import { computeSessionHumanSignal } from "./knowledge-graph/reusability.js";
@@ -56,6 +61,8 @@ export interface CliArgs {
   evalThreshold: number;
   useHumanFeedback: boolean;
   feedbackFile: string;
+  embed: boolean;
+  embedModel?: string;
 }
 
 /**
@@ -76,6 +83,8 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
   let evalThreshold = 60;
   let useHumanFeedback = false;
   let feedbackFile = path.resolve("public", "data", "feedback.json");
+  let embed = false;
+  let embedModel: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -109,6 +118,10 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
       useHumanFeedback = true;
     } else if (args[i] === "--feedback-file" && args[i + 1]) {
       feedbackFile = path.resolve(args[++i]);
+    } else if (args[i] === "--embed") {
+      embed = true;
+    } else if (args[i] === "--embed-model" && args[i + 1]) {
+      embedModel = args[++i];
     }
   }
   return {
@@ -124,6 +137,8 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     evalThreshold,
     useHumanFeedback,
     feedbackFile,
+    embed,
+    embedModel,
   };
 }
 
@@ -303,6 +318,53 @@ interface SynthesisConfig {
   evalThreshold?: number;
   useHumanFeedback?: boolean;
   feedbackFile?: string;
+}
+
+/**
+ * Map parsed sessions onto the `SessionInput` shape consumed by the knowledge
+ * graph builder and the embedding pipeline. Extracted so both the overview
+ * generation and the `--embed` step share one mapping.
+ */
+function toSessionInputs(sessions: ParsedSession[]): SessionInput[] {
+  return sessions.map((s) => ({
+    sessionId: s.meta.sessionId,
+    projectDisplayName: s.projectDisplayName,
+    turns: s.turns.map((t) => ({
+      userPrompt: t.userPrompt,
+      assistantTexts: t.assistantTexts,
+      toolCalls: t.toolCalls.map((tc) => ({
+        toolName: tc.toolName,
+        input: tc.input,
+      })),
+    })),
+    subagents: Object.fromEntries(
+      Object.entries(s.subagents).map(([id, sub]) => [
+        id,
+        {
+          agentId: sub.agentId,
+          agentType: sub.agentType,
+          turns: sub.turns.map((t) => ({
+            userPrompt: t.userPrompt,
+            assistantTexts: t.assistantTexts,
+            toolCalls: t.toolCalls.map((tc) => ({
+              toolName: tc.toolName,
+              input: tc.input,
+            })),
+          })),
+        },
+      ])
+    ),
+    meta: {
+      sessionId: s.meta.sessionId,
+      createdAt: s.meta.createdAt,
+      lastActiveAt: s.meta.lastActiveAt,
+      durationMinutes: s.meta.durationMinutes,
+      filesEdited: s.meta.filesEdited,
+      gitBranch: s.meta.gitBranch,
+      toolBreakdown: s.meta.toolBreakdown,
+      subagentCount: s.meta.subagentCount,
+    },
+  }));
 }
 
 async function generateOverview(sessions: ParsedSession[], synthesisConfig: SynthesisConfig = { skip: false, count: 5 }): Promise<OverviewJson> {
@@ -720,7 +782,7 @@ function getWeekLabel(date: Date): string {
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
 
 async function main() {
-  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel, evalThreshold, useHumanFeedback, feedbackFile } = parseArgs();
+  const { sessionsDir, outputDir, skipSynthesis, synthesisModel, synthesisCount, facetsDir, skipFacets, skipEval, evalModel, evalThreshold, useHumanFeedback, feedbackFile, embed, embedModel } = parseArgs();
 
   console.error(`[crune] Sessions dir: ${sessionsDir}`);
   console.error(`[crune] Output dir:   ${outputDir}`);
@@ -854,6 +916,28 @@ async function main() {
   console.error(
     `[crune] Wrote ${overviewPath} (${(overviewSize / 1024).toFixed(1)} KB)`
   );
+
+  // Optional: chunk-level embedding index for RAG retrieval (issue #32).
+  // Opt-in (default OFF). Promotion to default is gated on the PoC (#35).
+  if (embed) {
+    const model = embedModel ?? DEFAULT_EMBED_MODEL;
+    const embeddingsDir = path.join(outputDir, "..", "embeddings");
+    console.error(`\n[crune] Embedding chunks with ${model}...`);
+    try {
+      const backend = createTransformersBackend(model, DEFAULT_EMBED_DIM);
+      const embedInputs = toSessionInputs(parsedSessions);
+      const result = await embedSessions(embedInputs, backend, { model });
+      writeEmbeddingIndex(embeddingsDir, result);
+      const binSize = result.matrix.byteLength;
+      console.error(
+        `[crune] Wrote embeddings index: ${result.count} chunks × ${result.dim} dim (${(binSize / 1024).toFixed(1)} KB) → ${embeddingsDir}`
+      );
+    } catch (err) {
+      console.error(
+        `[crune] Embedding step failed (continuing without index): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
 
   // Summary
   console.error(`\n[crune] --- Summary ---`);
