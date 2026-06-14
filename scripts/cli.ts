@@ -23,8 +23,20 @@ import {
   buildSynthesisPrompt,
   synthesizeWithClaude,
   stripSynthesisPreamble,
+  buildRetrievalQuery,
   type TopicNode as SynthTopicNode,
+  type RetrievedChunk,
 } from "./skill-synthesizer.js";
+import {
+  extractChunks,
+  embedSessions,
+  dequantize,
+  createRetriever,
+  createTransformersBackend,
+  DEFAULT_EMBED_MODEL,
+  DEFAULT_EMBED_DIM,
+  type Retriever,
+} from "./knowledge-graph-builder.js";
 import { evaluateSkill } from "./skill-evaluator.js";
 
 // ─── CLI argument parsing ─────────────────────────────────────────
@@ -40,6 +52,7 @@ interface CliArgs {
   json: boolean;
   skipEval: boolean;
   evalModel?: string;
+  retrievalContext: boolean;
 }
 
 export function parseCliArgs(argv: string[]): CliArgs {
@@ -54,6 +67,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let json = false;
   let skipEval = false;
   let evalModel: string | undefined;
+  let retrievalContext = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -77,13 +91,15 @@ export function parseCliArgs(argv: string[]): CliArgs {
       skipEval = true;
     } else if (args[i] === "--eval-model" && args[i + 1]) {
       evalModel = args[++i];
+    } else if (args[i] === "--retrieval-context") {
+      retrievalContext = true;
     } else if (args[i] === "--help" || args[i] === "-h") {
       printUsage();
       process.exit(0);
     }
   }
 
-  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, preview, json, skipEval, evalModel };
+  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, preview, json, skipEval, evalModel, retrievalContext };
 }
 
 function printUsage(): void {
@@ -103,6 +119,8 @@ Options:
                          stdout (see README "JSON output schema")
   --skip-eval            Skip skill evaluation pipeline (structural + rubric)
   --eval-model <model>   Claude model for rubric scoring (defaults to --model)
+  --retrieval-context    Enrich synthesis with hybrid-retrieved relevant moments
+                         instead of the cluster-blob examples (opt-in, issue #33)
   -h, --help             Show this help message`);
 }
 
@@ -320,6 +338,37 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // Retrieval-enriched synthesis context (issue #33, opt-in). Build an
+  // in-memory hybrid retriever over the analyzed sessions; on any failure we
+  // fall back to the cluster-blob examples (retriever stays undefined).
+  let retriever: Retriever | undefined;
+  if (config.retrievalContext && !config.skipSynthesis) {
+    console.error("\nBuilding retrieval context (issue #33)...");
+    try {
+      const extracted = extractChunks(sessionInputs);
+      if (extracted.length === 0) {
+        console.error("  No chunks to index — falling back to cluster blob");
+      } else {
+        const backend = createTransformersBackend(DEFAULT_EMBED_MODEL, DEFAULT_EMBED_DIM);
+        const result = await embedSessions(sessionInputs, backend, { model: DEFAULT_EMBED_MODEL });
+        const denseVectors = result.chunks.map((_, i) =>
+          dequantize(result.matrix.subarray(i * result.dim, (i + 1) * result.dim))
+        );
+        retriever = createRetriever({
+          chunks: result.chunks,
+          texts: extracted.map((c) => c.text),
+          denseVectors,
+          backend,
+        });
+        console.error(`  Retrieval strategy: freshly embedded (in-memory), ${retriever.size} chunks`);
+      }
+    } catch (err) {
+      console.error(
+        `  Retrieval context unavailable (falling back to cluster blob): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
   // Synthesize skills. In preview mode we emit markdown to stdout instead of
   // writing files, but evaluation still runs by default.
   const writeToDisk = !config.preview;
@@ -344,10 +393,31 @@ async function main(): Promise<void> {
         (seq) => seq.sessionIds.some((sid) => topicSessionSet.has(sid))
       );
 
+      // Retrieve top-k relevant moments for this candidate (issue #33). On any
+      // failure, leave undefined so the cluster-blob examples are used.
+      let retrievedContext: RetrievedChunk[] | undefined;
+      if (retriever) {
+        try {
+          const query = buildRetrievalQuery(candidate, topic as unknown as SynthTopicNode);
+          const chunks = await retriever.retrieve(query, 8);
+          if (chunks.length > 0) retrievedContext = chunks;
+        } catch (err) {
+          console.error(
+            `    Retrieval failed (using cluster blob): ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      }
+
+      // Surface the chosen context strategy so a human can A/B blob vs retrieval.
+      console.error(
+        `    Context strategy: ${retrievedContext ? `retrieval (${retrievedContext.length} moments)` : "cluster blob"}`
+      );
+
       const prompt = buildSynthesisPrompt({
         skillCandidate: candidate,
         topicNode: topic as unknown as SynthTopicNode,
         enrichedSequences: relatedSequences,
+        retrievedContext,
       });
 
       const result = await synthesizeWithClaude(prompt, {
