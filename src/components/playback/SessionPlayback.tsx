@@ -15,6 +15,12 @@ interface Props {
   sessionId: string | null
   /** Turn to open at (e.g. a semantic-search hit). Defaults to the top. */
   initialTurnIndex?: number
+  /**
+   * Monotonic navigation nonce from App. Re-navigating to the SAME
+   * sessionId+turnIndex bumps it so the deep-link reset/scroll effects refire
+   * (React would otherwise bail on identical props and skip the re-scroll).
+   */
+  navNonce?: number
   /** Open a different session/turn (e.g. a "似た瞬間" result). */
   onNavigate?: (sessionId: string, turnIndex: number) => void
   onClose: () => void
@@ -74,7 +80,7 @@ function summarizeTurn(turn: ConversationTurn): string {
   return lines.filter(Boolean).join('\n')
 }
 
-export function SessionPlayback({ sessionId, initialTurnIndex, onNavigate, onClose }: Props) {
+export function SessionPlayback({ sessionId, initialTurnIndex, navNonce, onNavigate, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
   const feedback = useSessionFeedback(sessionId)
   const [activeTurnIndex, setActiveTurnIndex] = useState(initialTurnIndex ?? 0)
@@ -91,15 +97,19 @@ export function SessionPlayback({ sessionId, initialTurnIndex, onNavigate, onClo
 
   // Reset active turn when session changes. Honor a deep-link target turn (e.g.
   // a semantic-search hit) so the drawer opens focused on the matched turn.
+  // `navNonce` is in the deps so re-navigating to the SAME sessionId+turn still
+  // resets (React would otherwise bail on identical props).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on prop change is intentional
     setActiveTurnIndex(initialTurnIndex ?? 0)
     setFilter({ text: '', toolName: '', keyTurnsOnly: false })
-  }, [sessionId, initialTurnIndex])
+  }, [sessionId, initialTurnIndex, navNonce])
 
   // After the session detail loads, scroll the deep-link target turn into view.
   // (The active-turn scroll effect only fires on index *changes*; a fresh load
   // that lands on the same index needs an explicit scroll once refs exist.)
+  // Deps include `sessionId` (consistency with the reset effect above) and
+  // `navNonce` so repeat navigation to the same target re-scrolls.
   useEffect(() => {
     if (!data || initialTurnIndex == null) return
     const raf = requestAnimationFrame(() => {
@@ -107,7 +117,7 @@ export function SessionPlayback({ sessionId, initialTurnIndex, onNavigate, onClo
       if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' })
     })
     return () => cancelAnimationFrame(raf)
-  }, [data, initialTurnIndex])
+  }, [data, sessionId, initialTurnIndex, navNonce])
 
   // Measure turn positions after render
   useEffect(() => {
