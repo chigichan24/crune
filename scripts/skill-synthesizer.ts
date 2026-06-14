@@ -302,7 +302,7 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
   const humanFeedbackSection = buildHumanFeedbackSection(humanFeedback ?? []);
   if (humanFeedbackSection) {
     instructionLines.push(
-      `${nextRule++}. Prioritize the **Human-Flagged Moments** above: replicate the \`reusable\` approaches and explicitly steer away from the \`anti-pattern\` ones. These are direct human signals and outrank heuristic inferences.`,
+      `${nextRule}. Prioritize the **Human-Flagged Moments** above: replicate the \`reusable\` approaches and explicitly steer away from the \`anti-pattern\` ones. These are direct human signals and outrank heuristic inferences.`,
     );
   }
 
