@@ -172,6 +172,18 @@ export function createRetrieverFromIndex(params: {
   backend: EmbeddingBackend;
 }): Retriever {
   const { chunks, matrix, dim, chunkTexts, backend } = params;
+  // chunkTexts (re-derived for BM25) must align 1:1 with the indexed chunks;
+  // a silent misalignment would score chunk i with another chunk's text.
+  if (chunkTexts.length !== chunks.length) {
+    throw new Error(
+      `retriever chunkTexts length (${chunkTexts.length}) != chunks length (${chunks.length})`
+    );
+  }
+  if (matrix.length !== chunks.length * dim) {
+    throw new Error(
+      `retriever matrix length (${matrix.length}) != chunks * dim (${chunks.length} * ${dim})`
+    );
+  }
   const denseVectors: Float32Array[] = chunks.map((_, i) =>
     dequantize(matrix.subarray(i * dim, (i + 1) * dim))
   );
