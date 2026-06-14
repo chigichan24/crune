@@ -79,7 +79,7 @@ export function buildAdHocSynthesisRequest(
     betweennessCentrality: 0,
     degreeCentrality: 0,
     communityId: -1,
-    representativePrompts: topics.flatMap((t) => t.representativePrompts).slice(0, 3),
+    representativePrompts: [...new Set(topics.flatMap((t) => t.representativePrompts))].slice(0, 3),
     suggestedPrompt: '',
     toolSignature,
     dominantRole,

@@ -64,15 +64,27 @@ describe('buildAdHocSynthesisRequest', () => {
     expect(req.skillCandidate.skillMarkdown).toContain('2 topics')
   })
 
-  it('filters enriched sequences by session overlap with the union', () => {
+  it('works for a single topic (the builder allows it; the panel gates ≥2)', () => {
+    const req = buildAdHocSynthesisRequest([node({ id: 't1', sessionIds: ['s1', 's2'] })], [])!
+    expect(req.topicNode.sessionCount).toBe(2)
+    expect(req.skillCandidate.skillMarkdown).toContain('1 topics')
+  })
+
+  it('falls back to a placeholder label when there are no keywords', () => {
+    const req = buildAdHocSynthesisRequest([node({ id: 't1', keywords: [] })], [])!
+    expect(req.topicNode.label).toBe('スライス (1 topics)')
+  })
+
+  it('filters enriched sequences by partial session overlap, dropping empty ones', () => {
     const topics = [node({ id: 't1', sessionIds: ['s1'] })]
     const seqs: EnrichedToolSequence[] = [
-      { sequence: [], count: 1, sessionIds: ['s1'], projects: [] },
-      { sequence: [], count: 1, sessionIds: ['s9'], projects: [] },
+      { sequence: [], count: 1, sessionIds: ['s1', 's9'], projects: [] }, // partial overlap → kept
+      { sequence: [], count: 1, sessionIds: ['s9'], projects: [] }, // no overlap → dropped
+      { sequence: [], count: 1, sessionIds: [], projects: [] }, // empty → dropped
     ]
     const req = buildAdHocSynthesisRequest(topics, seqs)!
     expect(req.enrichedSequences).toHaveLength(1)
-    expect(req.enrichedSequences![0].sessionIds).toEqual(['s1'])
+    expect(req.enrichedSequences![0].sessionIds).toEqual(['s1', 's9'])
   })
 
   it('merges facets when present, omits when none have them', () => {
