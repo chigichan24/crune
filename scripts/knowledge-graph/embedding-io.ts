@@ -92,7 +92,7 @@ export function createTransformersBackend(
 
   async function getExtractor() {
     if (extractorPromise) return extractorPromise;
-    extractorPromise = (async () => {
+    const loading = (async () => {
       // Dynamic import so test code that never calls embed() does not load the
       // heavy native dependency.
       const { pipeline } = await import("@huggingface/transformers");
@@ -107,7 +107,13 @@ export function createTransformersBackend(
         return rows.map((r) => Float32Array.from(r));
       };
     })();
-    return extractorPromise;
+    // Don't cache a rejected load: a transient network error should stay
+    // retryable rather than poison every later embed() call.
+    loading.catch(() => {
+      if (extractorPromise === loading) extractorPromise = null;
+    });
+    extractorPromise = loading;
+    return loading;
   }
 
   return {
