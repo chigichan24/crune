@@ -328,6 +328,21 @@ export interface FeedbackEntry {
   note: string
 }
 
+// === Semantic Search / Retrieval (issue #34) ===
+/**
+ * One retrieved conversation turn from the chunk-level embedding index.
+ * Mirrors the server's `RetrievedChunk` (scripts/knowledge-graph/retriever.ts).
+ */
+export interface RetrievedChunk {
+  sessionId: string
+  /** ConversationTurn.turnIndex to deep-link the playback drawer to. */
+  turnIndex: number
+  /** Short human-readable prefix of the matched turn. */
+  snippet: string
+  /** Blended dense+sparse relevance score (per-query normalized). */
+  score: number
+}
+
 // === Graph Context for Skill Synthesis ===
 export interface ConnectedTopicInfo {
   id: string

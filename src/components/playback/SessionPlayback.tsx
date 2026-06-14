@@ -13,6 +13,8 @@ import './SessionPlayback.css'
 
 interface Props {
   sessionId: string | null
+  /** Turn to open at (e.g. a semantic-search hit). Defaults to the top. */
+  initialTurnIndex?: number
   onClose: () => void
 }
 
@@ -61,10 +63,10 @@ function summarizeTurn(turn: ConversationTurn): string {
   return lines.filter(Boolean).join('\n')
 }
 
-export function SessionPlayback({ sessionId, onClose }: Props) {
+export function SessionPlayback({ sessionId, initialTurnIndex, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
   const feedback = useSessionFeedback(sessionId)
-  const [activeTurnIndex, setActiveTurnIndex] = useState(0)
+  const [activeTurnIndex, setActiveTurnIndex] = useState(initialTurnIndex ?? 0)
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const contentRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<HTMLDivElement>(null)
@@ -76,12 +78,25 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
   const [turnMeasurements, setTurnMeasurements] = useState<Array<{ top: number; height: number }>>([])
   const [scrollInfo, setScrollInfo] = useState({ top: 0, height: 1, client: 1 })
 
-  // Reset active turn when session changes
+  // Reset active turn when session changes. Honor a deep-link target turn (e.g.
+  // a semantic-search hit) so the drawer opens focused on the matched turn.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on prop change is intentional
-    setActiveTurnIndex(0)
+    setActiveTurnIndex(initialTurnIndex ?? 0)
     setFilter({ text: '', toolName: '', keyTurnsOnly: false })
-  }, [sessionId])
+  }, [sessionId, initialTurnIndex])
+
+  // After the session detail loads, scroll the deep-link target turn into view.
+  // (The active-turn scroll effect only fires on index *changes*; a fresh load
+  // that lands on the same index needs an explicit scroll once refs exist.)
+  useEffect(() => {
+    if (!data || initialTurnIndex == null) return
+    const raf = requestAnimationFrame(() => {
+      const el = turnRefs.current.get(initialTurnIndex)
+      if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [data, initialTurnIndex])
 
   // Measure turn positions after render
   useEffect(() => {

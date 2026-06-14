@@ -12,16 +12,21 @@ type ViewMode = 'overview' | 'knowledge'
 function App() {
   const [activeTab, setActiveTab] = useState<ViewMode>('overview')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  // Turn to open the playback drawer at (e.g. from a semantic-search result).
+  // Undefined means "open at the top" (existing session-list behaviour).
+  const [initialTurnIndex, setInitialTurnIndex] = useState<number | undefined>(undefined)
   const { data: indexData, loading: indexLoading, error: indexError } = useSessionIndex()
   const { data: overviewData, loading: overviewLoading, error: overviewError } = useSessionOverview()
   const [showHelp, setShowHelp] = useState(false)
 
-  const handleSessionSelect = (sessionId: string) => {
+  const handleSessionSelect = (sessionId: string, turnIndex?: number) => {
     setSelectedSessionId(sessionId)
+    setInitialTurnIndex(turnIndex)
   }
 
   const handleDrawerClose = () => {
     setSelectedSessionId(null)
+    setInitialTurnIndex(undefined)
   }
 
   const drawerOpen = selectedSessionId !== null
@@ -94,6 +99,7 @@ function App() {
         {drawerOpen && (
           <SessionPlayback
             sessionId={selectedSessionId}
+            initialTurnIndex={initialTurnIndex}
             onClose={handleDrawerClose}
           />
         )}
