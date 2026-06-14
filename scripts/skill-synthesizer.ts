@@ -357,28 +357,30 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
     `7. Output ONLY the markdown content. No code fences wrapping the output, no explanations before or after.`,
   ];
 
-  // Rules 1-7 are fixed; additional conditional rules are numbered sequentially.
-  let nextRule = 8;
-  if (graphContext && graphContext.connectedTopics.some(ct => ct.edgeType === "workflow-continuation")) {
-    instructionLines.push(`${nextRule++}. If workflow-continuation connections exist, include \`requires\` and/or \`next\` fields in the YAML frontmatter listing the connected topic labels.`);
-  }
-
-  // --- Retrieved relevant moments rule (issue #33) ---
-  // Redirect the "examples" expectation (rules 3/4 say "representative prompts")
-  // to the precisely-scoped retrieved moments that replaced the blob.
-  if (useRetrieval) {
-    instructionLines.push(
-      `${nextRule++}. Ground "When to Use" triggers and "Workflow" steps in the **Retrieved Relevant Moments** above: these are the most relevant turns to this skill. Draw concrete examples from them instead of the generic patterns.`,
-    );
-  }
-
-  // --- Human-flagged moments section (issue #24) ---
   const humanFeedbackSection = buildHumanFeedbackSection(humanFeedback ?? []);
-  if (humanFeedbackSection) {
-    instructionLines.push(
-      `${nextRule}. Prioritize the **Human-Flagged Moments** above: replicate the \`reusable\` approaches and explicitly steer away from the \`anti-pattern\` ones. These are direct human signals and outrank heuristic inferences.`,
-    );
-  }
+
+  // Rules 1-7 are fixed; the conditional rules below are collected as bodies,
+  // filtered for the ones that apply, and numbered in a single pass so adding
+  // or reordering a rule never desyncs the counter.
+  const conditionalRuleBodies: (string | false | undefined)[] = [
+    // Workflow-continuation frontmatter (graph context).
+    (graphContext && graphContext.connectedTopics.some((ct) => ct.edgeType === "workflow-continuation")) &&
+      "If workflow-continuation connections exist, include `requires` and/or `next` fields in the YAML frontmatter listing the connected topic labels.",
+    // Retrieved relevant moments rule (issue #33). Redirect the "examples"
+    // expectation (rules 3/4 say "representative prompts") to the
+    // precisely-scoped retrieved moments that replaced the blob.
+    useRetrieval &&
+      'Ground "When to Use" triggers and "Workflow" steps in the **Retrieved Relevant Moments** above: these are the most relevant turns to this skill. Draw concrete examples from them instead of the generic patterns.',
+    // Human-flagged moments rule (issue #24).
+    humanFeedbackSection &&
+      "Prioritize the **Human-Flagged Moments** above: replicate the `reusable` approaches and explicitly steer away from the `anti-pattern` ones. These are direct human signals and outrank heuristic inferences.",
+  ];
+  const FIRST_CONDITIONAL_RULE = 8; // rules 1-7 are fixed above
+  conditionalRuleBodies
+    .filter((body): body is string => Boolean(body))
+    .forEach((body, idx) => {
+      instructionLines.push(`${FIRST_CONDITIONAL_RULE + idx}. ${body}`);
+    });
 
   const instruction = instructionLines.join("\n");
 
