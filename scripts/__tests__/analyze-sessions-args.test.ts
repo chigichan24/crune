@@ -56,4 +56,18 @@ describe("parseArgs (analyze-sessions)", () => {
     expect(args.embed).toBe(true);
     expect(args.embedModel).toBe("Xenova/custom");
   });
+
+  it("defaults retrievalContext OFF (clean A/B, issue #33)", () => {
+    expect(parseArgs([]).retrievalContext).toBe(false);
+  });
+
+  it("enables retrieval context with --retrieval-context", () => {
+    expect(parseArgs(["--retrieval-context"]).retrievalContext).toBe(true);
+  });
+
+  it("keeps retrieval context independent from embed", () => {
+    const args = parseArgs(["--retrieval-context"]);
+    expect(args.retrievalContext).toBe(true);
+    expect(args.embed).toBe(false);
+  });
 });

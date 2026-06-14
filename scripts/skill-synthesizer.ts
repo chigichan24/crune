@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
 
+// Canonical retrieved-chunk shape lives with the hybrid retriever (issue #32);
+// re-export it (type-only = no runtime coupling to the embedding pipeline) so
+// this module's public API is unchanged while there is a single definition.
+import type { RetrievedChunk } from "./knowledge-graph/retriever.js";
+export type { RetrievedChunk } from "./knowledge-graph/retriever.js";
+
 // ---------- Types ----------
 
 export interface ToolSignatureEntry {
@@ -96,6 +102,13 @@ export interface SynthesisRequest {
   facetsInsights?: FacetsInsightsSummary;
   /** Human-flagged moments (issue #24); present only with --use-human-feedback. */
   humanFeedback?: HumanFeedbackSignal[];
+  /**
+   * Hybrid-retrieved relevant moments (issue #33); present only with
+   * --retrieval-context. When non-empty, the "Retrieved Relevant Moments"
+   * section REPLACES the loosely-related cluster-blob examples (representative
+   * prompts + enriched tool patterns).
+   */
+  retrievedContext?: RetrievedChunk[];
 }
 
 export interface SynthesisResponse {
@@ -153,8 +166,56 @@ export function buildHumanFeedbackSection(signals: HumanFeedbackSignal[]): strin
   return lines.join("\n");
 }
 
+/** Max characters of the heuristic skillMarkdown folded into a retrieval query. */
+const RETRIEVAL_QUERY_MARKDOWN_MAX = 600;
+
+/**
+ * Build a hybrid-retrieval query for a skill candidate (issue #33). Combines the
+ * topic label, top keywords, and a truncated slice of the heuristic
+ * `skillMarkdown` so the dense + BM25 signals both have material to match. Pure
+ * and side-effect free so it can be unit-tested without a retriever.
+ */
+export function buildRetrievalQuery(
+  candidate: Pick<SkillCandidate, "skillMarkdown">,
+  topic: Pick<TopicNode, "label" | "keywords">
+): string {
+  const label = topic.label?.trim() ?? "";
+  const keywords = (topic.keywords ?? []).join(" ").trim();
+  const markdown = (candidate.skillMarkdown ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, RETRIEVAL_QUERY_MARKDOWN_MAX);
+  return [label, keywords, markdown].filter(Boolean).join(" ").trim();
+}
+
+/**
+ * Render the "Retrieved Relevant Moments" section from hybrid-retrieved chunks
+ * (issue #33). Each line carries `sessionId#turnIndex`, the snippet, and the
+ * blended retrieval score so the model can weigh relevance. Returns "" when
+ * there is nothing to report (caller then falls back to the cluster blob).
+ */
+export function buildRetrievedMomentsSection(chunks: RetrievedChunk[]): string {
+  if (!chunks || chunks.length === 0) return "";
+
+  const lines = [
+    `## Retrieved Relevant Moments (hybrid retrieval)`,
+    `These conversation turns were retrieved as the most relevant to this skill via hybrid (dense + BM25) search. They are tightly scoped to the workflow — prefer them over generic patterns when shaping concrete steps and examples.`,
+    ...chunks.map(
+      (c) => `- [${c.sessionId}#${c.turnIndex}] (score: ${c.score.toFixed(3)}) ${c.snippet}`
+    ),
+  ];
+
+  return lines.join("\n");
+}
+
 export function buildSynthesisPrompt(body: SynthesisRequest): string {
-  const { skillCandidate, topicNode, enrichedSequences, graphContext, facetsInsights, humanFeedback } = body;
+  const { skillCandidate, topicNode, enrichedSequences, graphContext, facetsInsights, humanFeedback, retrievedContext } = body;
+
+  // When retrieval context is present, the precisely-scoped "Retrieved Relevant
+  // Moments" section REPLACES the loosely-related cluster blob (representative
+  // prompts + enriched tool patterns). Otherwise we keep the blob (issue #33 A/B).
+  const retrievedMomentsSection = buildRetrievedMomentsSection(retrievedContext ?? []);
+  const useRetrieval = retrievedMomentsSection !== "";
 
   const topicInfo = [
     `## Topic Information`,
@@ -166,7 +227,9 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
     `- **Total Duration:** ${topicNode.totalDurationMinutes} minutes`,
   ].join("\n");
 
-  const prompts = topicNode.representativePrompts.length > 0
+  // Cluster-blob examples (representative prompts) — suppressed when retrieval
+  // context replaces them.
+  const prompts = !useRetrieval && topicNode.representativePrompts.length > 0
     ? [
         `## Representative User Prompts`,
         ...topicNode.representativePrompts.map((p, i) => `${i + 1}. ${p}`),
@@ -180,8 +243,10 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
     ),
   ].join("\n");
 
+  // Cluster-blob examples (enriched tool patterns) — suppressed when retrieval
+  // context replaces them.
   let toolPatterns = "";
-  if (enrichedSequences && enrichedSequences.length > 0) {
+  if (!useRetrieval && enrichedSequences && enrichedSequences.length > 0) {
     const top5 = enrichedSequences.slice(0, 5);
     const flows = top5.map((seq) => {
       const flow = seq.sequence.map((s) => s.toolName).join(" → ");
@@ -292,19 +357,30 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
     `7. Output ONLY the markdown content. No code fences wrapping the output, no explanations before or after.`,
   ];
 
-  // Rules 1-7 are fixed; additional conditional rules are numbered sequentially.
-  let nextRule = 8;
-  if (graphContext && graphContext.connectedTopics.some(ct => ct.edgeType === "workflow-continuation")) {
-    instructionLines.push(`${nextRule++}. If workflow-continuation connections exist, include \`requires\` and/or \`next\` fields in the YAML frontmatter listing the connected topic labels.`);
-  }
-
-  // --- Human-flagged moments section (issue #24) ---
   const humanFeedbackSection = buildHumanFeedbackSection(humanFeedback ?? []);
-  if (humanFeedbackSection) {
-    instructionLines.push(
-      `${nextRule}. Prioritize the **Human-Flagged Moments** above: replicate the \`reusable\` approaches and explicitly steer away from the \`anti-pattern\` ones. These are direct human signals and outrank heuristic inferences.`,
-    );
-  }
+
+  // Rules 1-7 are fixed; the conditional rules below are collected as bodies,
+  // filtered for the ones that apply, and numbered in a single pass so adding
+  // or reordering a rule never desyncs the counter.
+  const conditionalRuleBodies: (string | false | undefined)[] = [
+    // Workflow-continuation frontmatter (graph context).
+    (graphContext && graphContext.connectedTopics.some((ct) => ct.edgeType === "workflow-continuation")) &&
+      "If workflow-continuation connections exist, include `requires` and/or `next` fields in the YAML frontmatter listing the connected topic labels.",
+    // Retrieved relevant moments rule (issue #33). Redirect the "examples"
+    // expectation (rules 3/4 say "representative prompts") to the
+    // precisely-scoped retrieved moments that replaced the blob.
+    useRetrieval &&
+      'Ground "When to Use" triggers and "Workflow" steps in the **Retrieved Relevant Moments** above: these are the most relevant turns to this skill. Draw concrete examples from them instead of the generic patterns.',
+    // Human-flagged moments rule (issue #24).
+    humanFeedbackSection &&
+      "Prioritize the **Human-Flagged Moments** above: replicate the `reusable` approaches and explicitly steer away from the `anti-pattern` ones. These are direct human signals and outrank heuristic inferences.",
+  ];
+  const FIRST_CONDITIONAL_RULE = 8; // rules 1-7 are fixed above
+  conditionalRuleBodies
+    .filter((body): body is string => Boolean(body))
+    .forEach((body, idx) => {
+      instructionLines.push(`${FIRST_CONDITIONAL_RULE + idx}. ${body}`);
+    });
 
   const instruction = instructionLines.join("\n");
 
@@ -329,7 +405,7 @@ export function buildSynthesisPrompt(body: SynthesisRequest): string {
     facetsSection = lines.join("\n");
   }
 
-  const parts = [topicInfo, prompts, toolSig, toolPatterns, graphPosition, connectedTopicsSection, facetsSection, humanFeedbackSection, reference, instruction].filter(Boolean);
+  const parts = [topicInfo, prompts, retrievedMomentsSection, toolSig, toolPatterns, graphPosition, connectedTopicsSection, facetsSection, humanFeedbackSection, reference, instruction].filter(Boolean);
   return parts.join("\n\n");
 }
 

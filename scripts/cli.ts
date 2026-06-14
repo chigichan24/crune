@@ -24,7 +24,16 @@ import {
   synthesizeWithClaude,
   stripSynthesisPreamble,
   type TopicNode as SynthTopicNode,
+  type RetrievedChunk,
 } from "./skill-synthesizer.js";
+import {
+  DEFAULT_EMBED_MODEL,
+  type Retriever,
+} from "./knowledge-graph-builder.js";
+import {
+  buildSynthesisRetriever,
+  retrieveContextForCandidate,
+} from "./knowledge-graph/synthesis-retriever.js";
 import { evaluateSkill } from "./skill-evaluator.js";
 
 // ─── CLI argument parsing ─────────────────────────────────────────
@@ -40,6 +49,7 @@ interface CliArgs {
   json: boolean;
   skipEval: boolean;
   evalModel?: string;
+  retrievalContext: boolean;
 }
 
 export function parseCliArgs(argv: string[]): CliArgs {
@@ -54,6 +64,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let json = false;
   let skipEval = false;
   let evalModel: string | undefined;
+  let retrievalContext = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--sessions-dir" && args[i + 1]) {
@@ -77,13 +88,15 @@ export function parseCliArgs(argv: string[]): CliArgs {
       skipEval = true;
     } else if (args[i] === "--eval-model" && args[i + 1]) {
       evalModel = args[++i];
+    } else if (args[i] === "--retrieval-context") {
+      retrievalContext = true;
     } else if (args[i] === "--help" || args[i] === "-h") {
       printUsage();
       process.exit(0);
     }
   }
 
-  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, preview, json, skipEval, evalModel };
+  return { sessionsDir, outputDir, count, model, skipSynthesis, dryRun, preview, json, skipEval, evalModel, retrievalContext };
 }
 
 function printUsage(): void {
@@ -103,6 +116,8 @@ Options:
                          stdout (see README "JSON output schema")
   --skip-eval            Skip skill evaluation pipeline (structural + rubric)
   --eval-model <model>   Claude model for rubric scoring (defaults to --model)
+  --retrieval-context    Enrich synthesis with hybrid-retrieved relevant moments
+                         instead of the cluster-blob examples (opt-in, issue #33)
   -h, --help             Show this help message`);
 }
 
@@ -320,6 +335,24 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // Retrieval-enriched synthesis context (issue #33, opt-in). Build a hybrid
+  // retriever over the analyzed sessions via the shared helper (reuses an
+  // on-disk index if one exists under outputDir, else embeds fresh). On any
+  // failure the retriever stays undefined and synthesis falls back to the blob.
+  let retriever: Retriever | undefined;
+  if (config.retrievalContext && !config.skipSynthesis) {
+    console.error("\nBuilding retrieval context (issue #33)...");
+    const built = await buildSynthesisRetriever(
+      sessionInputs,
+      path.join(config.outputDir, "embeddings"),
+      DEFAULT_EMBED_MODEL
+    );
+    if (built) {
+      retriever = built.retriever;
+      console.error(`  Retrieval strategy: ${built.strategy}, ${retriever.size} chunks`);
+    }
+  }
+
   // Synthesize skills. In preview mode we emit markdown to stdout instead of
   // writing files, but evaluation still runs by default.
   const writeToDisk = !config.preview;
@@ -344,10 +377,27 @@ async function main(): Promise<void> {
         (seq) => seq.sessionIds.some((sid) => topicSessionSet.has(sid))
       );
 
+      // Retrieve top-k relevant moments for this candidate (issue #33). On any
+      // failure `retrieveContextForCandidate` returns undefined so the
+      // cluster-blob examples are used.
+      let retrievedContext: RetrievedChunk[] | undefined;
+      if (retriever) {
+        retrievedContext = await retrieveContextForCandidate(retriever, candidate, {
+          label: topic.label,
+          keywords: topic.keywords,
+        });
+      }
+
+      // Surface the chosen context strategy so a human can A/B blob vs retrieval.
+      console.error(
+        `    Context strategy: ${retrievedContext ? `retrieval (${retrievedContext.length} moments)` : "cluster blob"}`
+      );
+
       const prompt = buildSynthesisPrompt({
         skillCandidate: candidate,
         topicNode: topic as unknown as SynthTopicNode,
         enrichedSequences: relatedSequences,
+        retrievedContext,
       });
 
       const result = await synthesizeWithClaude(prompt, {

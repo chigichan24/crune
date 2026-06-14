@@ -136,6 +136,16 @@ Flags on `analyze-sessions` (default **OFF**, promotion gated on the PoC):
 
 PoC harness: `npx tsx scripts/rag-poc.ts` (measures footprint / throughput / latency + A/B; `--fake` forces the no-network backend).
 
+### Retrieval-enriched synthesis (issue #33, opt-in)
+
+`--retrieval-context` (on both `analyze-sessions` and the `crune` CLI, default **OFF** for clean A/B) swaps the loosely-related cluster-blob "examples" slot (Representative User Prompts + Enriched Tool Patterns) for a **Retrieved Relevant Moments** section built from the hybrid retriever's top-k turn snippets (k=8). The rest of the synthesis prompt (frontmatter ask, topic info, graph position, human-flagged moments, heuristic reference) is unchanged.
+
+- **Query** per candidate: `buildRetrievalQuery(candidate, topic)` = topic label + top keywords + truncated heuristic `skillMarkdown` (600 chars). Pure/testable.
+- **Section**: `buildRetrievedMomentsSection(chunks)` renders `[sessionId#turnIndex] (score: N.NNN) snippet`; `SynthesisRequest.retrievedContext?: RetrievedChunk[]` threads it into `buildSynthesisPrompt`. When present and non-empty, the blob slots are suppressed and a numbered task rule grounds the skill in the retrieved moments.
+- **Retriever wiring** (`buildSynthesisRetriever`, shared via `scripts/knowledge-graph/synthesis-retriever.ts`): reuse the EmbedResult from `--embed` if it ran this run → else read an on-disk index at `public/data/embeddings/` → else embed fresh in-memory via `createTransformersBackend` + `embedSessions`. Index reuse is gated on per-chunk `sessionId`/`turnIndex` identity (`chunksAlign`), not just count, so a stale index can't ground synthesis on unrelated sessions. BM25 text is re-derived with `extractChunks` (same chunk order as the index). On any failure (no index, no backend) it logs a warning and returns `null` so synthesis FALLS BACK to the cluster blob (never crashes).
+- **Preview A/B** (`crune --preview --retrieval-context`): the synthesis loop prints `Context strategy: retrieval (N moments)` vs `cluster blob` per candidate so a human can compare side by side.
+- **Measurement**: the #20 evaluator path (`overallScore`) is unchanged — run `--retrieval-context` vs without and compare `SkillCandidate.evaluation.overallScore` to A/B synthesis quality. Tests inject a fake `EmbeddingBackend`/in-memory retriever; the `claude -p` call stays behind the `synthesizeWithClaude` seam (never invoked in tests).
+
 ### Semantic Search UI (issue #34)
 
 The chunk index powers a UI semantic search and a "似た瞬間" bookmark affordance, served by the skill-server.
