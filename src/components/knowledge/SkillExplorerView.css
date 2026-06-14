@@ -1,0 +1,135 @@
+.fse-root {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.fse-filters {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.fse-filters-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fse-filters-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.fse-reset {
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--accent);
+}
+
+.fse-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fse-filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fse-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fse-chip {
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 9px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.fse-chip--on {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.fse-search {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.fse-results {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fse-results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  padding-bottom: 4px;
+}
+
+.fse-results-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.fse-state {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.fse-state--error {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .fse-root {
+    grid-template-columns: 1fr;
+  }
+}
