@@ -15,7 +15,18 @@ interface Props {
   sessionId: string | null
   /** Turn to open at (e.g. a semantic-search hit). Defaults to the top. */
   initialTurnIndex?: number
+  /** Open a different session/turn (e.g. a "似た瞬間" result). */
+  onNavigate?: (sessionId: string, turnIndex: number) => void
   onClose: () => void
+}
+
+/** Build the semantic-search query text for a turn (mirrors the index input). */
+function turnQueryText(turn: ConversationTurn): string {
+  return [turn.userPrompt ?? '', ...(turn.assistantTexts ?? [])]
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500)
 }
 
 type DotColor = 'blue' | 'orange' | 'green'
@@ -63,7 +74,7 @@ function summarizeTurn(turn: ConversationTurn): string {
   return lines.filter(Boolean).join('\n')
 }
 
-export function SessionPlayback({ sessionId, initialTurnIndex, onClose }: Props) {
+export function SessionPlayback({ sessionId, initialTurnIndex, onNavigate, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
   const feedback = useSessionFeedback(sessionId)
   const [activeTurnIndex, setActiveTurnIndex] = useState(initialTurnIndex ?? 0)
@@ -490,7 +501,18 @@ export function SessionPlayback({ sessionId, initialTurnIndex, onClose }: Props)
                 ) : (
                   <>
                     <div className="playback-turn-feedback">
-                      <FeedbackCluster turnId={turn.turnIndex} />
+                      <FeedbackCluster
+                        turnId={turn.turnIndex}
+                        similar={
+                          onNavigate && sessionId
+                            ? {
+                                queryText: turnQueryText(turn),
+                                sessionId,
+                                onSelect: onNavigate,
+                              }
+                            : undefined
+                        }
+                      />
                     </div>
                     <PlaybackStep
                       turn={turn}

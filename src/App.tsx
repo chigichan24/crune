@@ -100,6 +100,7 @@ function App() {
           <SessionPlayback
             sessionId={selectedSessionId}
             initialTurnIndex={initialTurnIndex}
+            onNavigate={handleSessionSelect}
             onClose={handleDrawerClose}
           />
         )}

@@ -1,12 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFeedback } from './FeedbackContext'
 import { TagInput } from './TagInput'
+import { SimilarMoments } from './SimilarMoments'
 import './FeedbackCluster.css'
 
 interface Props {
   turnId: number
   /** Tool-call block id (toolUseId) for block-level feedback; absent = turn-level. */
   blockId?: string
+  /**
+   * Context enabling the "似た瞬間" affordance on a bookmarked turn. Provided at
+   * the turn level (omitted for block-level clusters), so the button only
+   * appears where a meaningful query text + navigation target exist.
+   */
+  similar?: {
+    /** Text of this turn, used as the semantic-search query. */
+    queryText: string
+    sessionId: string
+    /** Open the playback drawer at a similar moment (sessionId, turnIndex). */
+    onSelect: (sessionId: string, turnIndex: number) => void
+  }
 }
 
 /**
@@ -15,7 +28,7 @@ interface Props {
  * popovers using the expand/collapse convention (useState + conditional
  * render, no animation).
  */
-export function FeedbackCluster({ turnId, blockId }: Props) {
+export function FeedbackCluster({ turnId, blockId, similar }: Props) {
   const fb = useFeedback()
   const entry = fb.getEntry(turnId, blockId)
   const bookmarked = entry?.bookmarked ?? false
@@ -24,6 +37,12 @@ export function FeedbackCluster({ turnId, blockId }: Props) {
 
   const [tagsOpen, setTagsOpen] = useState(false)
   const [noteOpen, setNoteOpen] = useState(false)
+  const [similarOpen, setSimilarOpen] = useState(false)
+
+  // The "似た瞬間" affordance only makes sense for a bookmarked turn with a
+  // navigable query context. Collapse it if the bookmark is removed.
+  const canShowSimilar = bookmarked && !!similar?.queryText.trim()
+  if (similarOpen && !canShowSimilar) setSimilarOpen(false)
 
   const stop = (e: React.MouseEvent) => e.stopPropagation()
 
@@ -57,6 +76,17 @@ export function FeedbackCluster({ turnId, blockId }: Props) {
         {'📝'}
       </button>
 
+      {canShowSimilar && (
+        <button
+          className={`feedback-btn ${similarOpen ? 'feedback-btn--open' : ''}`}
+          title="このブックマークに似た瞬間"
+          aria-expanded={similarOpen}
+          onClick={() => setSimilarOpen(o => !o)}
+        >
+          {'🔍'}
+        </button>
+      )}
+
       {tagsOpen && (
         <div className="feedback-popover">
           <TagInput
@@ -73,6 +103,17 @@ export function FeedbackCluster({ turnId, blockId }: Props) {
           <NoteEditor
             value={note}
             onCommit={next => fb.setNote(turnId, blockId, next)}
+          />
+        </div>
+      )}
+
+      {similarOpen && canShowSimilar && similar && (
+        <div className="feedback-popover">
+          <SimilarMoments
+            queryText={similar.queryText}
+            currentSessionId={similar.sessionId}
+            currentTurnIndex={turnId}
+            onSelect={similar.onSelect}
           />
         </div>
       )}
