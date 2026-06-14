@@ -40,9 +40,11 @@ export function FeedbackCluster({ turnId, blockId, similar }: Props) {
   const [similarOpen, setSimilarOpen] = useState(false)
 
   // The "似た瞬間" affordance only makes sense for a bookmarked turn with a
-  // navigable query context. Collapse it if the bookmark is removed.
+  // navigable query context. Both the toggle button and the popover below are
+  // gated on `canShowSimilar`, so a stale `similarOpen === true` after the
+  // bookmark is removed renders nothing — no need to reconcile the flag during
+  // render (which would be a setState-in-render).
   const canShowSimilar = bookmarked && !!similar?.queryText.trim()
-  if (similarOpen && !canShowSimilar) setSimilarOpen(false)
 
   const stop = (e: React.MouseEvent) => e.stopPropagation()
 
