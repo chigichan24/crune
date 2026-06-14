@@ -10,7 +10,7 @@ import {
   type RetrieveRequestBody,
 } from "./retrieve-service.js";
 import { createTransformersBackend } from "./knowledge-graph/embedding-io.js";
-import type { Retriever } from "./knowledge-graph/retriever.js";
+import type { RetrieverResolution } from "./retrieve-service.js";
 
 // ---------- Constants ----------
 
@@ -157,7 +157,7 @@ async function handlePostFeedback(req: IncomingMessage, res: ServerResponse) {
 async function handleRetrieve(
   req: IncomingMessage,
   res: ServerResponse,
-  retrieverProvider: () => Retriever | null,
+  retrieverProvider: () => RetrieverResolution,
 ) {
   let body: RetrieveRequestBody;
   try {
@@ -182,10 +182,13 @@ const isDirectRun = process.argv[1]?.endsWith("skill-server.ts") || process.argv
 if (isDirectRun) {
   const PORT = 3456;
 
-  // Build the embedding backend + index lazily ONCE and reuse across requests.
-  // The Transformers.js model is materialized on the first retrieval call, not
-  // at startup, so the server boots fast even without an index present.
-  const retrieverProvider = createLazyRetrieverProvider(createTransformersBackend());
+  // Build the embedding backend + index lazily and reuse across requests. The
+  // backend is constructed from the loaded index's own model/dim (passing the
+  // factory, not a prebuilt backend) so query vectors match the chunk vectors
+  // even when the index was embedded with `--embed-model`. The Transformers.js
+  // model is materialized on the first retrieval call, not at startup, so the
+  // server boots fast even without an index present.
+  const retrieverProvider = createLazyRetrieverProvider(createTransformersBackend);
 
   const server = createServer(async (req, res) => {
     if (req.method === "OPTIONS") {
