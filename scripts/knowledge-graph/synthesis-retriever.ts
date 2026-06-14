@@ -22,6 +22,7 @@ import {
   createRetrieverFromIndex,
   DEFAULT_EMBED_DIM,
   type SessionInput,
+  type ChunkMeta,
   type EmbedResult,
   type Retriever,
   type RetrievedChunk,
@@ -31,6 +32,29 @@ import type { SkillCandidate } from "./types.js";
 
 /** Top-k turn snippets retrieved per candidate for synthesis context (#33). */
 export const RETRIEVAL_TOP_K = 8;
+
+/**
+ * Verify that an existing int8 index lines up with freshly re-extracted chunks
+ * by IDENTITY, not just count. A stale index with a coincidentally-equal chunk
+ * count would otherwise be zipped with fresh `chunkTexts` from unrelated
+ * sessions — grounding synthesis on the wrong conversation moments.
+ *
+ * We compare `sessionId`/`turnIndex` for every chunk (extractChunks is the
+ * canonical, deterministic order shared with the embedder), so any drift —
+ * inserted, removed, or reordered sessions — is caught.
+ */
+function chunksAlign(indexed: ChunkMeta[], extracted: ChunkMeta[]): boolean {
+  if (indexed.length !== extracted.length) return false;
+  for (let i = 0; i < indexed.length; i++) {
+    if (
+      indexed[i].sessionId !== extracted[i].sessionId ||
+      indexed[i].turnIndex !== extracted[i].turnIndex
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * Build a hybrid retriever for retrieval-enriched synthesis (issue #33).
@@ -43,8 +67,11 @@ export const RETRIEVAL_TOP_K = 8;
  *
  * BM25 needs the full chunk text, which the persisted meta.json does NOT store
  * (only the short snippet). We re-derive it with `extractChunks` (same order as
- * the index) and zip by index. Returns `null` (never throws) when no index and
- * no usable backend are available, so the caller falls back to the cluster blob.
+ * the index) and zip by index — but only after confirming the index chunks
+ * align with the re-extracted chunks by IDENTITY (not just count). On mismatch
+ * we fall through to a fresh embed rather than grounding on stale data. Returns
+ * `null` (never throws) when no index and no usable backend are available, so
+ * the caller falls back to the cluster blob.
  */
 export async function buildSynthesisRetriever(
   sessionInputs: SessionInput[],
@@ -65,7 +92,7 @@ export async function buildSynthesisRetriever(
     const backend = createTransformersBackend(model, DEFAULT_EMBED_DIM);
 
     // (1) Reuse embeddings computed earlier this run.
-    if (precomputed && precomputed.count === extracted.length) {
+    if (precomputed && chunksAlign(precomputed.chunks, extracted)) {
       const retriever = createRetrieverFromIndex({
         chunks: precomputed.chunks,
         matrix: precomputed.matrix,
@@ -76,10 +103,13 @@ export async function buildSynthesisRetriever(
       return { retriever, strategy: "reused --embed index (this run)" };
     }
 
-    // (2) Reuse an index persisted by a prior run.
+    // (2) Reuse an index persisted by a prior run — only when its chunks align
+    // with the re-extracted chunks by identity (stale-index guard). A matching
+    // count alone is not enough: a coincidentally-equal count would zip stale
+    // vectors with fresh, unrelated chunkTexts.
     if (fs.existsSync(path.join(embeddingsDir, "meta.json"))) {
       const { meta, matrix } = readEmbeddingIndex(embeddingsDir);
-      if (meta.count === extracted.length) {
+      if (chunksAlign(meta.chunks, extracted)) {
         const retriever = createRetrieverFromIndex({
           chunks: meta.chunks,
           matrix,
@@ -90,7 +120,7 @@ export async function buildSynthesisRetriever(
         return { retriever, strategy: `on-disk index (${embeddingsDir})` };
       }
       console.error(
-        `[crune] Retrieval context: on-disk index count ${meta.count} != ${extracted.length} chunks, re-embedding`
+        `[crune] Retrieval context: on-disk index (${meta.count} chunks) does not align with ${extracted.length} re-extracted chunks, re-embedding`
       );
     }
 
