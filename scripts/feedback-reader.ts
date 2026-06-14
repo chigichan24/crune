@@ -93,19 +93,27 @@ export function mergeFeedbackBlob(
 }
 
 /**
- * Read `public/data/feedback.json` into a Map. Returns an empty Map when the
- * file is absent or unreadable (offline / no feedback yet — never throws).
+ * Read a feedback file into a normalized blob. Returns {} when the file is
+ * absent or unreadable (offline / no feedback yet — never throws). Single source
+ * of the tolerant-read contract, shared by the pipeline and the skill-server.
+ */
+export function readFeedbackBlob(filePath: string): FeedbackBlob {
+  if (!existsSync(filePath)) return {};
+  try {
+    return normalizeFeedbackBlob(JSON.parse(readFileSync(filePath, "utf-8")));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Read `public/data/feedback.json` into a Map (the pipeline's preferred shape).
+ * Thin wrapper over {@link readFeedbackBlob}.
  */
 export function readFeedbackFile(
   filePath: string,
 ): Map<string, FeedbackEntry[]> {
-  if (!existsSync(filePath)) return new Map();
-  try {
-    const blob = normalizeFeedbackBlob(JSON.parse(readFileSync(filePath, "utf-8")));
-    return new Map(Object.entries(blob));
-  } catch {
-    return new Map();
-  }
+  return new Map(Object.entries(readFeedbackBlob(filePath)));
 }
 
 // ─── Turn selection helpers ──────────────────────────────────────────────────

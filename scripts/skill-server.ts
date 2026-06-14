@@ -1,9 +1,9 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { buildSynthesisPrompt, synthesizeWithClaude, stripSynthesisPreamble } from "./skill-synthesizer.js";
 import type { SynthesisRequest, SynthesisResponse } from "./skill-synthesizer.js";
-import { mergeFeedbackBlob, normalizeFeedbackBlob, type FeedbackBlob } from "./feedback-reader.js";
+import { mergeFeedbackBlob, readFeedbackBlob, type FeedbackBlob } from "./feedback-reader.js";
 
 // ---------- Constants ----------
 
@@ -78,17 +78,6 @@ async function handleSynthesize(req: IncomingMessage, res: ServerResponse) {
   sendJson(res, 200, { success: true, synthesizedMarkdown: stripSynthesisPreamble(result.stdout) } satisfies SynthesisResponse);
 }
 
-/** Read the on-disk feedback map (normalized), or {} if absent/corrupt. */
-function readFeedbackFile(filePath = FEEDBACK_FILE): FeedbackBlob {
-  if (!existsSync(filePath)) return {};
-  try {
-    const raw = readFileSync(filePath, "utf-8");
-    return normalizeFeedbackBlob(JSON.parse(raw));
-  } catch {
-    return {};
-  }
-}
-
 /** Atomically replace `filePath` with `blob` (write temp, then rename) so a
  *  crash mid-write cannot leave a truncated, unparseable feedback.json. */
 function writeFeedbackFile(blob: FeedbackBlob, filePath = FEEDBACK_FILE): void {
@@ -111,7 +100,7 @@ export function mergeFeedbackPost(
   filePath = FEEDBACK_FILE,
 ): Promise<void> {
   const task = feedbackChain.then(() => {
-    const merged = mergeFeedbackBlob(readFeedbackFile(filePath), sessionId, entries);
+    const merged = mergeFeedbackBlob(readFeedbackBlob(filePath), sessionId, entries);
     writeFeedbackFile(merged, filePath);
   });
   feedbackChain = task.catch(() => {});
@@ -119,7 +108,7 @@ export function mergeFeedbackPost(
 }
 
 function handleGetFeedback(res: ServerResponse) {
-  sendJson(res, 200, readFeedbackFile());
+  sendJson(res, 200, readFeedbackBlob(FEEDBACK_FILE));
 }
 
 /**
