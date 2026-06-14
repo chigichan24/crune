@@ -8,6 +8,7 @@ export default defineConfig({
     proxy: {
       '/api/synthesize': 'http://localhost:3456',
       '/api/feedback': 'http://localhost:3456',
+      '/api/retrieve': 'http://localhost:3456',
     },
   },
 })

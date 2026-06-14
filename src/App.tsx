@@ -12,16 +12,27 @@ type ViewMode = 'overview' | 'knowledge'
 function App() {
   const [activeTab, setActiveTab] = useState<ViewMode>('overview')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  // Turn to open the playback drawer at (e.g. from a semantic-search result).
+  // Undefined means "open at the top" (existing session-list behaviour).
+  const [initialTurnIndex, setInitialTurnIndex] = useState<number | undefined>(undefined)
+  // Monotonic navigation nonce. Clicking the SAME result twice sets identical
+  // sessionId+turnIndex, so React bails and SessionPlayback's scroll effect
+  // (keyed on those) never refires. Bumping the nonce on every navigation makes
+  // repeat navigation re-trigger the deep-link scroll.
+  const [navNonce, setNavNonce] = useState(0)
   const { data: indexData, loading: indexLoading, error: indexError } = useSessionIndex()
   const { data: overviewData, loading: overviewLoading, error: overviewError } = useSessionOverview()
   const [showHelp, setShowHelp] = useState(false)
 
-  const handleSessionSelect = (sessionId: string) => {
+  const handleSessionSelect = (sessionId: string, turnIndex?: number) => {
     setSelectedSessionId(sessionId)
+    setInitialTurnIndex(turnIndex)
+    setNavNonce((n) => n + 1)
   }
 
   const handleDrawerClose = () => {
     setSelectedSessionId(null)
+    setInitialTurnIndex(undefined)
   }
 
   const drawerOpen = selectedSessionId !== null
@@ -94,6 +105,9 @@ function App() {
         {drawerOpen && (
           <SessionPlayback
             sessionId={selectedSessionId}
+            initialTurnIndex={initialTurnIndex}
+            navNonce={navNonce}
+            onNavigate={handleSessionSelect}
             onClose={handleDrawerClose}
           />
         )}

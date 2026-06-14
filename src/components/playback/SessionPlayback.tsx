@@ -13,7 +13,26 @@ import './SessionPlayback.css'
 
 interface Props {
   sessionId: string | null
+  /** Turn to open at (e.g. a semantic-search hit). Defaults to the top. */
+  initialTurnIndex?: number
+  /**
+   * Monotonic navigation nonce from App. Re-navigating to the SAME
+   * sessionId+turnIndex bumps it so the deep-link reset/scroll effects refire
+   * (React would otherwise bail on identical props and skip the re-scroll).
+   */
+  navNonce?: number
+  /** Open a different session/turn (e.g. a "似た瞬間" result). */
+  onNavigate?: (sessionId: string, turnIndex: number) => void
   onClose: () => void
+}
+
+/** Build the semantic-search query text for a turn (mirrors the index input). */
+function turnQueryText(turn: ConversationTurn): string {
+  return [turn.userPrompt ?? '', ...(turn.assistantTexts ?? [])]
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500)
 }
 
 type DotColor = 'blue' | 'orange' | 'green'
@@ -61,10 +80,10 @@ function summarizeTurn(turn: ConversationTurn): string {
   return lines.filter(Boolean).join('\n')
 }
 
-export function SessionPlayback({ sessionId, onClose }: Props) {
+export function SessionPlayback({ sessionId, initialTurnIndex, navNonce, onNavigate, onClose }: Props) {
   const { data, loading, error } = useSessionDetail(sessionId)
   const feedback = useSessionFeedback(sessionId)
-  const [activeTurnIndex, setActiveTurnIndex] = useState(0)
+  const [activeTurnIndex, setActiveTurnIndex] = useState(initialTurnIndex ?? 0)
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const contentRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<HTMLDivElement>(null)
@@ -76,12 +95,29 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
   const [turnMeasurements, setTurnMeasurements] = useState<Array<{ top: number; height: number }>>([])
   const [scrollInfo, setScrollInfo] = useState({ top: 0, height: 1, client: 1 })
 
-  // Reset active turn when session changes
+  // Reset active turn when session changes. Honor a deep-link target turn (e.g.
+  // a semantic-search hit) so the drawer opens focused on the matched turn.
+  // `navNonce` is in the deps so re-navigating to the SAME sessionId+turn still
+  // resets (React would otherwise bail on identical props).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on prop change is intentional
-    setActiveTurnIndex(0)
+    setActiveTurnIndex(initialTurnIndex ?? 0)
     setFilter({ text: '', toolName: '', keyTurnsOnly: false })
-  }, [sessionId])
+  }, [sessionId, initialTurnIndex, navNonce])
+
+  // After the session detail loads, scroll the deep-link target turn into view.
+  // (The active-turn scroll effect only fires on index *changes*; a fresh load
+  // that lands on the same index needs an explicit scroll once refs exist.)
+  // Deps include `sessionId` (consistency with the reset effect above) and
+  // `navNonce` so repeat navigation to the same target re-scrolls.
+  useEffect(() => {
+    if (!data || initialTurnIndex == null) return
+    const raf = requestAnimationFrame(() => {
+      const el = turnRefs.current.get(initialTurnIndex)
+      if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [data, sessionId, initialTurnIndex, navNonce])
 
   // Measure turn positions after render
   useEffect(() => {
@@ -475,7 +511,18 @@ export function SessionPlayback({ sessionId, onClose }: Props) {
                 ) : (
                   <>
                     <div className="playback-turn-feedback">
-                      <FeedbackCluster turnId={turn.turnIndex} />
+                      <FeedbackCluster
+                        turnId={turn.turnIndex}
+                        similar={
+                          onNavigate && sessionId
+                            ? {
+                                queryText: turnQueryText(turn),
+                                sessionId,
+                                onSelect: onNavigate,
+                              }
+                            : undefined
+                        }
+                      />
                     </div>
                     <PlaybackStep
                       turn={turn}

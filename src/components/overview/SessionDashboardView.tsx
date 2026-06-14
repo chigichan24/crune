@@ -8,12 +8,13 @@ import { SessionToolTrends } from './SessionToolTrends'
 import { SessionDurationDistribution } from './SessionDurationDistribution'
 import { SessionTopFiles } from './SessionTopFiles'
 import { SessionList } from './SessionList'
+import { SemanticSearch } from '../search/SemanticSearch'
 import './SessionDashboardView.css'
 
 interface Props {
   sessions: SessionSummary[]
   projects: ProjectSummary[]
-  onSessionSelect: (sessionId: string) => void
+  onSessionSelect: (sessionId: string, turnIndex?: number) => void
 }
 
 export function SessionDashboardView({ sessions, projects, onSessionSelect }: Props) {
@@ -33,6 +34,14 @@ export function SessionDashboardView({ sessions, projects, onSessionSelect }: Pr
 
   return (
     <div className="session-dashboard">
+      <div className="dashboard-section dashboard-section--full">
+        <h2 className="dashboard-section-title">セマンティック検索</h2>
+        <SemanticSearch
+          sessions={sessions}
+          onResultSelect={onSessionSelect}
+        />
+      </div>
+
       <SessionOverviewCards sessions={sessions} projects={projects} />
 
       <div className="dashboard-section dashboard-section--full">
