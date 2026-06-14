@@ -15,6 +15,7 @@ import {
   buildSemanticKnowledgeGraph,
   readFacetsDir,
   aggregateFacetsForTopic,
+  buildTopicFacetsSummary,
   type SessionInput,
   type SemanticKnowledgeGraph,
   embedSessions,
@@ -525,6 +526,23 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     humanSignalMap: synthesisConfig.useHumanFeedback ? humanSignalMap : undefined,
   });
 
+  // Read facets once and reuse for both topic-level filtering metadata (#73)
+  // and the synthesis loop below.
+  const facetsMap = synthesisConfig.facetsDir
+    ? readFacetsDir(synthesisConfig.facetsDir)
+    : undefined;
+
+  // Attach a compact facets summary to each topic so the UI can filter by goal
+  // category without recomputing the aggregation (issue #73).
+  if (facetsMap && facetsMap.size > 0) {
+    for (const node of knowledgeGraph.nodes) {
+      const summary = buildTopicFacetsSummary(
+        aggregateFacetsForTopic(node.sessionIds, facetsMap)
+      );
+      if (summary) node.facetsSummary = summary;
+    }
+  }
+
   // Top files
   const topFiles = [...fileEditCounts.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -620,11 +638,8 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     if (total > 0) {
       console.error(`[crune] Synthesizing top ${total} skill candidates${synthesisConfig.model ? ` (model: ${synthesisConfig.model})` : ""}...`);
     }
-    // Read facets once for the whole loop — the result is loop-invariant, so
-    // re-reading/re-parsing the directory per candidate was wasted I/O.
-    const facetsForSynthesis = synthesisConfig.facetsDir
-      ? readFacetsDir(synthesisConfig.facetsDir)
-      : undefined;
+    // Reuse the facets read above (loop-invariant) for synthesis enrichment.
+    const facetsForSynthesis = facetsMap;
     for (let i = 0; i < topCandidates.length; i++) {
       const candidate = topCandidates[i];
       const topic = knowledgeGraph.nodes.find((n) => n.id === candidate.topicId);

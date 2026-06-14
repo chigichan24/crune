@@ -67,6 +67,7 @@ export {
   normalizeGoalCategory,
   helpfulnessToScore,
   aggregateFacetsForTopic,
+  buildTopicFacetsSummary,
   // RAG embedding pipeline + retriever (issue #32)
   extractChunks,
   embedSessions,

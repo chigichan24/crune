@@ -4,7 +4,9 @@ import {
   normalizeGoalCategory,
   helpfulnessToScore,
   aggregateFacetsForTopic,
+  buildTopicFacetsSummary,
 } from "../knowledge-graph-builder.js";
+import type { FacetsInsightsSummary } from "../knowledge-graph/types.js";
 
 describe("normalizeGoalCategory", () => {
   it("maps feature_implementation → feature", () => {
@@ -218,5 +220,36 @@ describe("aggregateFacetsForTopic", () => {
     expect(result!.successRate).toBe(0.75);
     // helpfulnessScore: (1.0 + 0.5) / 2 = 0.75
     expect(result!.helpfulnessScore).toBe(0.75);
+  });
+});
+
+describe("buildTopicFacetsSummary", () => {
+  const agg = (over: Partial<FacetsInsightsSummary> = {}): FacetsInsightsSummary => ({
+    aggregatedGoals: ["ship the feature"],
+    normalizedCategories: ["feature", "testing"],
+    successRate: 0.8,
+    helpfulnessScore: 0.6,
+    commonFrictions: [],
+    frictionDetails: [],
+    ...over,
+  });
+
+  it("maps the compact subset for the UI", () => {
+    expect(buildTopicFacetsSummary(agg())).toEqual({
+      categories: ["feature", "testing"],
+      goals: ["ship the feature"],
+      successRate: 0.8,
+      helpfulness: 0.6,
+    });
+  });
+
+  it("returns undefined for no aggregation (no facets matched)", () => {
+    expect(buildTopicFacetsSummary(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined when there is no category or goal signal", () => {
+    expect(
+      buildTopicFacetsSummary(agg({ normalizedCategories: [], aggregatedGoals: [] }))
+    ).toBeUndefined();
   });
 });

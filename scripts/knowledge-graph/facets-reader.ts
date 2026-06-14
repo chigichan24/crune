@@ -5,7 +5,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import type { FacetsData, FacetsInsightsSummary } from "./types.js";
+import type { FacetsData, FacetsInsightsSummary, TopicFacetsSummary } from "./types.js";
 
 // ─── Goal category normalization ────────────────────────────────────────────
 
@@ -216,5 +216,25 @@ export function aggregateFacetsForTopic(
     helpfulnessScore,
     commonFrictions,
     frictionDetails,
+  };
+}
+
+/**
+ * Map an aggregated facets summary to the compact per-topic shape persisted on
+ * a TopicNode for UI filtering (issue #73). Returns undefined when there is no
+ * category/goal signal (so the field stays absent rather than empty).
+ */
+export function buildTopicFacetsSummary(
+  agg: FacetsInsightsSummary | undefined
+): TopicFacetsSummary | undefined {
+  if (!agg) return undefined;
+  if (agg.normalizedCategories.length === 0 && agg.aggregatedGoals.length === 0) {
+    return undefined;
+  }
+  return {
+    categories: agg.normalizedCategories,
+    goals: agg.aggregatedGoals,
+    successRate: agg.successRate,
+    helpfulness: agg.helpfulnessScore,
   };
 }
