@@ -93,9 +93,11 @@ export function createRetriever(inputs: RetrieverInputs): Retriever {
   const { chunks, texts, denseVectors, backend } = inputs;
 
   // Precompute BM25 over chunk texts once. Document ids are chunk indices.
+  // minDf=1: each chunk is one short turn, so a distinctive term in a single
+  // turn must stay in the vocabulary or the sparse channel goes inert.
   const docs = new Map<string, string[]>();
   texts.forEach((t, i) => docs.set(String(i), tokenize(t)));
-  const bm25 = buildBm25(docs);
+  const bm25 = buildBm25(docs, 1);
 
   async function retrieve(
     query: string,
