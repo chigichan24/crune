@@ -128,8 +128,11 @@ function tagSetHas(entry: FeedbackEntry, tag: string): boolean {
 
 /**
  * Select human-flagged turns for the given sessions. A turn qualifies when it is
- * bookmarked OR carries a meaningful tag (`reusable` / `anti-pattern`). Returns
- * one FlaggedTurn per qualifying entry, ordered by sessionId then turnId.
+ * bookmarked OR carries a meaningful tag (`reusable` / `anti-pattern`). Multiple
+ * (block-level) entries on the same turn are collapsed into a single FlaggedTurn
+ * — unioning tags/flags and keeping the first non-empty note — so a turn flagged
+ * on several tool-call blocks is not listed (or weighted) more than once. Result
+ * is ordered by sessionId then turnId.
  */
 export function selectFlaggedTurns(
   feedback: Map<string, FeedbackEntry[]>,
@@ -139,19 +142,31 @@ export function selectFlaggedTurns(
   for (const sessionId of sessionIds) {
     const entries = feedback.get(sessionId);
     if (!entries) continue;
+    const byTurn = new Map<number, FlaggedTurn>();
     for (const entry of entries) {
       const reusable = tagSetHas(entry, REUSABLE_TAG);
       const antiPattern = tagSetHas(entry, ANTI_PATTERN_TAG);
       if (!entry.bookmarked && !reusable && !antiPattern) continue;
-      flagged.push({
-        sessionId,
-        turnId: entry.turnId,
-        note: entry.note,
-        tags: entry.tags,
-        reusable,
-        antiPattern,
-      });
+      const existing = byTurn.get(entry.turnId);
+      if (existing) {
+        existing.reusable = existing.reusable || reusable;
+        existing.antiPattern = existing.antiPattern || antiPattern;
+        for (const t of entry.tags) {
+          if (!existing.tags.includes(t)) existing.tags.push(t);
+        }
+        if (!existing.note.trim() && entry.note.trim()) existing.note = entry.note;
+      } else {
+        byTurn.set(entry.turnId, {
+          sessionId,
+          turnId: entry.turnId,
+          note: entry.note,
+          tags: [...entry.tags],
+          reusable,
+          antiPattern,
+        });
+      }
     }
+    flagged.push(...byTurn.values());
   }
   flagged.sort((a, b) =>
     a.sessionId === b.sessionId ? a.turnId - b.turnId : a.sessionId < b.sessionId ? -1 : 1,
@@ -207,13 +222,17 @@ export function computeSessionFeedbackCounts(
   const counts = new Map<string, SessionFeedbackCounts>();
   for (const [sessionId, entries] of feedback) {
     let bookmarked = false;
-    let reusableCount = 0;
-    let antiPatternCount = 0;
+    // Count distinct flagged TURNS, not entries: block-level feedback can carry
+    // several entries for one turn, which must not inflate the human signal.
+    const reusableTurns = new Set<number>();
+    const antiPatternTurns = new Set<number>();
     for (const entry of entries) {
       if (entry.bookmarked) bookmarked = true;
-      if (tagSetHas(entry, REUSABLE_TAG)) reusableCount++;
-      if (tagSetHas(entry, ANTI_PATTERN_TAG)) antiPatternCount++;
+      if (tagSetHas(entry, REUSABLE_TAG)) reusableTurns.add(entry.turnId);
+      if (tagSetHas(entry, ANTI_PATTERN_TAG)) antiPatternTurns.add(entry.turnId);
     }
+    const reusableCount = reusableTurns.size;
+    const antiPatternCount = antiPatternTurns.size;
     if (bookmarked || reusableCount > 0 || antiPatternCount > 0) {
       counts.set(sessionId, { bookmarked, reusableCount, antiPatternCount });
     }
