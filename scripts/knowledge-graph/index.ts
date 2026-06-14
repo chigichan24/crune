@@ -84,7 +84,7 @@ export { computeReusabilityScores, computeSessionHumanSignal, aggregateHumanSign
 export type { SessionHumanSignal } from "./reusability.js";
 export { abstractToolCall, extractEnrichedSequences } from "./tool-pattern.js";
 export { generateSkillMarkdown, generateHookJson, generateSkillCandidates } from "./skill-generator.js";
-export { readFacetsDir, normalizeGoalCategory, helpfulnessToScore, aggregateFacetsForTopic, buildTopicFacetsSummary } from "./facets-reader.js";
+export { readFacetsDir, normalizeGoalCategory, helpfulnessToScore, aggregateFacetsForTopic, buildTopicFacetsSummary, attachFacetsSummaries } from "./facets-reader.js";
 
 // ─── RAG embedding pipeline + retriever (issue #32) ──────────────────────────
 export {

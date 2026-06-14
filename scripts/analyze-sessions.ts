@@ -15,7 +15,7 @@ import {
   buildSemanticKnowledgeGraph,
   readFacetsDir,
   aggregateFacetsForTopic,
-  buildTopicFacetsSummary,
+  attachFacetsSummaries,
   type SessionInput,
   type SemanticKnowledgeGraph,
   embedSessions,
@@ -526,22 +526,15 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     humanSignalMap: synthesisConfig.useHumanFeedback ? humanSignalMap : undefined,
   });
 
-  // Read facets once and reuse for both topic-level filtering metadata (#73)
-  // and the synthesis loop below.
+  // Read facets once here in generateOverview and reuse for both topic-level
+  // filtering metadata (#73) and the synthesis loop below.
   const facetsMap = synthesisConfig.facetsDir
     ? readFacetsDir(synthesisConfig.facetsDir)
     : undefined;
 
   // Attach a compact facets summary to each topic so the UI can filter by goal
   // category without recomputing the aggregation (issue #73).
-  if (facetsMap && facetsMap.size > 0) {
-    for (const node of knowledgeGraph.nodes) {
-      const summary = buildTopicFacetsSummary(
-        aggregateFacetsForTopic(node.sessionIds, facetsMap)
-      );
-      if (summary) node.facetsSummary = summary;
-    }
-  }
+  attachFacetsSummaries(knowledgeGraph.nodes, facetsMap);
 
   // Top files
   const topFiles = [...fileEditCounts.entries()]
@@ -638,8 +631,7 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
     if (total > 0) {
       console.error(`[crune] Synthesizing top ${total} skill candidates${synthesisConfig.model ? ` (model: ${synthesisConfig.model})` : ""}...`);
     }
-    // Reuse the facets read above (loop-invariant) for synthesis enrichment.
-    const facetsForSynthesis = facetsMap;
+    // facetsMap was read once above (loop-invariant) — reuse it directly.
     for (let i = 0; i < topCandidates.length; i++) {
       const candidate = topCandidates[i];
       const topic = knowledgeGraph.nodes.find((n) => n.id === candidate.topicId);
@@ -653,8 +645,8 @@ async function generateOverview(sessions: ParsedSession[], synthesisConfig: Synt
       console.error(`[crune]   [${i + 1}/${total}] ${topic.label}...`);
 
       // Build facets insights for this topic if facets data is available
-      const facetsInsights = facetsForSynthesis
-        ? aggregateFacetsForTopic(topic.sessionIds, facetsForSynthesis)
+      const facetsInsights = facetsMap
+        ? aggregateFacetsForTopic(topic.sessionIds, facetsMap)
         : undefined;
 
       // Human-flagged moments for this topic (issue #24), only when enabled.

@@ -5,7 +5,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import type { FacetsData, FacetsInsightsSummary, TopicFacetsSummary } from "./types.js";
+import type { FacetsData, FacetsInsightsSummary, TopicFacetsSummary, TopicNode } from "./types.js";
 
 // ─── Goal category normalization ────────────────────────────────────────────
 
@@ -237,4 +237,22 @@ export function buildTopicFacetsSummary(
     successRate: agg.successRate,
     helpfulness: agg.helpfulnessScore,
   };
+}
+
+/**
+ * Attach a {@link TopicFacetsSummary} to every topic that has facets signal
+ * (issue #73). No-op when no facets data is available. Mutates the nodes in
+ * place; extracted from analyze-sessions so the attachment is unit-testable.
+ */
+export function attachFacetsSummaries(
+  nodes: TopicNode[],
+  facetsMap: Map<string, FacetsData> | undefined
+): void {
+  if (!facetsMap || facetsMap.size === 0) return;
+  for (const node of nodes) {
+    const summary = buildTopicFacetsSummary(
+      aggregateFacetsForTopic(node.sessionIds, facetsMap)
+    );
+    if (summary) node.facetsSummary = summary;
+  }
 }

@@ -69,6 +69,7 @@ export {
   helpfulnessToScore,
   aggregateFacetsForTopic,
   buildTopicFacetsSummary,
+  attachFacetsSummaries,
   // RAG embedding pipeline + retriever (issue #32)
   extractChunks,
   embedSessions,
