@@ -136,6 +136,16 @@ Flags on `analyze-sessions` (default **OFF**, promotion gated on the PoC):
 
 PoC harness: `npx tsx scripts/rag-poc.ts` (measures footprint / throughput / latency + A/B; `--fake` forces the no-network backend).
 
+### Semantic Search UI (issue #34)
+
+The chunk index powers a UI semantic search and a "似た瞬間" bookmark affordance, served by the skill-server.
+
+- **Endpoint**: `POST /api/retrieve` (`scripts/skill-server.ts`, proxied by `vite.config.ts`). Body `{ query, k? }` → `{ results: RetrievedChunk[] }`. The embedding backend + on-disk index are built lazily ONCE (`createLazyRetrieverProvider`, `scripts/retrieve-service.ts`) and reused across requests — the model is never reloaded per request. A missing index returns a **400** `{error:'no embedding index; run analyze-sessions --embed'}` (not 500) so the UI degrades gracefully. The pure `handleRetrieveRequest` is unit-tested with an injected fake retriever.
+- **BM25 fallback**: `meta.json` persists only the short snippet, so BM25 runs over snippets as a documented degraded fallback; dense cosine (alpha=0.6) remains the primary signal.
+- **Hook**: `src/hooks/useSemanticSearch.ts` — debounced (`SEARCH_DEBOUNCE_MS`) best-effort POST; pure `mapRetrieveResponse` is tested without a DOM.
+- **UI**: `SemanticSearch` bar on the Overview dashboard (`src/components/search/`); clicking a result opens the playback drawer at the matched turn via an optional `turnIndex` on `onSessionSelect` (App → `SessionPlayback initialTurnIndex`). On a bookmarked turn, `FeedbackCluster` shows a 🔍 "このブックマークに似た瞬間" popover (`SimilarMoments`) that searches with the turn's text and deep-links similar moments.
+- **Static-deploy note**: in-browser retrieval (loading the ~93KB quantized index + a WASM embedder) is a viable follow-up; the current PoC routes through the local server.
+
 ## Session Summarization
 
 セッション一覧の `firstUserPrompt` フィールドは、facetsデータが利用可能な場合は `/insights` の `brief_summary`（LLM生成の要約）で置き換えられる。facetsがないセッションは従来通り最初のユーザープロンプトを表示する。
